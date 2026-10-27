@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    /* Toàn bộ spacing/kích cỡ Tailwind tính theo rem (dựa vào font-size gốc), nên hạ xuống 90% cho
+       hiệu ứng tương đương "zoom 90%" của trình duyệt — web không có quyền tự đặt zoom thật của
+       trình duyệt, đây là cách tương đương không vỡ layout (khác với transform: scale()). */
+    font-size: 90%;
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
+  body {
+    @apply bg-paper font-sans text-gray-900;
+  }
+
+  ::selection {
+    @apply bg-brand-200 text-brand-950;
+  }
+}
