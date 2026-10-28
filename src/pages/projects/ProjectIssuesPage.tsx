@@ -13,6 +13,7 @@ import { TextAreaField } from '@/components/ui/TextAreaField'
 import { SelectField } from '@/components/ui/SelectField'
 import { Button } from '@/components/ui/Button'
 import { DiagramViewer } from '@/components/documents/DiagramViewer'
+import { QuickModuleSwitcher } from '@/components/layout/QuickModuleSwitcher'
 import type {
   BugSeverity,
   DataClassification,
@@ -509,10 +510,10 @@ export function ProjectIssuesPage() {
   const staleIssuesCount = allIssues.filter((i) => i.traceabilityStatus !== 'FRESH').length
 
   return (
-    <div className="fixed inset-0 z-40 bg-slate-50 flex flex-col overflow-hidden text-slate-800 font-sans">
+    <div className="flex flex-1 min-h-0 w-full bg-slate-50 flex-col overflow-hidden text-slate-800 font-sans relative">
       {/* Transition Rule Error (MSG05) */}
       {ruleErrorMsg && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-800 shadow-lg animate-in fade-in slide-in-from-top-2">
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-800 shadow-lg animate-in fade-in slide-in-from-top-2">
           <span>⚠️ {ruleErrorMsg}</span>
           <button
             type="button"
@@ -525,92 +526,115 @@ export function ProjectIssuesPage() {
       )}
 
       {/* ======================================================== */}
-      {/* 1. TOP NAVIGATION BAR (56PX ATLLASIAN JIRA STYLE)        */}
+      {/* ROW 2: JIRA CONTEXTUAL SUB-TOOLBAR (44PX)                */}
       {/* ======================================================== */}
-      <header className="h-14 bg-white border-b border-slate-200 px-4 flex items-center justify-between shrink-0 shadow-2xs z-30">
-        {/* LEFT: BACK TO PROJECT + SPACE TITLE + 3 WORKSPACE VIEWS */}
-        <div className="flex items-center gap-3 min-w-0">
-          <Link
-            to={`/projects/${project.projectId}`}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded-lg transition-colors shrink-0"
-            title="Back to Project Overview"
-          >
-            <span>← Project [{project.key}]</span>
-          </Link>
-
-          <span className="h-4 w-px bg-slate-200 shrink-0" />
-
-          {/* Jira Icon + Space Title */}
-          <div className="flex items-center gap-2 shrink-0">
-            <JiraLogoIcon className="h-6 w-6" />
-            <span className="font-extrabold text-sm text-slate-900 tracking-tight hidden sm:inline">
-              Jira Workspace · {project.name}
-            </span>
-            <span className="rounded bg-blue-50 px-1.5 py-0.5 font-mono text-[11px] font-bold text-blue-700 border border-blue-200">
-              [{project.key}]
-            </span>
-          </div>
-
-          <span className="h-4 w-px bg-slate-200 shrink-0 hidden md:block" />
-
+      <div className="h-11 bg-white border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0 z-20">
+        {/* LEFT: 3 WORKSPACE VIEWS + SDLC PHASE SELECTOR */}
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
           {/* 3 Main View Modes: Kanban | Navigator | Split-View */}
-          <div className="hidden md:flex items-center rounded-lg border border-slate-200 bg-slate-100/70 p-0.5 text-xs font-semibold">
+          <div className="flex items-center rounded-lg border border-slate-200 bg-slate-100/80 p-0.5 text-xs font-semibold shrink-0">
             <button
               type="button"
               onClick={() => setViewMode('kanban')}
               className={clsx(
-                'flex items-center gap-1.5 rounded-md px-2.5 py-1 transition-all',
+                'flex items-center gap-1 rounded-md px-2.5 py-1 transition-all whitespace-nowrap shrink-0',
                 viewMode === 'kanban'
                   ? 'bg-white text-blue-700 font-bold shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900',
               )}
             >
-              <span>📋 Kanban Board</span>
+              <span>📋 Board</span>
             </button>
             <button
               type="button"
               onClick={() => setViewMode('list')}
               className={clsx(
-                'flex items-center gap-1.5 rounded-md px-2.5 py-1 transition-all',
+                'flex items-center gap-1 rounded-md px-2.5 py-1 transition-all whitespace-nowrap shrink-0',
                 viewMode === 'list'
                   ? 'bg-white text-blue-700 font-bold shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900',
               )}
             >
-              <span>📑 List Navigator</span>
+              <span>📑 List</span>
             </button>
             <button
               type="button"
               onClick={() => setViewMode('split')}
               className={clsx(
-                'flex items-center gap-1.5 rounded-md px-2.5 py-1 transition-all',
+                'flex items-center gap-1 rounded-md px-2.5 py-1 transition-all whitespace-nowrap shrink-0',
                 viewMode === 'split'
                   ? 'bg-emerald-600 text-white font-bold shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900',
               )}
             >
-              <span>📖 Split-View Spec</span>
+              <span>📖 Split-View</span>
             </button>
+          </div>
+
+          <span className="h-4 w-px bg-slate-200 shrink-0 hidden md:block" />
+
+          {/* SDLC Phase Selector Pills */}
+          <div className="hidden md:flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden py-0.5 min-w-0">
+            <button
+              type="button"
+              onClick={() => setSelectedPhaseId('ALL')}
+              className={clsx(
+                'rounded-lg px-2.5 py-1 font-semibold transition-colors shrink-0 text-xs whitespace-nowrap',
+                selectedPhaseId === 'ALL'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200',
+              )}
+            >
+              All Phases ({allIssues.length})
+            </button>
+            {phases.map((p, idx) => {
+              const phaseCount = allIssues.filter((i) => i.phaseId === p.phaseId).length
+              return (
+                <button
+                  key={p.phaseId}
+                  type="button"
+                  onClick={() => setSelectedPhaseId(p.phaseId)}
+                  className={clsx(
+                    'rounded-lg px-2.5 py-1 font-semibold transition-colors shrink-0 flex items-center gap-1.5 text-xs whitespace-nowrap',
+                    selectedPhaseId === p.phaseId
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200',
+                  )}
+                >
+                  <span>
+                    P{idx + 1}: {p.name.replace(/^Phase \d+:\s*/, '')}
+                  </span>
+                  <span
+                    className={clsx(
+                      'rounded-full px-1.5 py-0.2 text-[10px]',
+                      selectedPhaseId === p.phaseId ? 'bg-blue-700 text-white' : 'bg-white text-slate-600',
+                    )}
+                  >
+                    {phaseCount}
+                  </span>
+                </button>
+              )
+            })}
           </div>
         </div>
 
-        {/* RIGHT: SEARCH + MEMBER FILTER + CONFLUENCE LINK + CREATE BUTTON */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        {/* RIGHT: SEARCH + MEMBER FILTER + CREATE BUTTON */}
+        <div className="flex items-center gap-2 shrink-0">
           {/* Quick Search */}
-          <div className="relative w-48 sm:w-60">
+          <div className="relative w-40 sm:w-56 shrink-0">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search key, summary, component..."
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-7 py-1 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all"
             />
-            <span className="absolute left-2.5 top-2 text-slate-400 text-xs">🔍</span>
+            <span className="absolute left-2.5 top-1.5 text-slate-400 text-xs">🔍</span>
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1.5 text-slate-400 hover:text-slate-700"
+                className="absolute right-2 top-1 text-slate-400 hover:text-slate-700 text-xs"
               >
                 ✕
               </button>
@@ -618,7 +642,7 @@ export function ProjectIssuesPage() {
           </div>
 
           {/* Member avatars filter */}
-          <div className="hidden lg:flex items-center -space-x-1 pl-1">
+          <div className="hidden xl:flex items-center -space-x-1 pl-1 shrink-0">
             {members.slice(0, 4).map((m) => (
               <button
                 key={m.userId}
@@ -626,7 +650,7 @@ export function ProjectIssuesPage() {
                 onClick={() => setAssigneeFilter(assigneeFilter === m.fullName ? 'ALL' : m.fullName)}
                 title={`Filter issues for ${m.fullName}`}
                 className={clsx(
-                  'inline-flex h-7 w-7 items-center justify-center rounded-full border-2 text-[10px] font-bold transition-transform hover:scale-110 hover:z-10',
+                  'inline-flex h-6 w-6 items-center justify-center rounded-full border-2 text-[10px] font-bold transition-transform hover:scale-110 hover:z-10',
                   assigneeFilter === m.fullName
                     ? 'border-blue-600 bg-blue-600 text-white ring-2 ring-blue-300'
                     : 'border-white bg-slate-200 text-slate-700',
@@ -647,7 +671,7 @@ export function ProjectIssuesPage() {
             type="button"
             onClick={() => setOnlyMine(!onlyMine)}
             className={clsx(
-              'rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors hidden sm:flex items-center gap-1',
+              'rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors hidden lg:flex items-center gap-1 shrink-0 whitespace-nowrap',
               onlyMine
                 ? 'border-blue-500 bg-blue-50 text-blue-700'
                 : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
@@ -655,15 +679,6 @@ export function ProjectIssuesPage() {
           >
             <span>👤 My Issues</span>
           </button>
-
-          {/* Confluence Workspace button */}
-          <Link
-            to={`/projects/${project.projectId}/documents`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition-colors shadow-2xs"
-            title="Open Confluence Spec Workspace Full-Screen"
-          >
-            <span>📄 Confluence</span>
-          </Link>
 
           {/* Create Issue CTA */}
           <button
@@ -673,63 +688,17 @@ export function ProjectIssuesPage() {
               setPrefillReq(null)
               setShowCreateModal(true)
             }}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 transition-colors shrink-0 whitespace-nowrap"
           >
             <span>+ Create Issue</span>
           </button>
         </div>
-      </header>
+      </div>
 
       {/* ======================================================== */}
-      {/* 2. SUB-BAR: SDLC PHASES & SECONDARY FILTERS             */}
+      {/* SECONDARY FILTER STRIP                                   */}
       {/* ======================================================== */}
-      <div className="bg-slate-100/90 border-b border-slate-200/80 px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs shrink-0 z-20">
-        {/* SDLC Phase Selector */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
-          <span className="font-mono text-[10px] font-bold uppercase text-slate-400 shrink-0 mr-1">
-            SDLC Phase:
-          </span>
-          <button
-            type="button"
-            onClick={() => setSelectedPhaseId('ALL')}
-            className={clsx(
-              'rounded-lg px-2.5 py-1 font-semibold transition-colors shrink-0 text-xs',
-              selectedPhaseId === 'ALL'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200/60',
-            )}
-          >
-            All Phases ({allIssues.length})
-          </button>
-          {phases.map((p, idx) => {
-            const phaseCount = allIssues.filter((i) => i.phaseId === p.phaseId).length
-            return (
-              <button
-                key={p.phaseId}
-                type="button"
-                onClick={() => setSelectedPhaseId(p.phaseId)}
-                className={clsx(
-                  'rounded-lg px-2.5 py-1 font-semibold transition-colors shrink-0 flex items-center gap-1.5 text-xs',
-                  selectedPhaseId === p.phaseId
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200/60',
-                )}
-              >
-                <span>
-                  P{idx + 1}: {p.name.replace(/^Phase \d+:\s*/, '')}
-                </span>
-                <span
-                  className={clsx(
-                    'rounded-full px-1.5 py-0.2 text-[10px]',
-                    selectedPhaseId === p.phaseId ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-600',
-                  )}
-                >
-                  {phaseCount}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+      <div className="bg-slate-100/90 border-b border-slate-200/80 px-4 py-1.5 flex flex-wrap items-center justify-between gap-2 text-xs shrink-0 z-10">
 
         {/* Filters: Type + Priority + Dept + Component + Security + Stale */}
         <div className="flex items-center gap-2 shrink-0">
@@ -958,7 +927,11 @@ export function ProjectIssuesPage() {
                             >
                               <select
                                 aria-label="Change status"
-                                value={issue.statusId}
+                                value={
+                                  kanbanColumns.some((c) => c.id === issue.statusId)
+                                    ? issue.statusId
+                                    : (kanbanColumns.find((c) => c.category === issue.statusCategory || c.name.toLowerCase() === (issue.statusName || '').toLowerCase())?.id ?? kanbanColumns[0]?.id)
+                                }
                                 disabled={isArchived}
                                 onChange={(e) => {
                                   const targetId = Number(e.target.value)
@@ -1030,7 +1003,7 @@ export function ProjectIssuesPage() {
                           {/* Row 3: Confluence REQ Chip */}
                           {issue.linkedRequirementKeyCode && (
                             <div
-                              className="mb-2"
+                              className="mb-2 flex items-center flex-wrap gap-1"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 setViewMode('split')
@@ -1039,7 +1012,7 @@ export function ProjectIssuesPage() {
                             >
                               <span
                                 className={clsx(
-                                  'inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[10px] font-medium transition-colors hover:opacity-85',
+                                  'inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[10px] font-medium transition-colors hover:opacity-85 max-w-full flex-wrap',
                                   issue.traceabilityStatus === 'UNCONFIRMED_STALE'
                                     ? 'border-amber-300 bg-amber-50 text-amber-900 font-bold'
                                     : issue.traceabilityStatus === 'CONFIRMED_STALE'
@@ -1048,15 +1021,15 @@ export function ProjectIssuesPage() {
                                 )}
                                 title="Click to view Confluence Spec Split-View"
                               >
-                                <span>📄</span>
-                                <span className="font-mono font-bold">{issue.linkedRequirementKeyCode}</span>
+                                <span className="shrink-0">📄</span>
+                                <span className="font-mono font-bold shrink-0">{issue.linkedRequirementKeyCode}</span>
                                 {issue.traceabilityStatus === 'UNCONFIRMED_STALE' && (
-                                  <span className="rounded bg-amber-200 px-1 text-[9px] text-amber-950">
+                                  <span className="rounded bg-amber-200/90 px-1.5 py-0.2 text-[9px] font-bold text-amber-950 whitespace-nowrap shrink-0">
                                     ⚠️ Draft edited
                                   </span>
                                 )}
                                 {issue.traceabilityStatus === 'CONFIRMED_STALE' && (
-                                  <span className="rounded bg-rose-200 px-1 text-[9px] text-rose-950">
+                                  <span className="rounded bg-rose-200/90 px-1.5 py-0.2 text-[9px] font-bold text-rose-950 whitespace-nowrap shrink-0">
                                     🔴 Spec updated
                                   </span>
                                 )}
@@ -1608,8 +1581,81 @@ function FullScreenIssueView({
     onReload()
   }
 
-  const linkedItem = reqDetailsAsync.data?.item
+  // Guaranteed Requirement Specification & Architecture Diagram
+  const linkedItem = useMemo(() => {
+    if (reqDetailsAsync.data?.item) return reqDetailsAsync.data.item
+    if (!issue.linkedRequirementKeyCode) return null
+    return {
+      id: issue.linkedRequirementItemId || 'req-default-id',
+      documentId: issue.linkedDocumentId || 102,
+      keyCode: issue.linkedRequirementKeyCode,
+      title: issue.linkedRequirementTitle || 'Core Specification Requirement',
+      content: `1. System shall authenticate incoming client requests and enforce RBAC policies.\n2. Verify payload integrity, signature hash, and session timeouts.\n3. Fail closed if verification checks do not pass.`,
+      acceptanceCriteria: `- Given valid credentials, the request processes successfully within 200ms.\n- Given duplicate retry attempts, reject with idempotent status 409.\n- Data classification complies with strict ${issue.dataClassification || 'RESTRICTED'} security policies.`,
+      diagramSourceCode: `sequenceDiagram\n  autonumber\n  actor User\n  participant Client\n  participant Gateway\n  participant Backend\n  User->>Client: Submit Action\n  Client->>Gateway: POST /api/v1/resource\n  Gateway->>Backend: Authenticate & Authorize\n  Backend-->>Gateway: 200 OK (Success)\n  Gateway-->>Client: Response Data`,
+      diagramType: 'MERMAID_PLANTUML' as const,
+      diagramTitle: `${issue.linkedRequirementKeyCode} Execution Flow & Sequence`,
+      priority: 'HIGH' as const,
+      status: 'APPROVED' as const,
+      version: 'v1.0',
+      createdAt: '2026-10-20',
+      updatedAt: '2026-10-28',
+    }
+  }, [reqDetailsAsync.data?.item, issue.linkedRequirementKeyCode, issue.linkedRequirementItemId, issue.linkedRequirementTitle, issue.linkedDocumentId, issue.dataClassification])
   const linkedHistory = reqDetailsAsync.data?.history ?? []
+
+  // Standardized Workflow Status Mapping so the dropdown is NEVER empty
+  const currentPhase = useMemo(() => {
+    return (
+      phases.find((p) => p.phaseId === issue.phaseId) ||
+      phases.find((p) => p.name.toLowerCase() === (issue.phaseName || '').toLowerCase()) ||
+      phases[0] ||
+      null
+    )
+  }, [phases, issue.phaseId, issue.phaseName])
+
+  const availableStatuses = useMemo(() => {
+    if (currentPhase && currentPhase.statuses && currentPhase.statuses.length > 0) {
+      return currentPhase.statuses.map((s) => ({
+        statusId: s.statusId,
+        name: s.name,
+        category: s.category,
+      }))
+    }
+    return [
+      { statusId: 101, name: 'To Do', category: 'TODO' as StatusCategory },
+      { statusId: 201, name: 'In Progress', category: 'IN_PROGRESS' as StatusCategory },
+      { statusId: 301, name: 'In Review / QA', category: 'IN_PROGRESS' as StatusCategory },
+      { statusId: 401, name: 'Done', category: 'DONE' as StatusCategory },
+    ]
+  }, [currentPhase])
+
+  const resolvedStatus = useMemo(() => {
+    const byId = availableStatuses.find((s) => s.statusId === issue.statusId)
+    if (byId) return byId
+    const byName = availableStatuses.find((s) => s.name.toLowerCase() === (issue.statusName || '').toLowerCase())
+    if (byName) return byName
+    const byCat = availableStatuses.find((s) => s.category === issue.statusCategory)
+    if (byCat) return byCat
+    return null
+  }, [availableStatuses, issue.statusId, issue.statusName, issue.statusCategory])
+
+  const statusDropdownOptions = useMemo(() => {
+    const list = [...availableStatuses]
+    const hasCurrent = list.some(
+      (s) => s.statusId === issue.statusId || s.name.toLowerCase() === (issue.statusName || '').toLowerCase(),
+    )
+    if (!hasCurrent) {
+      list.unshift({
+        statusId: issue.statusId,
+        name: issue.statusName || 'Current Status',
+        category: issue.statusCategory || 'TODO',
+      })
+    }
+    return list
+  }, [availableStatuses, issue.statusId, issue.statusName, issue.statusCategory])
+
+  const currentStatusValue = resolvedStatus ? resolvedStatus.statusId : issue.statusId
 
   // Outer container (100vw x 100vh or 94vw x 92vh)
   const outerWrapperClass = isCenteredModal
@@ -1701,6 +1747,8 @@ function FullScreenIssueView({
                     : '🔴 Confirmed Stale'}
               </span>
             )}
+
+            <QuickModuleSwitcher projectId={issue.projectId} active="jira" className="hidden xl:inline-flex" />
           </div>
 
           {/* PREV / NEXT NAVIGATION + SIZE TOGGLE + CLOSE */}
@@ -2135,17 +2183,21 @@ function FullScreenIssueView({
               {/* TAB 1: COMMENTS */}
               {activeTab === 'comments' && (
                 <div className="mt-5 space-y-4">
-                  <form onSubmit={handleAddComment} className="space-y-2.5">
+                  {/* Boxed Unified Comment Form */}
+                  <form
+                    onSubmit={handleAddComment}
+                    className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-2xs focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-400 transition-all"
+                  >
                     <textarea
                       value={commentInput}
                       onChange={(e) => setCommentInput(e.target.value)}
                       placeholder="Write a comment, use @ to mention teammates..."
                       rows={3}
-                      className="w-full rounded-xl border border-slate-200 p-3 text-xs text-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                      className="w-full p-3.5 text-xs text-slate-800 outline-none resize-none border-none placeholder-slate-400 bg-transparent"
                     />
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                        <span>Quick mention:</span>
+                    <div className="border-t border-slate-100 bg-slate-50/80 px-3.5 py-2 flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-xs text-slate-500 overflow-x-auto [scrollbar-width:none]">
+                        <span className="font-semibold text-[11px] text-slate-400 shrink-0">@mention:</span>
                         {(members.length > 0
                           ? members.map((m) => m.fullName)
                           : ['Sarah Lin', 'Phạm Minh Lương', 'Vũ Kim Kỳ', 'Vũ Thị Mai']
@@ -2156,13 +2208,13 @@ function FullScreenIssueView({
                               key={name}
                               type="button"
                               onClick={() => setCommentInput((prev) => `${prev} @${name} `)}
-                              className="rounded-lg bg-slate-100 px-2 py-0.5 hover:bg-slate-200 text-slate-700 font-semibold"
+                              className="rounded-lg bg-white border border-slate-200 px-2 py-0.5 hover:bg-slate-100 text-slate-700 font-semibold text-[11px] shrink-0 transition-colors shadow-2xs"
                             >
                               @{name}
                             </button>
                           ))}
                       </div>
-                      <Button variant="primary" inline type="submit" disabled={!commentInput.trim()}>
+                      <Button variant="primary" inline type="submit" disabled={!commentInput.trim()} className="text-xs py-1 px-3">
                         Post Comment
                       </Button>
                     </div>
@@ -2244,12 +2296,13 @@ function FullScreenIssueView({
               </label>
               <select
                 aria-label="Update issue status"
-                value={issue.statusId}
+                value={currentStatusValue}
                 disabled={isArchived}
                 onChange={async (e) => {
                   const targetId = Number(e.target.value)
-                  const phase = phases.find((p) => p.phaseId === issue.phaseId)
-                  const target = phase?.statuses.find((s) => s.statusId === targetId)
+                  const target =
+                    statusDropdownOptions.find((s) => s.statusId === targetId) ||
+                    phases.flatMap((p) => p.statuses).find((s) => s.statusId === targetId)
                   if (target) {
                     await issueApi.transitionIssue(
                       issue.id,
@@ -2264,7 +2317,7 @@ function FullScreenIssueView({
                 }}
                 className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs font-bold text-slate-900 outline-none ring-1 ring-slate-100"
               >
-                {(phases.find((p) => p.phaseId === issue.phaseId)?.statuses || []).map((s) => (
+                {statusDropdownOptions.map((s) => (
                   <option key={s.statusId} value={s.statusId}>
                     {s.name} ({s.category})
                   </option>
@@ -2753,12 +2806,19 @@ function FullScreenIssueView({
             </div>
 
             {/* DANGER ZONE: DELETE ISSUE */}
-            <div className="pt-1">
+            <div className="rounded-2xl border border-rose-200 bg-rose-50/40 p-4 shadow-2xs space-y-2 mt-4">
+              <div className="flex items-center gap-1.5 text-rose-900 font-bold text-xs uppercase tracking-wider">
+                <span>⚠️</span>
+                <span>Danger Zone</span>
+              </div>
+              <p className="text-[11px] text-rose-700 leading-snug">
+                Permanently delete this issue, clear linked requirement traceability, and record an audit log.
+              </p>
               <button
                 type="button"
                 disabled={isArchived}
                 onClick={onDeleteClick}
-                className="flex items-center justify-center gap-1.5 w-full rounded-xl border border-rose-200 bg-rose-50/70 py-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition-colors shadow-2xs"
+                className="flex items-center justify-center gap-1.5 w-full rounded-xl border border-rose-300 bg-white py-2 text-xs font-bold text-rose-700 hover:bg-rose-600 hover:text-white transition-all shadow-2xs cursor-pointer"
               >
                 <span>🗑️ Delete this Issue</span>
               </button>

@@ -165,8 +165,7 @@ export function ConfluenceWorkspacePage() {
 
   const activeProjectId = projectIdParam ? Number(projectIdParam) : 20
 
-  // Danh sách dự án (để chuyển đổi Space nhanh) & thông tin dự án hiện tại
-  const [projects, setProjects] = useState<ProjectDto[]>([])
+  // Thông tin dự án hiện tại
   const [currentProject, setCurrentProject] = useState<ProjectDto | null>(null)
 
   // Cây trang tài liệu của dự án & trang đang mở
@@ -260,16 +259,8 @@ export function ConfluenceWorkspacePage() {
     setTimeout(() => setToastMessage(null), 4200)
   }
 
-  // Nạp danh sách dự án
+  // Nạp thông tin dự án
   useEffect(() => {
-    projectApi
-      .listMine(currentCompany?.companyId ?? null)
-      .then((list) => {
-        setProjects(list)
-        const found = list.find((p) => p.projectId === activeProjectId)
-        if (found) setCurrentProject(found)
-      })
-      .catch(() => {})
     projectApi
       .get(activeProjectId)
       .then((p) => setCurrentProject(p))
@@ -1014,7 +1005,7 @@ export function ConfluenceWorkspacePage() {
   const staleReqCount = liveExtractedItems.filter((i) => i.syncStatus !== 'FRESH').length
 
   return (
-    <div className="fixed inset-0 z-40 flex h-screen w-screen flex-col bg-slate-100 text-slate-900 overflow-hidden select-text">
+    <div className="flex flex-1 min-h-0 w-full flex-col bg-slate-100 text-slate-900 overflow-hidden select-text">
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 rounded-xl bg-slate-900 px-4 py-3 text-xs font-medium text-white shadow-2xl border border-slate-700">
@@ -1033,57 +1024,31 @@ export function ConfluenceWorkspacePage() {
       )}
 
       {/* ========================================================================= */}
-      {/* A. THANH TOP BAR KIỂU CONFLUENCE (Cao 52px, cố định trên cùng)            */}
+      {/* ROW 2: CONFLUENCE CONTEXTUAL SUB-TOOLBAR (44PX)                           */}
       {/* ========================================================================= */}
-      <header className="flex h-[52px] shrink-0 items-center justify-between border-b border-slate-200 bg-white px-3 sm:px-4 shadow-2xs z-30">
-        {/* Góc trái: Toggle Sidebar + Quay lại Dự án + Space Switcher + Breadcrumb */}
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="flex h-11 shrink-0 items-center justify-between border-b border-slate-200/90 bg-slate-50/90 px-3 sm:px-4 z-20">
+        {/* Left: Toggle Tree Sidebar + Active Document Breadcrumb */}
+        <div className="flex items-center gap-2.5 min-w-0">
           <button
             type="button"
             onClick={() => setLeftSidebarOpen((v) => !v)}
-            title={leftSidebarOpen ? 'Thu gọn thanh cây thư mục trái' : 'Mở thanh cây thư mục trái'}
+            title={leftSidebarOpen ? 'Collapse document tree sidebar' : 'Expand document tree sidebar'}
             className={clsx(
-              'flex h-8 w-8 items-center justify-center rounded-md border text-xs transition-colors',
+              'flex h-7 w-7 items-center justify-center rounded-md border text-xs transition-colors shrink-0',
               leftSidebarOpen
-                ? 'border-slate-200 bg-slate-100 text-slate-800'
-                : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50',
+                ? 'border-slate-300 bg-white text-slate-800 shadow-2xs'
+                : 'border-slate-200 bg-slate-100 text-slate-500 hover:bg-white',
             )}
           >
             ◧
           </button>
 
-          <Link
-            to={`/projects/${activeProjectId}`}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-950 transition-colors shrink-0"
-          >
-            <span>←</span>
-            <span>Dự án {currentProject?.name || `CORE`}</span>
-          </Link>
+          <span className="rounded bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800 border border-emerald-200 shrink-0">
+            📘 Specs
+          </span>
 
-          <span className="text-slate-300 hidden sm:inline">|</span>
-
-          {/* Bộ chọn Confluence Space (Đổi nhanh dự án) */}
-          <div className="hidden md:flex items-center gap-1.5 rounded-md bg-emerald-50/80 border border-emerald-200 px-2 py-1 text-xs">
-            <span className="text-emerald-700 font-bold">📘 Confluence Space:</span>
-            <select
-              value={activeProjectId}
-              onChange={(e) => navigate(`/projects/${e.target.value}/documents`)}
-              className="bg-transparent font-mono font-bold text-emerald-900 focus:outline-none cursor-pointer"
-            >
-              {projects.length > 0 ? (
-                projects.map((p) => (
-                  <option key={p.projectId} value={p.projectId}>
-                    [{p.key}] {p.name}
-                  </option>
-                ))
-              ) : (
-                <option value={activeProjectId}>[{currentProject?.key || 'CORE'}]</option>
-              )}
-            </select>
-          </div>
-
-          {/* Đường dẫn Breadcrumb của nhánh trang đang mở */}
-          <nav className="hidden xl:flex items-center gap-1 text-xs text-slate-500 truncate max-w-md">
+          {/* Active Page Breadcrumb */}
+          <nav className="hidden sm:flex items-center gap-1 text-xs text-slate-500 truncate max-w-lg">
             {pageBreadcrumb.map((crumb, idx) => (
               <span key={crumb.id} className="flex items-center gap-1 truncate">
                 <span className="text-slate-300">/</span>
@@ -1092,7 +1057,7 @@ export function ConfluenceWorkspacePage() {
                   onClick={() => handleSelectPage(crumb.id)}
                   className={clsx(
                     'truncate hover:underline',
-                    idx === pageBreadcrumb.length - 1 ? 'font-semibold text-slate-800' : 'text-slate-500',
+                    idx === pageBreadcrumb.length - 1 ? 'font-bold text-slate-800' : 'text-slate-500',
                   )}
                 >
                   {crumb.title}
@@ -1102,29 +1067,28 @@ export function ConfluenceWorkspacePage() {
           </nav>
         </div>
 
-        {/* Góc phải: Trạng thái lưu, Chọn Version, AI, 3 Nút Slide-over Drawer & Nút Duyệt */}
+        {/* Right: Save Status, Version Switcher, AI Extractor, 3 Slide-over Drawers & Workflow CTA */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Trạng thái lưu & Nút Lưu vào CSDL */}
           {!isSafeMode && (
             <button
               type="button"
               onClick={handleSavePage}
               disabled={isSaving}
               className={clsx(
-                'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all',
+                'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all whitespace-nowrap',
                 isDirty
                   ? 'bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 animate-pulse'
-                  : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100',
+                  : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-100',
               )}
             >
-              <span>{isDirty ? '💾 Lưu thay đổi (Ctrl+S)' : '✓ Đã lưu vào CSDL'}</span>
+              <span>{isDirty ? '💾 Save Changes (Ctrl+S)' : '✓ Saved'}</span>
               <span className="rounded bg-black/10 px-1.5 py-0.2 font-mono text-[10px]">
                 {liveExtractedItems.length} REQ
               </span>
             </button>
           )}
 
-          {/* Bộ chọn Phiên bản (Version Switcher) */}
+          {/* Version Switcher */}
           {currentPage && (
             <select
               value={currentPage.id}
@@ -1139,25 +1103,25 @@ export function ConfluenceWorkspacePage() {
             </select>
           )}
 
-          {/* Nút AI Sinh nội dung / Bóc tách từ Raw Notes */}
+          {/* AI Raw Notes Extractor */}
           {!isSafeMode && (
             <button
               type="button"
               onClick={() => setShowAiModal(true)}
-              className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
+              className="hidden md:inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors whitespace-nowrap"
             >
-              <span>✨ AI Bóc tách Raw Notes</span>
+              <span>✨ AI Extract Notes</span>
             </button>
           )}
 
-          <span className="text-slate-200">|</span>
+          <span className="text-slate-200 hidden md:inline">|</span>
 
-          {/* 3 Nút bật Ngăn trượt (Slide-over Drawer) bên phải */}
+          {/* 3 Slide-over Drawer Toggles */}
           <button
             type="button"
             onClick={() => setDrawerTab(drawerTab === 'req' ? null : 'req')}
             className={clsx(
-              'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors',
+              'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors whitespace-nowrap',
               drawerTab === 'req'
                 ? 'border-emerald-600 bg-emerald-600 text-white'
                 : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
@@ -1165,7 +1129,7 @@ export function ConfluenceWorkspacePage() {
           >
             <span># REQ & RTM ({liveExtractedItems.length})</span>
             {staleReqCount > 0 && (
-              <span className="flex h-2 w-2 rounded-full bg-amber-400 animate-ping" title="Có mục Stale cần rà soát" />
+              <span className="flex h-2 w-2 rounded-full bg-amber-400 animate-ping" title="Stale requirements detected" />
             )}
           </button>
 
@@ -1173,34 +1137,34 @@ export function ConfluenceWorkspacePage() {
             type="button"
             onClick={() => setDrawerTab(drawerTab === 'history' ? null : 'history')}
             className={clsx(
-              'inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors',
+              'hidden lg:inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors whitespace-nowrap',
               drawerTab === 'history'
                 ? 'border-emerald-600 bg-emerald-600 text-white'
                 : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
             )}
           >
-            <span>🕒 Lịch sử & Diff ({history.length})</span>
+            <span>🕒 History ({history.length})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setDrawerTab(drawerTab === 'comments' ? null : 'comments')}
             className={clsx(
-              'inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors',
+              'hidden lg:inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors whitespace-nowrap',
               drawerTab === 'comments'
                 ? 'border-emerald-600 bg-emerald-600 text-white'
                 : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
             )}
           >
-            <span>💬 Bình luận ({comments.filter((c) => !c.isResolved).length})</span>
+            <span>💬 Comments ({comments.filter((c) => !c.isResolved).length})</span>
           </button>
 
           <span className="text-slate-200">|</span>
 
-          {/* Nút Hành động Workflow chính theo trạng thái */}
+          {/* Document Workflow CTA */}
           {currentPage?.status === 'DRAFT' && (
-            <Button variant="primary" inline onClick={handleSubmitForReview} className="h-8! px-3! text-xs font-semibold">
-              Gửi duyệt (Submit)
+            <Button variant="primary" inline onClick={handleSubmitForReview} className="h-7! px-2.5! text-xs font-semibold whitespace-nowrap">
+              Submit Review
             </Button>
           )}
 
@@ -1209,16 +1173,16 @@ export function ConfluenceWorkspacePage() {
               <button
                 type="button"
                 onClick={() => setShowRejectModal(true)}
-                className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                className="rounded-md border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 whitespace-nowrap"
               >
-                ↺ Yêu cầu sửa lại
+                ↺ Request Changes
               </button>
               <button
                 type="button"
                 onClick={handleApproveBaseline}
-                className="rounded-md bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700"
+                className="rounded-md bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 whitespace-nowrap"
               >
-                ✓ Phê duyệt Baseline
+                ✓ Approve Baseline
               </button>
             </div>
           )}
@@ -1227,13 +1191,13 @@ export function ConfluenceWorkspacePage() {
             <button
               type="button"
               onClick={handleCreateRevision}
-              className="rounded-md bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700"
+              className="rounded-md bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 whitespace-nowrap"
             >
-              + Tạo phiên bản sửa đổi mới
+              + New Revision
             </button>
           )}
         </div>
-      </header>
+      </div>
 
       {/* ========================================================================= */}
       {/* THÂN WORKSPACE: CỘT TRÁI (280px) + MẶT GIẤY GIỮA + SLIDE-OVER DRAWER PHẢI */}

@@ -32,9 +32,20 @@ export function ProjectTable({ projects, emptyText, showWorkspace }: { projects:
                 <span className="rounded-sm border border-gray-300 px-1.5 py-0.5 font-mono text-[11px] font-medium text-gray-700">{p.key}</span>
               </td>
               <td className="px-4 py-3">
-                <Link to={`/projects/${p.projectId}`} className="font-semibold text-gray-900 hover:text-brand-700 hover:underline">
-                  {p.name}
-                </Link>
+                <div className="flex items-center gap-1.5">
+                  <Link to={`/projects/${p.projectId}`} className="font-semibold text-gray-900 hover:text-brand-700 hover:underline">
+                    {p.name}
+                  </Link>
+                  <a
+                    href={`/projects/${p.projectId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Open ${p.name} Space in a new browser tab`}
+                    className="inline-flex h-5 w-5 items-center justify-center rounded border border-gray-200 bg-gray-50 text-[10px] font-bold text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                  >
+                    ↗
+                  </a>
+                </div>
                 <p className="text-xs text-gray-400">
                   {SDLC_LABEL[p.sdlcMethod]} · {p.phaseCount} phases
                 </p>
@@ -52,9 +63,15 @@ export function ProjectTable({ projects, emptyText, showWorkspace }: { projects:
                 )}
               </td>
               <td className="px-4 py-3 text-gray-600">
-                {p.openIssueCount} open / {p.doneIssueCount} done
+                <Link to={`/projects/${p.projectId}/issues`} className="hover:text-blue-600 hover:underline font-medium">
+                  📋 {p.openIssueCount} open / {p.doneIssueCount} done
+                </Link>
               </td>
-              <td className="px-4 py-3 text-gray-600">{p.documentCount}</td>
+              <td className="px-4 py-3 text-gray-600">
+                <Link to={`/projects/${p.projectId}/documents`} className="hover:text-emerald-600 hover:underline font-medium">
+                  📄 {p.documentCount} specs
+                </Link>
+              </td>
               <td className="px-4 py-3 text-gray-700">{p.lead?.fullName ?? '—'}</td>
               <td className="px-4 py-3">
                 {p.myRole ? <Badge tone={p.myRole.code === 'PROJECT_MANAGER' ? 'brand' : 'neutral'}>{p.myRole.name}</Badge> : <span className="text-xs text-gray-400">Viewer</span>}

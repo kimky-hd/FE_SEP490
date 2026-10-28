@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import { AuthProvider, useAuth } from '@/context/AuthContext'
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute'
@@ -36,6 +36,7 @@ import { ProjectMembersPage } from '@/pages/projects/ProjectMembersPage'
 import { ProjectSettingsPage } from '@/pages/projects/ProjectSettingsPage'
 import { ProjectIssuesPage } from '@/pages/projects/ProjectIssuesPage'
 import { ConfluenceWorkspacePage } from '@/pages/projects/ConfluenceWorkspacePage'
+import { ProjectTestCasesPage } from '@/pages/projects/ProjectTestCasesPage'
 import { RoleListPage } from '@/pages/admin/RoleListPage'
 import { RoleEditorPage } from '@/pages/admin/RoleEditorPage'
 import { CompanyUsersPage } from '@/pages/admin/CompanyUsersPage'
@@ -181,49 +182,11 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-      {/* Không gian làm việc Tài liệu Toàn màn hình Độc lập (Confluence Workspace 100vw x 100vh) */}
-      <Route
-        path="/documents"
-        element={
-          <ProtectedRoute>
-            <ConfluenceWorkspacePage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/projects/:projectId/documents"
-        element={
-          <ProtectedRoute>
-            <ConfluenceWorkspacePage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/projects/:projectId/documents/:docId"
-        element={
-          <ProtectedRoute>
-            <ConfluenceWorkspacePage />
-          </ProtectedRoute>
-        }
-      />
-      {/* Không gian làm việc Quản lý Công việc & Lỗi Toàn màn hình Độc lập (Jira Workspace 100vw x 100vh) */}
-      <Route
-        path="/projects/:projectId/issues"
-        element={
-          <ProtectedRoute>
-            <ProjectIssuesPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/projects/:projectId/kanban"
-        element={
-          <ProtectedRoute>
-            <ProjectIssuesPage />
-          </ProtectedRoute>
-        }
-      />
+      {/* Redirect root-level module shortcuts to default project space */}
+      <Route path="/documents" element={<Navigate to="/projects/20/documents" replace />} />
+      <Route path="/testcases" element={<Navigate to="/projects/20/testcases" replace />} />
 
+      {/* Unified Full-Screen Project Workspace Shell (100vw x 100vh) */}
       <Route
         path="/projects/:projectId"
         element={
@@ -233,6 +196,11 @@ function AppRoutes() {
         }
       >
         <Route index element={<ProjectOverviewPage />} />
+        <Route path="documents" element={<ConfluenceWorkspacePage />} />
+        <Route path="documents/:docId" element={<ConfluenceWorkspacePage />} />
+        <Route path="issues" element={<ProjectIssuesPage />} />
+        <Route path="kanban" element={<ProjectIssuesPage />} />
+        <Route path="testcases" element={<ProjectTestCasesPage />} />
         <Route path="workflow" element={<ProjectWorkflowPage />} />
         <Route path="members" element={<ProjectMembersPage />} />
         <Route path="settings" element={<ProjectSettingsPage />} />

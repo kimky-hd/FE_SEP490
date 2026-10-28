@@ -47,7 +47,7 @@ export interface TabItem {
 
 export function PageTabs({ items }: { items: TabItem[] }) {
   return (
-    <div className="mt-6 overflow-x-auto border-b border-gray-200">
+    <div className="mt-4 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden border-b border-gray-200">
       <nav className="-mb-px flex gap-5">
         {items
           .filter((item) => !item.hidden)
@@ -55,11 +55,11 @@ export function PageTabs({ items }: { items: TabItem[] }) {
             item.soon ? (
               <span
                 key={item.to}
-                title="Sắp ra mắt"
+                title="Coming soon"
                 className="flex cursor-not-allowed items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-0.5 pb-2.5 text-sm font-medium text-gray-300"
               >
                 {item.label}
-                <span className="rounded-sm bg-gray-100 px-1 py-0.5 text-[9px] font-semibold text-gray-400">SỚM</span>
+                <span className="rounded-sm bg-gray-100 px-1 py-0.5 text-[9px] font-semibold text-gray-400">SOON</span>
               </span>
             ) : (
             <NavLink
@@ -69,7 +69,7 @@ export function PageTabs({ items }: { items: TabItem[] }) {
               className={({ isActive }) =>
                 clsx(
                   'whitespace-nowrap border-b-2 px-0.5 pb-2.5 text-sm font-medium transition-colors',
-                  isActive ? 'border-brand-600 text-gray-950' : 'border-transparent text-gray-500 hover:text-gray-800',
+                  isActive ? 'border-brand-600 text-gray-950 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-800',
                 )
               }
             >

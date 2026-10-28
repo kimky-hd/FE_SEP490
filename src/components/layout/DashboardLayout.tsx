@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import clsx from 'clsx'
 import { useAuth } from '@/context/AuthContext'
@@ -30,14 +30,6 @@ interface NavItem {
   permission?: string
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { label: 'Overview', icon: <HomeIcon className="h-5 w-5" />, to: '/' },
-  { label: 'Workspaces', icon: <BuildingIcon className="h-5 w-5" />, to: '/workspaces', activePrefix: '/workspaces' },
-  { label: 'Projects', icon: <FolderIcon className="h-5 w-5" />, to: '/projects', activePrefix: '/projects' },
-  { label: 'Requirements', icon: <DocumentIcon className="h-5 w-5" />, to: '/documents', activePrefix: '/documents' },
-  { label: 'Test Cases', icon: <ListChecksIcon className="h-5 w-5" />, comingSoon: true },
-]
-
 // Organization Admin Console — hidden if lacking permission.
 const ADMIN_NAV_ITEMS: NavItem[] = [
   {
@@ -67,6 +59,30 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
   const activeWorkspaceId = Number(location.pathname.match(/^\/workspaces\/(\d+)/)?.[1] ?? NaN)
   const activeWorkspace = workspaces.find((w) => w.workspaceId === activeWorkspaceId)
   const switcherWorkspaces = workspaces.filter((w) => w.status !== 'ARCHIVED')
+
+  // Smart contextual navigation based on active project
+  const activeProjectId = Number(location.pathname.match(/\/projects\/(\d+)/)?.[1] ?? NaN)
+
+  const navItems: NavItem[] = useMemo(() => {
+    const hasProject = !Number.isNaN(activeProjectId)
+    return [
+      { label: 'Overview', icon: <HomeIcon className="h-5 w-5" />, to: '/' },
+      { label: 'Workspaces', icon: <BuildingIcon className="h-5 w-5" />, to: '/workspaces', activePrefix: '/workspaces' },
+      { label: 'Projects', icon: <FolderIcon className="h-5 w-5" />, to: '/projects', activePrefix: '/projects' },
+      {
+        label: 'Requirements',
+        icon: <DocumentIcon className="h-5 w-5" />,
+        to: hasProject ? `/projects/${activeProjectId}/documents` : '/documents',
+        activePrefix: hasProject ? `/projects/${activeProjectId}/documents` : '/documents',
+      },
+      {
+        label: 'Test Cases',
+        icon: <ListChecksIcon className="h-5 w-5" />,
+        to: hasProject ? `/projects/${activeProjectId}/testcases` : '/testcases',
+        activePrefix: hasProject ? `/projects/${activeProjectId}/testcases` : '/testcases',
+      },
+    ]
+  }, [activeProjectId])
 
   // Close workspace dropdown on outside click or navigation
   useEffect(() => {
@@ -125,7 +141,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {NAV_ITEMS.map(renderNavItem)}
+        {navItems.map(renderNavItem)}
 
         {adminItems.length > 0 && (
           <>
