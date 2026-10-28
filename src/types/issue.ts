@@ -7,6 +7,23 @@ export type IssuePriority = 'HIGHEST' | 'HIGH' | 'MEDIUM' | 'LOW'
 export type BugSeverity = 'BLOCKER' | 'CRITICAL' | 'MAJOR' | 'MINOR'
 export type TraceabilityStatus = TraceSyncStatus
 
+export type DepartmentLabel =
+  | 'Backend Team'
+  | 'Frontend Team'
+  | 'BA & Product'
+  | 'QA / Testing Team'
+  | 'DevOps & SecOps'
+  | 'UI/UX Design'
+
+export type DataClassification = 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL_PII' | 'RESTRICTED'
+
+export type EnvironmentType = 'DEV' | 'STAGING' | 'UAT' | 'PRODUCTION'
+
+export interface IssueWatcher {
+  name: string
+  role: string
+}
+
 export interface IssueComment {
   id: string
   authorName: string
@@ -45,14 +62,29 @@ export interface ProjectIssue {
   statusName: string
   statusCategory: StatusCategory // 'TODO' | 'IN_PROGRESS' | 'DONE'
 
-  // Thuộc tính quản trị Jira
+  // Thuộc tính quản trị Jira & Nhân sự 4 vai trò
   priority: IssuePriority
   storyPoints?: number // 1, 2, 3, 5, 8...
+  originalEstimate?: string // '2h', '1d 4h', '3d'
+  dueDate?: string // 'YYYY-MM-DD'
+
+  // Nhân sự & Trách nhiệm (4 vai trò)
   assigneeName: string
   assigneeRole: string
   assigneeAvatar?: string
+  ownerName: string
+  ownerRole: string
   reporterName: string
+  reporterRole: string
+  watchers: IssueWatcher[]
+
+  // Phân loại Tổ chức, Phân hệ & Bảo mật
+  departmentLabel: DepartmentLabel
+  component: string
+  dataClassification: DataClassification
+  environment: EnvironmentType
   labels: string[]
+
   createdAt: string
   updatedAt: string
 
@@ -75,6 +107,9 @@ export interface IssueFilterState {
   phaseId: number | 'ALL'
   statusCategory: 'ALL' | StatusCategory
   assignee: string | 'ALL'
+  departmentLabel: 'ALL' | DepartmentLabel
+  component: 'ALL' | string
+  dataClassification: 'ALL' | DataClassification
   onlyMine: boolean
   onlyStale: boolean
 }

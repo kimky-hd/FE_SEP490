@@ -15,12 +15,114 @@ import { Button } from '@/components/ui/Button'
 import { DiagramViewer } from '@/components/documents/DiagramViewer'
 import type {
   BugSeverity,
+  DataClassification,
+  DepartmentLabel,
+  EnvironmentType,
   IssuePriority,
   IssueType,
+  IssueWatcher,
   ProjectIssue,
 } from '@/types/issue'
 import type { PhaseDto, ProjectDto, StatusCategory, WorkflowStatusDto } from '@/types/project'
 import type { SpecificationDocument } from '@/types/document'
+
+export const DEFAULT_DEPARTMENTS: DepartmentLabel[] = [
+  'Backend Team',
+  'Frontend Team',
+  'BA & Product',
+  'QA / Testing Team',
+  'DevOps & SecOps',
+  'UI/UX Design',
+]
+
+export const DEFAULT_COMPONENTS = [
+  'Authentication & SSO',
+  'RBAC & Permission',
+  'Core Banking & VietQR',
+  'Confluence Spec Editor',
+  'Traceability & RTM',
+  'AI Generation Engine',
+  'Notification Service',
+]
+
+export function DataClassificationBadge({
+  classification,
+  className,
+}: {
+  classification?: DataClassification
+  className?: string
+}) {
+  switch (classification) {
+    case 'PUBLIC':
+      return (
+        <span
+          className={clsx(
+            'inline-flex items-center gap-1 rounded bg-slate-100 text-slate-700 px-1.5 py-0.5 text-[10px] font-semibold border border-slate-200 shrink-0',
+            className,
+          )}
+          title="Dữ liệu công khai nội bộ dự án"
+        >
+          <span>🌐</span>
+          <span>PUBLIC</span>
+        </span>
+      )
+    case 'INTERNAL':
+      return (
+        <span
+          className={clsx(
+            'inline-flex items-center gap-1 rounded bg-emerald-50 text-emerald-800 px-1.5 py-0.5 text-[10px] font-semibold border border-emerald-200 shrink-0',
+            className,
+          )}
+          title="Nghiệp vụ nội bộ kỹ thuật"
+        >
+          <span>🏢</span>
+          <span>INTERNAL</span>
+        </span>
+      )
+    case 'CONFIDENTIAL_PII':
+      return (
+        <span
+          className={clsx(
+            'inline-flex items-center gap-1 rounded bg-amber-50 text-amber-900 px-1.5 py-0.5 text-[10px] font-bold border border-amber-300 shadow-2xs shrink-0',
+            className,
+          )}
+          title="Chứa thông tin cá nhân PII / eKYC nhạy cảm"
+        >
+          <span>🛡️</span>
+          <span>PII / Nhạy cảm</span>
+        </span>
+      )
+    case 'RESTRICTED':
+      return (
+        <span
+          className={clsx(
+            'inline-flex items-center gap-1 rounded bg-rose-50 text-rose-900 px-1.5 py-0.5 text-[10px] font-extrabold border border-rose-300 shadow-2xs shrink-0',
+            className,
+          )}
+          title="Bảo mật cao / Tài chính & Khóa bí mật"
+        >
+          <span>🔒</span>
+          <span>RESTRICTED</span>
+        </span>
+      )
+    default:
+      return null
+  }
+}
+
+export function DepartmentBadge({ label, className }: { label?: DepartmentLabel; className?: string }) {
+  if (!label) return null
+  return (
+    <span
+      className={clsx(
+        'inline-flex items-center rounded-md bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 text-[10px] font-semibold shrink-0',
+        className,
+      )}
+    >
+      {label}
+    </span>
+  )
+}
 
 // --- ICONS CHUẨN ATLASSIAN JIRA ---
 
@@ -136,6 +238,9 @@ export function ProjectIssuesPage() {
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'TASK' | 'BUG'>('ALL')
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | IssuePriority>('ALL')
   const [assigneeFilter, setAssigneeFilter] = useState<string | 'ALL'>('ALL')
+  const [departmentFilter, setDepartmentFilter] = useState<'ALL' | DepartmentLabel>('ALL')
+  const [componentFilter, setComponentFilter] = useState<string | 'ALL'>('ALL')
+  const [classificationFilter, setClassificationFilter] = useState<'ALL' | DataClassification>('ALL')
   const [onlyMine, setOnlyMine] = useState(false)
   const [onlyStale, setOnlyStale] = useState(false)
 
@@ -228,6 +333,29 @@ export function ProjectIssuesPage() {
       ]
     }, [activePhase])
 
+  // Danh sách Phân hệ (Component) tổng hợp từ mặc định + dữ liệu thực tế
+  const availableComponents = useMemo(() => {
+    const set = new Set<string>(DEFAULT_COMPONENTS)
+    allIssues.forEach((i) => {
+      if (i.component) set.add(i.component)
+    })
+    return Array.from(set)
+  }, [allIssues])
+
+  // Mã Key tự động kế tiếp
+  const nextIssueNum = useMemo(() => {
+    const nums = allIssues
+      .filter((i) => i.projectId === projectId)
+      .map((i) => {
+        const parts = i.key.split('-')
+        const num = parseInt(parts[parts.length - 1], 10)
+        return isNaN(num) ? 0 : num
+      })
+      .filter((n) => n > 0)
+    return nums.length > 0 ? Math.max(...nums) + 1 : 101
+  }, [allIssues, projectId])
+  const nextIssueKey = `${project.key || 'CORE'}-${nextIssueNum}`
+
   // Lọc Issues
   const filteredIssues = useMemo(() => {
     return allIssues.filter((iss) => {
@@ -235,6 +363,9 @@ export function ProjectIssuesPage() {
       if (typeFilter !== 'ALL' && iss.type !== typeFilter) return false
       if (priorityFilter !== 'ALL' && iss.priority !== priorityFilter) return false
       if (assigneeFilter !== 'ALL' && iss.assigneeName !== assigneeFilter) return false
+      if (departmentFilter !== 'ALL' && iss.departmentLabel !== departmentFilter) return false
+      if (componentFilter !== 'ALL' && iss.component !== componentFilter) return false
+      if (classificationFilter !== 'ALL' && iss.dataClassification !== classificationFilter) return false
       if (onlyMine) {
         const myName = user?.fullName || 'Sarah Lin'
         if (!iss.assigneeName.toLowerCase().includes(myName.toLowerCase()) && !iss.assigneeName.includes('Sarah')) {
@@ -248,11 +379,30 @@ export function ProjectIssuesPage() {
         const matchSummary = iss.summary.toLowerCase().includes(q)
         const matchDesc = iss.description.toLowerCase().includes(q)
         const matchReq = (iss.linkedRequirementKeyCode || '').toLowerCase().includes(q)
-        if (!matchKey && !matchSummary && !matchDesc && !matchReq) return false
+        const matchComp = (iss.component || '').toLowerCase().includes(q)
+        const matchDept = (iss.departmentLabel || '').toLowerCase().includes(q)
+        const matchOwner = (iss.ownerName || '').toLowerCase().includes(q)
+        const matchLabels = (iss.labels || []).some((l) => l.toLowerCase().includes(q))
+        if (!matchKey && !matchSummary && !matchDesc && !matchReq && !matchComp && !matchDept && !matchOwner && !matchLabels) {
+          return false
+        }
       }
       return true
     })
-  }, [allIssues, selectedPhaseId, typeFilter, priorityFilter, assigneeFilter, onlyMine, onlyStale, searchQuery, user])
+  }, [
+    allIssues,
+    selectedPhaseId,
+    typeFilter,
+    priorityFilter,
+    assigneeFilter,
+    departmentFilter,
+    componentFilter,
+    classificationFilter,
+    onlyMine,
+    onlyStale,
+    searchQuery,
+    user,
+  ])
 
   // Lấy Issue đang chọn
   const currentSelectedIssue = useMemo(() => {
@@ -348,6 +498,9 @@ export function ProjectIssuesPage() {
     setTypeFilter('ALL')
     setPriorityFilter('ALL')
     setAssigneeFilter('ALL')
+    setDepartmentFilter('ALL')
+    setComponentFilter('ALL')
+    setClassificationFilter('ALL')
     setOnlyMine(false)
     setOnlyStale(false)
     setSearchQuery('')
@@ -630,6 +783,50 @@ export function ProjectIssuesPage() {
             <option value="LOW">🔵 Low</option>
           </select>
 
+          {/* Lọc Phòng / Nhóm quản lý */}
+          <select
+            aria-label="Lọc theo phòng ban"
+            value={departmentFilter}
+            onChange={(e) => setDepartmentFilter(e.target.value as 'ALL' | DepartmentLabel)}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 outline-none"
+          >
+            <option value="ALL">🏢 Phòng: Tất cả</option>
+            {DEFAULT_DEPARTMENTS.map((dept) => (
+              <option key={dept} value={dept}>
+                {dept}
+              </option>
+            ))}
+          </select>
+
+          {/* Lọc Phân hệ (Component) */}
+          <select
+            aria-label="Lọc theo phân hệ"
+            value={componentFilter}
+            onChange={(e) => setComponentFilter(e.target.value)}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 outline-none max-w-[145px] truncate"
+          >
+            <option value="ALL">🧩 Phân hệ: Tất cả</option>
+            {availableComponents.map((comp) => (
+              <option key={comp} value={comp}>
+                {comp}
+              </option>
+            ))}
+          </select>
+
+          {/* Lọc Mức độ bảo mật dữ liệu */}
+          <select
+            aria-label="Lọc theo phân loại dữ liệu"
+            value={classificationFilter}
+            onChange={(e) => setClassificationFilter(e.target.value as 'ALL' | DataClassification)}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 outline-none"
+          >
+            <option value="ALL">🛡️ Bảo mật: Tất cả</option>
+            <option value="PUBLIC">🌐 PUBLIC</option>
+            <option value="INTERNAL">🏢 INTERNAL</option>
+            <option value="CONFIDENTIAL_PII">🛡️ CONFIDENTIAL / PII</option>
+            <option value="RESTRICTED">🔒 RESTRICTED</option>
+          </select>
+
           {/* Lọc cờ Stale */}
           <button
             type="button"
@@ -649,7 +846,15 @@ export function ProjectIssuesPage() {
             )}
           </button>
 
-          {(typeFilter !== 'ALL' || priorityFilter !== 'ALL' || assigneeFilter !== 'ALL' || onlyMine || onlyStale || searchQuery) && (
+          {(typeFilter !== 'ALL' ||
+            priorityFilter !== 'ALL' ||
+            assigneeFilter !== 'ALL' ||
+            departmentFilter !== 'ALL' ||
+            componentFilter !== 'ALL' ||
+            classificationFilter !== 'ALL' ||
+            onlyMine ||
+            onlyStale ||
+            searchQuery) && (
             <button
               type="button"
               onClick={clearAllFilters}
@@ -776,6 +981,52 @@ export function ProjectIssuesPage() {
                             {issue.summary}
                           </p>
 
+                          {/* Hàng 2.5: Component, Department & Data Classification badges */}
+                          <div className="flex flex-wrap items-center gap-1 mb-2">
+                            {issue.component && (
+                              <span
+                                className="rounded bg-slate-100 border border-slate-200/80 px-1.5 py-0.5 text-[9px] font-medium text-slate-700 truncate max-w-[120px]"
+                                title={`Phân hệ: ${issue.component}`}
+                              >
+                                {issue.component}
+                              </span>
+                            )}
+                            {issue.departmentLabel && (
+                              <span
+                                className="rounded bg-blue-50 text-blue-700 font-semibold px-1.5 py-0.5 text-[9px]"
+                                title={`Phòng/Nhóm: ${issue.departmentLabel}`}
+                              >
+                                {issue.departmentLabel}
+                              </span>
+                            )}
+                            {issue.dataClassification === 'CONFIDENTIAL_PII' && (
+                              <span
+                                className="rounded bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 text-[9px] flex items-center gap-0.5"
+                                title="Chứa thông tin nhạy cảm PII"
+                              >
+                                <span>🛡️</span>
+                                <span>PII</span>
+                              </span>
+                            )}
+                            {issue.dataClassification === 'RESTRICTED' && (
+                              <span
+                                className="rounded bg-rose-100 text-rose-900 font-extrabold px-1.5 py-0.5 text-[9px] flex items-center gap-0.5"
+                                title="Dữ liệu bảo mật cao / Tài chính"
+                              >
+                                <span>🔒</span>
+                                <span>Restricted</span>
+                              </span>
+                            )}
+                            {issue.dueDate && (
+                              <span
+                                className="rounded bg-slate-50 border border-slate-200 px-1.5 py-0.5 text-[9px] text-slate-500 font-mono"
+                                title={`Hạn chót: ${issue.dueDate}`}
+                              >
+                                📅 {issue.dueDate.slice(5)}
+                              </span>
+                            )}
+                          </div>
+
                           {/* Hàng 3: Chip Confluence REQ */}
                           {issue.linkedRequirementKeyCode && (
                             <div
@@ -863,11 +1114,15 @@ export function ProjectIssuesPage() {
                     <th className="py-3 px-4 w-12 text-center">Loại</th>
                     <th className="py-3 px-3 w-28">Mã Key</th>
                     <th className="py-3 px-4">Tiêu đề (Summary)</th>
-                    <th className="py-3 px-3">Giai đoạn (Phase)</th>
+                    <th className="py-3 px-3">Phân hệ</th>
+                    <th className="py-3 px-3">Phòng / Nhóm</th>
+                    <th className="py-3 px-3">Bảo mật</th>
+                    <th className="py-3 px-3">Giai đoạn</th>
                     <th className="py-3 px-3">Trạng thái</th>
                     <th className="py-3 px-3 w-24">Độ ưu tiên</th>
-                    <th className="py-3 px-4">Liên kết Yêu cầu (REQ)</th>
-                    <th className="py-3 px-3">Người phụ trách</th>
+                    <th className="py-3 px-4">Liên kết REQ</th>
+                    <th className="py-3 px-3">Phụ trách</th>
+                    <th className="py-3 px-3">Hạn chót</th>
                     <th className="py-3 px-2 text-center">Điểm</th>
                     <th className="py-3 px-3 text-right">Cập nhật</th>
                   </tr>
@@ -890,13 +1145,24 @@ export function ProjectIssuesPage() {
                       </td>
                       <td className="py-3 px-4 font-semibold text-slate-900">
                         <div className="flex items-center gap-1.5">
-                          <span className="truncate max-w-lg">{issue.summary}</span>
+                          <span className="truncate max-w-sm">{issue.summary}</span>
                           {issue.severity && (
                             <span className="rounded bg-rose-100 px-1.5 py-0.2 text-[9px] font-bold text-rose-800 shrink-0">
                               {issue.severity}
                             </span>
                           )}
                         </div>
+                      </td>
+                      <td className="py-3 px-3 text-slate-600 whitespace-nowrap">
+                        <span className="rounded bg-slate-100 border border-slate-200 px-1.5 py-0.5 text-[10px] font-medium">
+                          {issue.component || '—'}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        <DepartmentBadge label={issue.departmentLabel} />
+                      </td>
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        <DataClassificationBadge classification={issue.dataClassification} />
                       </td>
                       <td className="py-3 px-3 text-slate-500 whitespace-nowrap">
                         {issue.phaseName.replace(/^Phase \d+:\s*/, '')}
@@ -947,6 +1213,9 @@ export function ProjectIssuesPage() {
                           </div>
                           <span className="font-medium text-slate-800">{issue.assigneeName}</span>
                         </div>
+                      </td>
+                      <td className="py-3 px-3 whitespace-nowrap font-mono text-[11px] text-slate-600">
+                        {issue.dueDate ? `📅 ${issue.dueDate}` : '—'}
                       </td>
                       <td className="py-3 px-2 text-center font-mono font-bold text-slate-600">
                         {issue.storyPoints ?? '—'}
@@ -1006,6 +1275,7 @@ export function ProjectIssuesPage() {
         <CreateIssueModal
           projectId={project.projectId}
           projectKey={project.key}
+          nextIssueKey={nextIssueKey}
           phases={phases}
           members={members}
           documents={documents}
@@ -1014,11 +1284,13 @@ export function ProjectIssuesPage() {
             setShowCreateModal(false)
             setPrefillReq(null)
           }}
-          onSuccess={(newIssue) => {
-            setShowCreateModal(false)
-            setPrefillReq(null)
+          onSuccess={(newIssue, keepOpen) => {
             issuesAsync.reload()
-            handleSelectIssue(newIssue.id)
+            if (!keepOpen) {
+              setShowCreateModal(false)
+              setPrefillReq(null)
+              handleSelectIssue(newIssue.id)
+            }
           }}
         />
       )}
@@ -1247,6 +1519,61 @@ function FullScreenIssueView({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
+  // Trạng thái theo dõi Watchers của người dùng hiện tại
+  const isUserWatching = useMemo(() => {
+    const myName = user?.fullName || 'Sarah Lin'
+    return (issue.watchers || []).some((w) => w.name === myName)
+  }, [issue.watchers, user])
+
+  const handleToggleWatch = async () => {
+    const myName = user?.fullName || 'Sarah Lin'
+    const myMember = members.find((m) => m.fullName === myName)
+    const myRole = myMember?.role.name || 'Thành viên'
+    await issueApi.toggleWatcher(issue.id, { name: myName, role: myRole }, myName)
+    onReload()
+  }
+
+  const handleAddWatcher = async (memberFullName: string) => {
+    if (!memberFullName) return
+    const member = members.find((m) => m.fullName === memberFullName)
+    await issueApi.toggleWatcher(
+      issue.id,
+      { name: memberFullName, role: member?.role.name || 'Thành viên' },
+      user?.fullName || 'Người dùng',
+    )
+    onReload()
+  }
+
+  const handleRemoveWatcher = async (watcherName: string) => {
+    const watcher = (issue.watchers || []).find((w) => w.name === watcherName)
+    if (watcher) {
+      await issueApi.toggleWatcher(issue.id, watcher, user?.fullName || 'Người dùng')
+      onReload()
+    }
+  }
+
+  const [newTagInput, setNewTagInput] = useState('')
+  const [showAddTag, setShowAddTag] = useState(false)
+
+  const handleAddLabel = async (tag: string) => {
+    const trimmed = tag.trim()
+    if (!trimmed) return
+    const current = issue.labels || []
+    if (current.includes(trimmed)) return
+    const updated = [...current, trimmed]
+    await issueApi.updateIssue(issue.id, { labels: updated }, user?.fullName || 'Người dùng', `Thêm nhãn "${trimmed}"`)
+    setNewTagInput('')
+    setShowAddTag(false)
+    onReload()
+  }
+
+  const handleRemoveLabel = async (tag: string) => {
+    const current = issue.labels || []
+    const updated = current.filter((l) => l !== tag)
+    await issueApi.updateIssue(issue.id, { labels: updated }, user?.fullName || 'Người dùng', `Xóa nhãn "${tag}"`)
+    onReload()
+  }
+
   // Điều hướng nhanh Previous / Next Issue
   const currentIndex = useMemo(() => {
     return filteredIssues.findIndex((i) => i.id === issue.id)
@@ -1329,6 +1656,31 @@ function FullScreenIssueView({
               {issue.type === 'TASK' ? <JiraTaskIcon className="h-3 w-3" /> : <JiraBugIcon className="h-3 w-3" />}
               <span>{issue.type === 'TASK' ? 'Task' : 'Bug'}</span>
             </span>
+
+            {/* Badges Phân hệ & Phòng ban */}
+            {issue.component && (
+              <span className="hidden sm:inline-flex items-center rounded-md bg-slate-100 border border-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-700 shrink-0">
+                {issue.component}
+              </span>
+            )}
+            <DepartmentBadge label={issue.departmentLabel} className="hidden md:inline-flex shrink-0" />
+            <DataClassificationBadge classification={issue.dataClassification} className="shrink-0" />
+
+            {/* Badge Watchers tương tác */}
+            <button
+              type="button"
+              onClick={handleToggleWatch}
+              className={clsx(
+                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0 transition-colors border',
+                isUserWatching
+                  ? 'border-blue-400 bg-blue-50 text-blue-800 hover:bg-blue-100'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100',
+              )}
+              title={isUserWatching ? 'Bạn đang theo dõi Issue này (Bấm để hủy theo dõi)' : 'Bấm để theo dõi Issue này'}
+            >
+              <span>👁️</span>
+              <span>Watchers ({issue.watchers?.length || 0})</span>
+            </button>
 
             {/* Badge Trạng thái Truy xuất */}
             {issue.linkedRequirementKeyCode && (
@@ -1884,8 +2236,8 @@ function FullScreenIssueView({
           {/* ------------------------------------------------------ */}
           {/* CỘT 3 (BÊN PHẢI): BẢNG ĐIỀU KHIỂN THUỘC TÍNH (360PX)   */}
           {/* ------------------------------------------------------ */}
-          <div className="w-80 lg:w-90 bg-slate-50/80 border-l border-slate-200 p-6 overflow-y-auto space-y-6 shrink-0">
-            {/* TRẠNG THÁI WORKFLOW NỔI BẬT */}
+          <div className="w-80 lg:w-96 bg-slate-50/80 border-l border-slate-200 p-6 overflow-y-auto space-y-5 shrink-0">
+            {/* CARD 1: TRẠNG THÁI WORKFLOW NỔI BẬT */}
             <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-2xs space-y-1.5">
               <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                 Trạng thái Quy trình (Workflow Status)
@@ -1920,36 +2272,338 @@ function FullScreenIssueView({
               </select>
             </div>
 
-            {/* DETAILS CARD */}
-            <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-2xs space-y-4 text-xs">
-              <h3 className="font-extrabold text-xs uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">
-                Chi tiết Quản trị (Details)
+            {/* CARD 2: NHÂN SỰ & TRÁCH NHIỆM (PEOPLE & OWNERSHIP - 4 VAI TRÒ) */}
+            <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-2xs space-y-3.5 text-xs">
+              <h3 className="font-extrabold text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2 flex items-center justify-between">
+                <span>Nhân sự & Trách nhiệm (People)</span>
+                <span className="text-[10px] font-semibold text-blue-600">4 Vai trò</span>
               </h3>
 
-              {/* Người phụ trách (Assignee) */}
+              {/* 1. Người phụ trách (Assignee) */}
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-slate-500 font-semibold">Người phụ trách:</span>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-slate-500 font-semibold text-[11px]">Người phụ trách (Assignee):</span>
                   {!isArchived && (
                     <button
                       type="button"
                       onClick={onReassignClick}
-                      className="text-xs font-bold text-blue-600 hover:underline"
+                      className="text-[11px] font-bold text-blue-600 hover:underline"
                     >
                       ⇄ Bàn giao
                     </button>
                   )}
                 </div>
-                <div className="flex items-center gap-2.5 rounded-xl bg-slate-50 border border-slate-200 p-2.5">
-                  <div className="h-7 w-7 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
+                <div className="flex items-center gap-2 rounded-xl bg-slate-50 border border-slate-200 p-2">
+                  <div className="h-6 w-6 rounded-full bg-blue-600 text-white font-bold text-[10px] flex items-center justify-center shadow-xs shrink-0">
                     {issue.assigneeAvatar || 'SL'}
                   </div>
-                  <div>
-                    <p className="font-bold text-slate-900 text-xs">{issue.assigneeName}</p>
-                    <p className="text-[10px] text-slate-500">{issue.assigneeRole}</p>
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-900 text-xs truncate">{issue.assigneeName}</p>
+                    <p className="text-[10px] text-slate-500 truncate">{issue.assigneeRole}</p>
                   </div>
                 </div>
               </div>
+
+              {/* 2. Người sở hữu / Chịu trách nhiệm chính (Owner) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-slate-500 font-semibold text-[11px]">Người sở hữu (Feature Owner):</span>
+                </div>
+                <div className="flex items-center gap-2 rounded-xl bg-indigo-50/50 border border-indigo-100 p-2">
+                  <div className="h-6 w-6 rounded-full bg-indigo-600 text-white font-bold text-[10px] flex items-center justify-center shadow-xs shrink-0">
+                    {(issue.ownerName || 'Lead')
+                      .split(' ')
+                      .map((w) => w[0])
+                      .slice(0, 2)
+                      .join('')
+                      .toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <select
+                      aria-label="Cập nhật Owner"
+                      value={issue.ownerName}
+                      disabled={isArchived}
+                      onChange={async (e) => {
+                        const chosenName = e.target.value
+                        const chosen = members.find((m) => m.fullName === chosenName)
+                        await issueApi.updateIssue(
+                          issue.id,
+                          {
+                            ownerName: chosenName,
+                            ownerRole: chosen?.role.name || 'Feature Owner',
+                          },
+                          user?.fullName || 'Người dùng',
+                          `Chuyển quyền sở hữu Owner sang ${chosenName}`,
+                        )
+                        onReload()
+                      }}
+                      className="w-full bg-transparent font-bold text-slate-900 text-xs outline-none cursor-pointer"
+                    >
+                      {members.map((m) => (
+                        <option key={m.fullName} value={m.fullName}>
+                          {m.fullName} ({m.role.name})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-indigo-700 truncate">{issue.ownerRole || 'Feature Owner'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Người báo cáo / Khởi tạo (Reporter) */}
+              <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                <span className="text-slate-400 text-[11px]">Khởi tạo (Reporter):</span>
+                <span className="font-semibold text-slate-800 text-[11px]">
+                  {issue.reporterName} {issue.reporterRole ? `(${issue.reporterRole})` : ''}
+                </span>
+              </div>
+
+              {/* 4. Người theo dõi (Watchers) */}
+              <div className="border-t border-slate-100 pt-2.5 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-600 font-semibold text-[11px] flex items-center gap-1">
+                    <span>👁️</span>
+                    <span>Người theo dõi ({issue.watchers?.length || 0}):</span>
+                  </span>
+                  <button
+                    type="button"
+                    disabled={isArchived}
+                    onClick={handleToggleWatch}
+                    className="text-[10px] font-bold text-blue-600 hover:underline"
+                  >
+                    {isUserWatching ? '✕ Bỏ theo dõi' : '+ Theo dõi'}
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-1">
+                  {(issue.watchers || []).map((w) => (
+                    <span
+                      key={w.name}
+                      className="inline-flex items-center gap-1 rounded-md bg-slate-100 border border-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-700"
+                    >
+                      <span className="truncate max-w-[120px]">{w.name}</span>
+                      {!isArchived && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveWatcher(w.name)}
+                          className="text-slate-400 hover:text-rose-600 font-bold"
+                          title={`Bỏ ${w.name} khỏi Watchers`}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                </div>
+
+                {!isArchived && (
+                  <select
+                    aria-label="Thêm người theo dõi"
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) handleAddWatcher(e.target.value)
+                    }}
+                    className="w-full rounded-lg border border-slate-200 p-1 text-[10px] text-slate-600 outline-none bg-white"
+                  >
+                    <option value="">+ Thêm người theo dõi...</option>
+                    {members
+                      .filter((m) => !(issue.watchers || []).some((w) => w.name === m.fullName))
+                      .map((m) => (
+                        <option key={m.fullName} value={m.fullName}>
+                          {m.fullName} ({m.role.name})
+                        </option>
+                      ))}
+                  </select>
+                )}
+              </div>
+            </div>
+
+            {/* CARD 3: PHÂN LOẠI QUẢN TRỊ & BẢO MẬT (CLASSIFICATION & SECURITY) */}
+            <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-2xs space-y-3.5 text-xs">
+              <h3 className="font-extrabold text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">
+                Phân loại & Bảo mật (Classification)
+              </h3>
+
+              {/* Phòng / Nhóm quản lý (Department Label) */}
+              <div>
+                <span className="text-slate-500 font-semibold block mb-1">Phòng / Nhóm quản lý:</span>
+                <select
+                  aria-label="Cập nhật phòng nhóm"
+                  value={issue.departmentLabel}
+                  disabled={isArchived}
+                  onChange={async (e) => {
+                    await issueApi.updateIssue(
+                      issue.id,
+                      { departmentLabel: e.target.value as DepartmentLabel },
+                      user?.fullName || 'Người dùng',
+                      `Đổi nhóm quản lý sang ${e.target.value}`,
+                    )
+                    onReload()
+                  }}
+                  className="w-full rounded-lg border border-slate-200 p-2 text-xs font-bold text-slate-800 outline-none bg-white"
+                >
+                  {DEFAULT_DEPARTMENTS.map((dept) => (
+                    <option key={dept} value={dept}>
+                      {dept}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Phân hệ hệ thống (Component) */}
+              <div>
+                <span className="text-slate-500 font-semibold block mb-1">Phân hệ hệ thống (Component):</span>
+                <select
+                  aria-label="Cập nhật phân hệ"
+                  value={issue.component}
+                  disabled={isArchived}
+                  onChange={async (e) => {
+                    await issueApi.updateIssue(
+                      issue.id,
+                      { component: e.target.value },
+                      user?.fullName || 'Người dùng',
+                      `Đổi phân hệ thành ${e.target.value}`,
+                    )
+                    onReload()
+                  }}
+                  className="w-full rounded-lg border border-slate-200 p-2 text-xs font-bold text-slate-800 outline-none bg-white"
+                >
+                  {DEFAULT_COMPONENTS.map((comp) => (
+                    <option key={comp} value={comp}>
+                      {comp}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Phân loại mức độ dữ liệu (Data Classification) */}
+              <div>
+                <span className="text-slate-500 font-semibold block mb-1">Mức độ bảo mật dữ liệu:</span>
+                <select
+                  aria-label="Cập nhật mức độ bảo mật dữ liệu"
+                  value={issue.dataClassification}
+                  disabled={isArchived}
+                  onChange={async (e) => {
+                    await issueApi.updateIssue(
+                      issue.id,
+                      { dataClassification: e.target.value as DataClassification },
+                      user?.fullName || 'Người dùng',
+                      `Đổi phân loại dữ liệu thành ${e.target.value}`,
+                    )
+                    onReload()
+                  }}
+                  className="w-full rounded-lg border border-slate-200 p-2 text-xs font-bold text-slate-800 outline-none bg-white"
+                >
+                  <option value="PUBLIC">🌐 PUBLIC - Công khai nội bộ</option>
+                  <option value="INTERNAL">🏢 INTERNAL - Nghiệp vụ nội bộ</option>
+                  <option value="CONFIDENTIAL_PII">🛡️ CONFIDENTIAL / PII - Dữ liệu nhạy cảm</option>
+                  <option value="RESTRICTED">🔒 RESTRICTED - Bảo mật cao / Tài chính</option>
+                </select>
+              </div>
+
+              {/* Môi trường thực thi (Environment) */}
+              <div>
+                <span className="text-slate-500 font-semibold block mb-1">Môi trường (Environment):</span>
+                <select
+                  aria-label="Cập nhật môi trường"
+                  value={issue.environment || 'DEV'}
+                  disabled={isArchived}
+                  onChange={async (e) => {
+                    await issueApi.updateIssue(
+                      issue.id,
+                      { environment: e.target.value as EnvironmentType },
+                      user?.fullName || 'Người dùng',
+                      `Đổi môi trường thành ${e.target.value}`,
+                    )
+                    onReload()
+                  }}
+                  className="w-full rounded-lg border border-slate-200 p-2 text-xs font-bold text-slate-800 outline-none bg-white"
+                >
+                  <option value="DEV">DEV (Môi trường phát triển)</option>
+                  <option value="STAGING">STAGING (Tiền sản phẩm)</option>
+                  <option value="UAT">UAT (Nghiệm thu người dùng)</option>
+                  <option value="PRODUCTION">PRODUCTION (Vận hành thực tế)</option>
+                </select>
+              </div>
+
+              {/* Nhãn (Labels) */}
+              <div className="border-t border-slate-100 pt-2.5 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500 font-semibold text-[11px]">Nhãn thẻ (Labels):</span>
+                  {!isArchived && !showAddTag && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAddTag(true)}
+                      className="text-[10px] font-bold text-blue-600 hover:underline"
+                    >
+                      + Thêm nhãn
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-1">
+                  {(issue.labels || []).map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 rounded bg-slate-100 border border-slate-200 px-1.5 py-0.5 text-[10px] font-medium text-slate-700"
+                    >
+                      <span>{tag}</span>
+                      {!isArchived && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveLabel(tag)}
+                          className="text-slate-400 hover:text-rose-600 font-bold"
+                          title={`Xóa nhãn ${tag}`}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                  {(issue.labels || []).length === 0 && (
+                    <span className="text-[10px] text-slate-400 italic">Chưa gắn nhãn</span>
+                  )}
+                </div>
+
+                {showAddTag && !isArchived && (
+                  <div className="flex gap-1 pt-1">
+                    <input
+                      type="text"
+                      value={newTagInput}
+                      onChange={(e) => setNewTagInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          handleAddLabel(newTagInput)
+                        }
+                      }}
+                      placeholder="Nhập nhãn..."
+                      className="flex-1 rounded border border-slate-200 p-1 text-xs outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleAddLabel(newTagInput)}
+                      className="rounded bg-blue-600 px-2 py-1 text-[10px] font-bold text-white"
+                    >
+                      Thêm
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddTag(false)}
+                      className="rounded bg-slate-100 px-1.5 py-1 text-[10px] text-slate-600"
+                    >
+                      Hủy
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* CARD 4: KẾ HOẠCH & ƯỚC LƯỢNG (SCHEDULE & ESTIMATION) */}
+            <div className="rounded-2xl bg-white border border-slate-200 p-4 shadow-2xs space-y-3.5 text-xs">
+              <h3 className="font-extrabold text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">
+                Kế hoạch & Ước lượng (Schedule)
+              </h3>
 
               {/* Giai đoạn Phase */}
               <div>
@@ -1973,7 +2627,7 @@ function FullScreenIssueView({
                     )
                     onReload()
                   }}
-                  className="w-full rounded-lg border border-slate-200 p-2 text-xs font-bold text-slate-800 outline-none"
+                  className="w-full rounded-lg border border-slate-200 p-2 text-xs font-bold text-slate-800 outline-none bg-white"
                 >
                   <option value="HIGHEST">🔴 Highest (Cao nhất)</option>
                   <option value="HIGH">🟠 High (Cao)</option>
@@ -1984,7 +2638,7 @@ function FullScreenIssueView({
 
               {/* Story Points */}
               <div>
-                <span className="text-slate-500 font-semibold block mb-1">Điểm ước lượng (Story Points):</span>
+                <span className="text-slate-500 font-semibold block mb-1">Điểm phức tạp (Story Points):</span>
                 <input
                   type="number"
                   min={1}
@@ -2005,6 +2659,47 @@ function FullScreenIssueView({
                 />
               </div>
 
+              {/* Thời gian ước lượng (Original Estimate) */}
+              <div>
+                <span className="text-slate-500 font-semibold block mb-1">Thời gian ước lượng (Estimate):</span>
+                <input
+                  type="text"
+                  placeholder="VD: 2h, 1d 4h, 3d"
+                  value={issue.originalEstimate || ''}
+                  disabled={isArchived}
+                  onChange={async (e) => {
+                    await issueApi.updateIssue(
+                      issue.id,
+                      { originalEstimate: e.target.value },
+                      user?.fullName || 'Người dùng',
+                      `Cập nhật ước lượng thời gian thành ${e.target.value}`,
+                    )
+                    onReload()
+                  }}
+                  className="w-full rounded-lg border border-slate-200 p-2 text-xs font-mono font-semibold text-slate-800 outline-none"
+                />
+              </div>
+
+              {/* Hạn hoàn thành (Due Date) */}
+              <div>
+                <span className="text-slate-500 font-semibold block mb-1">Hạn hoàn thành (Due Date):</span>
+                <input
+                  type="date"
+                  value={issue.dueDate || ''}
+                  disabled={isArchived}
+                  onChange={async (e) => {
+                    await issueApi.updateIssue(
+                      issue.id,
+                      { dueDate: e.target.value },
+                      user?.fullName || 'Người dùng',
+                      `Đổi hạn hoàn thành thành ${e.target.value}`,
+                    )
+                    onReload()
+                  }}
+                  className="w-full rounded-lg border border-slate-200 p-2 text-xs font-mono font-semibold text-slate-800 outline-none"
+                />
+              </div>
+
               {/* Severity (nếu là Bug) */}
               {issue.type === 'BUG' && (
                 <div>
@@ -2022,7 +2717,7 @@ function FullScreenIssueView({
                       )
                       onReload()
                     }}
-                    className="w-full rounded-lg border border-slate-200 p-2 text-xs font-bold text-slate-800 outline-none"
+                    className="w-full rounded-lg border border-slate-200 p-2 text-xs font-bold text-slate-800 outline-none bg-white"
                   >
                     <option value="BLOCKER">💥 BLOCKER (Chặn release)</option>
                     <option value="CRITICAL">🔴 CRITICAL (Nghiêm trọng)</option>
@@ -2054,21 +2749,15 @@ function FullScreenIssueView({
                 </div>
               )}
 
-              {/* Reporter */}
-              <div className="border-t border-slate-100 pt-3">
-                <span className="text-slate-400 text-[11px] block">Người tạo (Reporter):</span>
-                <span className="font-semibold text-slate-800">{issue.reporterName}</span>
-              </div>
-
               {/* Ngày tạo & Cập nhật */}
-              <div className="text-[11px] text-slate-400 space-y-0.5">
-                <p>Tạo: {formatDate(issue.createdAt)}</p>
+              <div className="text-[11px] text-slate-400 space-y-0.5 border-t border-slate-100 pt-2">
+                <p>Khởi tạo: {formatDate(issue.createdAt)}</p>
                 <p>Cập nhật: {formatDate(issue.updatedAt)}</p>
               </div>
             </div>
 
             {/* HÀNH ĐỘNG NGUY HIỂM: XÓA ISSUE */}
-            <div className="pt-2">
+            <div className="pt-1">
               <button
                 type="button"
                 disabled={isArchived}
@@ -2436,12 +3125,14 @@ function SplitViewWorkspace({
 }
 
 // ========================================================
-// MODAL TẠO MỚI TASK HOẶC BUG
+// MODAL TẠO MỚI TASK HOẶC BUG CHUẨN ATLASSIAN JIRA
+// (BỐ CỤC 2 CỘT: 60% TRÁI - 40% PHẢI, ĐẦY ĐỦ CÁC TRƯỜNG CHUYÊN SÂU)
 // ========================================================
 
 function CreateIssueModal({
   projectId,
-  projectKey,
+  projectKey = 'CORE',
+  nextIssueKey,
   phases,
   members,
   documents,
@@ -2451,228 +3142,773 @@ function CreateIssueModal({
 }: {
   projectId: number
   projectKey?: string
+  nextIssueKey: string
   phases: PhaseDto[]
-  members: { fullName: string; role: { name: string } }[]
+  members: { userId?: number; fullName: string; role: { name: string; code?: string | null } }[]
   documents: SpecificationDocument[]
   prefillReq: { docId?: number; reqId?: string; reqKey?: string; reqTitle?: string } | null
   onClose: () => void
-  onSuccess: (issue: ProjectIssue) => void
+  onSuccess: (issue: ProjectIssue, keepOpen: boolean) => void
 }) {
   const { user } = useAuth()
   const [type, setType] = useState<IssueType>('TASK')
   const [summary, setSummary] = useState('')
   const [description, setDescription] = useState('')
   const [phaseId, setPhaseId] = useState<number>(phases[0]?.phaseId || 1)
-  const [priority, setPriority] = useState<IssuePriority>('HIGH')
-  const [storyPoints, setStoryPoints] = useState<number>(type === 'BUG' ? 3 : 5)
-  const [assigneeName, setAssigneeName] = useState(members[0]?.fullName || 'Sarah Lin')
+
+  // Trạng thái khởi tạo của Phase đang chọn
+  const currentPhase = useMemo(() => {
+    return phases.find((p) => p.phaseId === phaseId) || phases[0] || { phaseId: 1, name: 'Phase 1', statuses: [] }
+  }, [phases, phaseId])
+
+  const [statusId, setStatusId] = useState<number>(currentPhase.statuses[0]?.statusId || 101)
+
+  useEffect(() => {
+    if (currentPhase.statuses.length > 0) {
+      setStatusId(currentPhase.statuses[0].statusId)
+    }
+  }, [currentPhase])
+
+  // Bug details
   const [severity, setSeverity] = useState<BugSeverity>('MAJOR')
   const [stepsToReproduce, setStepsToReproduce] = useState('')
+  const [environment, setEnvironment] = useState<EnvironmentType>('DEV')
   const [linkedTestCaseCode, setLinkedTestCaseCode] = useState('')
 
-  const [linkedReqKey, setLinkedReqKey] = useState(prefillReq?.reqKey || '')
-  const [linkedDocId, setLinkedDocId] = useState<number | undefined>(prefillReq?.docId)
+  // Phân loại quản trị & Dữ liệu (Grid 2x2)
+  const [departmentLabel, setDepartmentLabel] = useState<DepartmentLabel>('Backend Team')
+  const [component, setComponent] = useState(DEFAULT_COMPONENTS[0])
+  const [customComponent, setCustomComponent] = useState('')
+  const [dataClassification, setDataClassification] = useState<DataClassification>('INTERNAL')
+  const [labels, setLabels] = useState<string[]>(['Sprint-3'])
+  const [tagInput, setTagInput] = useState('')
 
-  const currentPhase = phases.find((p) => p.phaseId === phaseId) || phases[0]
-  const initialStatus = currentPhase?.statuses[0] || {
-    statusId: 101,
-    name: 'To Do',
-    category: 'TODO' as StatusCategory,
+  // Traceability Confluence
+  const [linkedDocId, setLinkedDocId] = useState<number | undefined>(prefillReq?.docId)
+  const [linkedReqKey, setLinkedReqKey] = useState(prefillReq?.reqKey || '')
+
+  // People & Ownership (4 vai trò)
+  const [assigneeName, setAssigneeName] = useState(members[0]?.fullName || 'Sarah Lin')
+  const defaultOwner = useMemo(() => {
+    const lead = members.find(
+      (m) =>
+        m.role.name.toLowerCase().includes('manager') ||
+        m.role.name.toLowerCase().includes('lead') ||
+        m.role.name.toLowerCase().includes('owner'),
+    )
+    return lead?.fullName || members[0]?.fullName || 'Sarah Lin'
+  }, [members])
+  const [ownerName, setOwnerName] = useState(defaultOwner)
+  const [reporterName, setReporterName] = useState(user?.fullName || 'Phạm Văn Khoa (PM)')
+  const [selectedWatcherNames, setSelectedWatcherNames] = useState<string[]>([
+    reporterName,
+    assigneeName,
+  ])
+
+  // Kế hoạch & Ước lượng
+  const [priority, setPriority] = useState<IssuePriority>('HIGH')
+  const [storyPoints, setStoryPoints] = useState<number>(5)
+  const [originalEstimate, setOriginalEstimate] = useState('1d 4h')
+  const [dueDate, setDueDate] = useState(
+    new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+  )
+
+  // Footer & Feedback
+  const [createAnother, setCreateAnother] = useState(false)
+  const [successToast, setSuccessToast] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Đổi loại Task <-> Bug cập nhật story points gợi ý
+  const handleTypeSwitch = (newType: IssueType) => {
+    setType(newType)
+    if (newType === 'BUG') {
+      setStoryPoints(3)
+      if (!labels.includes('Bug')) setLabels((prev) => [...prev.filter((l) => l !== 'Task'), 'Bug'])
+    } else {
+      setStoryPoints(5)
+      if (!labels.includes('Task')) setLabels((prev) => [...prev.filter((l) => l !== 'Bug'), 'Task'])
+    }
+  }
+
+  // Thêm / bớt label
+  const handleAddTag = (tag: string) => {
+    const trimmed = tag.trim()
+    if (!trimmed || labels.includes(trimmed)) return
+    setLabels([...labels, trimmed])
+    setTagInput('')
+  }
+
+  const handleRemoveTag = (tag: string) => {
+    setLabels(labels.filter((l) => l !== tag))
+  }
+
+  // Bật / tắt watcher
+  const toggleWatcherName = (name: string) => {
+    if (selectedWatcherNames.includes(name)) {
+      setSelectedWatcherNames(selectedWatcherNames.filter((n) => n !== name))
+    } else {
+      setSelectedWatcherNames([...selectedWatcherNames, name])
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!summary.trim()) return
 
-    const assigneeMember = members.find((m) => m.fullName === assigneeName)
-    const newIssue = await issueApi.createIssue({
-      projectId,
-      projectKey,
-      type,
-      summary,
-      description,
-      phaseId: currentPhase.phaseId,
-      phaseName: currentPhase.name,
-      statusId: initialStatus.statusId,
-      statusName: initialStatus.name,
-      statusCategory: initialStatus.category as StatusCategory,
-      priority,
-      storyPoints,
-      assigneeName,
-      assigneeRole: assigneeMember?.role.name || 'Thành viên',
-      reporterName: user?.fullName || 'Phạm Văn Khoa (PM)',
-      severity: type === 'BUG' ? severity : undefined,
-      stepsToReproduce: type === 'BUG' ? stepsToReproduce : undefined,
-      linkedTestCaseCode: type === 'BUG' ? linkedTestCaseCode : undefined,
-      linkedDocumentId: linkedDocId,
-      linkedRequirementKeyCode: linkedReqKey || undefined,
-      linkedRequirementTitle: prefillReq?.reqTitle,
-    })
+    setIsSubmitting(true)
+    try {
+      const activeStatusObj =
+        currentPhase.statuses.find((s) => s.statusId === statusId) ||
+        currentPhase.statuses[0] || {
+          statusId: 101,
+          name: 'To Do',
+          category: 'TODO' as StatusCategory,
+        }
 
-    onSuccess(newIssue)
+      const assigneeMember = members.find((m) => m.fullName === assigneeName)
+      const ownerMember = members.find((m) => m.fullName === ownerName)
+      const reporterMember = members.find((m) => m.fullName === reporterName)
+
+      const watchersList: IssueWatcher[] = selectedWatcherNames.map((name) => {
+        const found = members.find((m) => m.fullName === name)
+        return {
+          name,
+          role: found?.role.name || 'Thành viên',
+        }
+      })
+
+      const finalComponent = customComponent.trim() || component
+
+      const newIssue = await issueApi.createIssue({
+        projectId,
+        projectKey,
+        type,
+        summary: summary.trim(),
+        description: description.trim(),
+        phaseId: currentPhase.phaseId,
+        phaseName: currentPhase.name,
+        statusId: activeStatusObj.statusId,
+        statusName: activeStatusObj.name,
+        statusCategory: activeStatusObj.category as StatusCategory,
+        priority,
+        storyPoints,
+        originalEstimate,
+        dueDate,
+
+        assigneeName,
+        assigneeRole: assigneeMember?.role.name || 'Thành viên',
+        ownerName,
+        ownerRole: ownerMember?.role.name || 'Feature Owner',
+        reporterName,
+        reporterRole: reporterMember?.role.name || 'Reporter',
+        watchers: watchersList,
+
+        departmentLabel,
+        component: finalComponent,
+        dataClassification,
+        environment: type === 'BUG' ? environment : 'DEV',
+        labels,
+
+        severity: type === 'BUG' ? severity : undefined,
+        stepsToReproduce: type === 'BUG' ? stepsToReproduce.trim() : undefined,
+        linkedTestCaseCode: type === 'BUG' ? linkedTestCaseCode.trim() : undefined,
+        linkedDocumentId: linkedDocId,
+        linkedRequirementKeyCode: linkedReqKey.trim() || undefined,
+        linkedRequirementTitle: prefillReq?.reqTitle,
+      })
+
+      if (createAnother) {
+        setSuccessToast(`✓ Đã tạo thành công ${newIssue.key}! Sẵn sàng tạo issue tiếp theo.`)
+        setSummary('')
+        setDescription('')
+        setStepsToReproduce('')
+        setLinkedTestCaseCode('')
+        setTimeout(() => setSuccessToast(null), 3500)
+        onSuccess(newIssue, true)
+      } else {
+        onSuccess(newIssue, false)
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
-    <Modal title={`Tạo mới ${type === 'TASK' ? 'Task (Công việc)' : 'Bug (Lỗi)'}`} open={true} onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setType('TASK')}
-            className={clsx(
-              'flex-1 flex items-center justify-center gap-2 rounded-lg border py-2 text-xs font-bold transition-colors',
-              type === 'TASK' ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-slate-200 text-slate-600',
-            )}
-          >
-            <JiraTaskIcon />
-            <span>Task (Công việc)</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setType('BUG')}
-            className={clsx(
-              'flex-1 flex items-center justify-center gap-2 rounded-lg border py-2 text-xs font-bold transition-colors',
-              type === 'BUG' ? 'border-rose-600 bg-rose-50 text-rose-800' : 'border-slate-200 text-slate-600',
-            )}
-          >
-            <JiraBugIcon />
-            <span>Bug (Báo lỗi phần mềm)</span>
-          </button>
-        </div>
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-in fade-in">
+      <div className="max-w-5xl w-[94vw] max-h-[92vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 text-slate-800">
+        {/* ======================================================== */}
+        {/* A. HEADER CỦA POPUP TẠO MỚI (FIXED TOP)                  */}
+        {/* ======================================================== */}
+        <header className="h-16 border-b border-slate-200 px-6 flex items-center justify-between shrink-0 bg-slate-50/70">
+          <div className="flex items-center gap-3">
+            <JiraLogoIcon className="h-6 w-6" />
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-extrabold text-slate-900">
+                  Tạo mới Issue (Create Jira Issue)
+                </h2>
+                <span className="rounded bg-blue-100 px-1.5 py-0.5 font-mono text-xs font-bold text-blue-800">
+                  [{projectKey}]
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 font-mono">
+                Mã Issue tự động tiếp theo: <strong className="text-blue-600">{nextIssueKey}</strong>
+              </p>
+            </div>
+          </div>
 
-        <TextField
-          label="Tiêu đề tóm tắt (Summary)"
-          required
-          placeholder="VD: Cấu hình Spring Security OAuth2 và JWT filter..."
-          value={summary}
-          onChange={(e) => setSummary(e.target.value)}
-        />
-
-        <TextAreaField
-          label="Mô tả chi tiết (Description)"
-          placeholder="Mô tả phạm vi thực hiện, kết quả kỳ vọng..."
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={3}
-        />
-
-        {type === 'BUG' && (
-          <div className="rounded-lg border border-rose-200 bg-rose-50/50 p-3.5 space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <SelectField
-                label="Mức độ nghiêm trọng (Severity)"
-                value={severity}
-                onChange={(e) => setSeverity(e.target.value as BugSeverity)}
+          {/* Bộ chuyển nhanh loại Issue ngay trên đầu */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center rounded-xl border border-slate-200 bg-white p-1 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => handleTypeSwitch('TASK')}
+                className={clsx(
+                  'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all',
+                  type === 'TASK'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:bg-slate-100',
+                )}
               >
-                <option value="BLOCKER">💥 BLOCKER</option>
-                <option value="CRITICAL">🔴 CRITICAL</option>
-                <option value="MAJOR">🟠 MAJOR</option>
-                <option value="MINOR">🟡 MINOR</option>
-              </SelectField>
-
-              <TextField
-                label="Mã Test Case phát hiện (nếu có)"
-                placeholder="VD: TC-01-01"
-                value={linkedTestCaseCode}
-                onChange={(e) => setLinkedTestCaseCode(e.target.value)}
-              />
+                <JiraTaskIcon className="h-3.5 w-3.5" />
+                <span>Task (Công việc)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTypeSwitch('BUG')}
+                className={clsx(
+                  'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all',
+                  type === 'BUG'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:bg-slate-100',
+                )}
+              >
+                <JiraBugIcon className="h-3.5 w-3.5" />
+                <span>Bug (Báo lỗi phần mềm)</span>
+              </button>
             </div>
 
-            <TextAreaField
-              label="Các bước tái hiện (Steps to Reproduce)"
-              placeholder="1. Mở màn hình đăng nhập...&#10;2. Nhập email sai 5 lần..."
-              value={stepsToReproduce}
-              onChange={(e) => setStepsToReproduce(e.target.value)}
-              rows={2}
-            />
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-3">
-          <SelectField
-            label="Giai đoạn (Phase)"
-            value={phaseId}
-            onChange={(e) => setPhaseId(Number(e.target.value))}
-          >
-            {phases.map((p) => (
-              <option key={p.phaseId} value={p.phaseId}>
-                {p.name}
-              </option>
-            ))}
-          </SelectField>
-
-          <SelectField
-            label="Người phụ trách (Assignee)"
-            value={assigneeName}
-            onChange={(e) => setAssigneeName(e.target.value)}
-          >
-            {members.map((m) => (
-              <option key={m.fullName} value={m.fullName}>
-                {m.fullName} ({m.role.name})
-              </option>
-            ))}
-          </SelectField>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <SelectField
-            label="Độ ưu tiên (Priority)"
-            value={priority}
-            onChange={(e) => setPriority(e.target.value as IssuePriority)}
-          >
-            <option value="HIGHEST">Highest</option>
-            <option value="HIGH">High</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="LOW">Low</option>
-          </SelectField>
-
-          <TextField
-            label="Story Points (pts)"
-            type="number"
-            min={1}
-            max={21}
-            value={String(storyPoints)}
-            onChange={(e) => setStoryPoints(Number(e.target.value))}
-          />
-        </div>
-
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
-          <span className="font-bold text-xs text-slate-700 flex items-center gap-1.5">
-            <span>🔗</span>
-            <span>Liên kết Yêu cầu Đặc tả Confluence (Tùy chọn)</span>
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            <SelectField
-              label="Tài liệu"
-              value={linkedDocId || ''}
-              onChange={(e) => setLinkedDocId(Number(e.target.value) || undefined)}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition-colors ml-2"
+              title="Đóng (Hủy)"
             >
-              <option value="">-- Không liên kết --</option>
-              {documents.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.code}: {d.title}
-                </option>
-              ))}
-            </SelectField>
-
-            <TextField
-              label="Mã REQ (VD: REQ-01)"
-              placeholder="REQ-01"
-              value={linkedReqKey}
-              onChange={(e) => setLinkedReqKey(e.target.value.toUpperCase())}
-            />
+              ✕
+            </button>
           </div>
-        </div>
+        </header>
 
-        <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-          <Button variant="secondary" inline onClick={onClose}>
-            Hủy
-          </Button>
-          <Button variant="primary" inline type="submit">
-            Tạo Issue
-          </Button>
-        </div>
-      </form>
-    </Modal>
+        {/* ======================================================== */}
+        {/* B. THÂN FORM CUỘN MƯỢT: 2 CỘT (60% TRÁI - 40% PHẢI)     */}
+        {/* ======================================================== */}
+        <form id="create-issue-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+          {successToast && (
+            <div className="bg-emerald-600 text-white px-6 py-2.5 text-xs font-bold flex items-center justify-between shadow-inner animate-in fade-in">
+              <span>{successToast}</span>
+              <button type="button" onClick={() => setSuccessToast(null)} className="text-white/80 hover:text-white">
+                ✕
+              </button>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 p-6">
+            {/* ---------------------------------------------------- */}
+            {/* CỘT TRÁI (60%): NỘI DUNG, PHÂN HỆ, DỮ LIỆU & REQ     */}
+            {/* ---------------------------------------------------- */}
+            <div className="lg:col-span-7 space-y-4">
+              {/* 1. Hàng Giai đoạn & Trạng thái khởi tạo */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SelectField
+                  label="Giai đoạn SDLC (Phase *)"
+                  value={phaseId}
+                  onChange={(e) => setPhaseId(Number(e.target.value))}
+                >
+                  {phases.map((p) => (
+                    <option key={p.phaseId} value={p.phaseId}>
+                      {p.name}
+                    </option>
+                  ))}
+                </SelectField>
+
+                <SelectField
+                  label="Trạng thái khởi tạo (Initial Workflow Status *)"
+                  value={statusId}
+                  onChange={(e) => setStatusId(Number(e.target.value))}
+                >
+                  {currentPhase.statuses.map((s) => (
+                    <option key={s.statusId} value={s.statusId}>
+                      {s.name} ({s.category})
+                    </option>
+                  ))}
+                </SelectField>
+              </div>
+
+              {/* 2. Tiêu đề tóm tắt */}
+              <TextField
+                label="Tiêu đề tóm tắt (Summary *)"
+                required
+                placeholder={
+                  type === 'TASK'
+                    ? 'VD: Cấu hình Spring Security OAuth2 và Token JWT Filter...'
+                    : 'VD: Lỗi Webhook Ngân hàng bị xử lý 2 lần (Duplicate Credit)...'
+                }
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+              />
+
+              {/* 3. Mô tả chi tiết */}
+              <TextAreaField
+                label="Mô tả chi tiết (Description)"
+                placeholder="Mô tả bối cảnh kỹ thuật, tiêu chí hoàn thành, các bước kiểm tra..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+              />
+
+              {/* Nếu là Bug: Khung viền đỏ nhạt chuyên sâu */}
+              {type === 'BUG' && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-4 space-y-3">
+                  <div className="flex items-center gap-1.5 text-rose-900 font-extrabold text-xs">
+                    <span>🐞</span>
+                    <span>Thông tin Báo cáo Lỗi Kỹ thuật (Bug Details)</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <SelectField
+                      label="Mức độ nghiêm trọng (Severity *)"
+                      value={severity}
+                      onChange={(e) => setSeverity(e.target.value as BugSeverity)}
+                    >
+                      <option value="BLOCKER">💥 BLOCKER - Chặn tiến độ phát hành</option>
+                      <option value="CRITICAL">🔴 CRITICAL - Nghiêm trọng / Mất dữ liệu</option>
+                      <option value="MAJOR">🟠 MAJOR - Lỗi chức năng chính</option>
+                      <option value="MINOR">🟡 MINOR - Lỗi nhỏ / Giao diện</option>
+                    </SelectField>
+
+                    <SelectField
+                      label="Môi trường phát hiện lỗi (Environment *)"
+                      value={environment}
+                      onChange={(e) => setEnvironment(e.target.value as EnvironmentType)}
+                    >
+                      <option value="DEV">DEV (Môi trường phát triển)</option>
+                      <option value="STAGING">STAGING (Tiền sản phẩm)</option>
+                      <option value="UAT">UAT (Nghiệm thu)</option>
+                      <option value="PRODUCTION">PRODUCTION (Vận hành thực tế)</option>
+                    </SelectField>
+                  </div>
+
+                  <TextAreaField
+                    label="Các bước tái hiện lỗi & Kết quả kỳ vọng (Steps to Reproduce & Expected vs Actual)"
+                    placeholder="1. Mở màn hình đăng nhập...&#10;2. Nhập mật khẩu sai 5 lần...&#10;3. Kết quả thực tế: Không bị khóa tài khoản...&#10;4. Kết quả mong đợi: Khóa tài khoản 15 phút theo REQ-01."
+                    value={stepsToReproduce}
+                    onChange={(e) => setStepsToReproduce(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+              )}
+
+              {/* 4. Khung Phân loại Quản trị & Dữ liệu (Grid 2x2) */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
+                <span className="font-extrabold text-xs text-slate-700 flex items-center gap-1.5">
+                  <span>🏢</span>
+                  <span>Phân loại Tổ chức, Phân hệ & Bảo mật (Classification Grid)</span>
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Ô 1: Phòng / Nhóm quản lý */}
+                  <SelectField
+                    label="Phòng / Nhóm quản lý (Team Label *)"
+                    value={departmentLabel}
+                    onChange={(e) => setDepartmentLabel(e.target.value as DepartmentLabel)}
+                  >
+                    {DEFAULT_DEPARTMENTS.map((dept) => (
+                      <option key={dept} value={dept}>
+                        {dept}
+                      </option>
+                    ))}
+                  </SelectField>
+
+                  {/* Ô 2: Phân hệ hệ thống (Component) */}
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      Phân hệ hệ thống (Component *)
+                    </label>
+                    <select
+                      value={component}
+                      onChange={(e) => {
+                        setComponent(e.target.value)
+                        if (e.target.value !== '__custom__') setCustomComponent('')
+                      }}
+                      className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs font-semibold text-slate-800 outline-none focus:border-blue-500"
+                    >
+                      {DEFAULT_COMPONENTS.map((comp) => (
+                        <option key={comp} value={comp}>
+                          {comp}
+                        </option>
+                      ))}
+                      <option value="__custom__">+ Nhập phân hệ khác...</option>
+                    </select>
+                    {component === '__custom__' && (
+                      <input
+                        type="text"
+                        placeholder="Nhập tên phân hệ mới..."
+                        value={customComponent}
+                        onChange={(e) => setCustomComponent(e.target.value)}
+                        className="mt-1.5 w-full rounded-lg border border-slate-300 p-2 text-xs outline-none"
+                      />
+                    )}
+                  </div>
+
+                  {/* Ô 3: Phân loại mức độ dữ liệu */}
+                  <SelectField
+                    label="Phân loại mức độ dữ liệu (Data Classification *)"
+                    value={dataClassification}
+                    onChange={(e) => setDataClassification(e.target.value as DataClassification)}
+                  >
+                    <option value="PUBLIC">🌐 PUBLIC - Công khai nội bộ dự án</option>
+                    <option value="INTERNAL">🏢 INTERNAL - Nghiệp vụ & Kỹ thuật nội bộ</option>
+                    <option value="CONFIDENTIAL_PII">🛡️ CONFIDENTIAL / PII - Dữ liệu cá nhân / eKYC</option>
+                    <option value="RESTRICTED">🔒 RESTRICTED - Bảo mật cao / Tài chính & Khóa</option>
+                  </SelectField>
+
+                  {/* Ô 4: Nhãn phân loại bổ sung */}
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      Nhãn thẻ bổ sung (Labels)
+                    </label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            handleAddTag(tagInput)
+                          }
+                        }}
+                        placeholder="Nhập thẻ rồi nhấn Enter..."
+                        className="flex-1 rounded-xl border border-slate-300 p-2 text-xs outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddTag(tagInput)}
+                        className="rounded-xl bg-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-300"
+                      >
+                        + Gắn
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Danh sách thẻ đang gắn & gợi ý nhanh */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[11px] text-slate-400">Đã gắn:</span>
+                  {labels.map((lbl) => (
+                    <span
+                      key={lbl}
+                      className="inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-bold text-blue-800"
+                    >
+                      <span>{lbl}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTag(lbl)}
+                        className="text-blue-500 hover:text-rose-600 font-bold"
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                  <div className="flex items-center gap-1 pl-2">
+                    <span className="text-[10px] text-slate-400">Gợi ý:</span>
+                    {['security', 'api', 'ui-fix', 'performance', 'uat-blocker', 'hotfix'].map((sug) => (
+                      <button
+                        key={sug}
+                        type="button"
+                        onClick={() => handleAddTag(sug)}
+                        className="rounded bg-slate-100 hover:bg-slate-200 px-1.5 py-0.2 text-[9px] text-slate-600"
+                      >
+                        +{sug}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* 5. Khung Liên kết Truy xuất Nguồn gốc (Traceability) */}
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4 space-y-3">
+                <span className="font-extrabold text-xs text-emerald-900 flex items-center gap-1.5">
+                  <span>🔗</span>
+                  <span>Liên kết Truy xuất Nguồn gốc (Traceability Mapping)</span>
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <SelectField
+                    label="Tài liệu Đặc tả Confluence"
+                    value={linkedDocId || ''}
+                    onChange={(e) => setLinkedDocId(Number(e.target.value) || undefined)}
+                  >
+                    <option value="">-- Không liên kết --</option>
+                    {documents.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.code}: {d.title}
+                      </option>
+                    ))}
+                  </SelectField>
+
+                  <TextField
+                    label="Mã Yêu cầu [REQ-xx]"
+                    placeholder="VD: REQ-01"
+                    value={linkedReqKey}
+                    onChange={(e) => setLinkedReqKey(e.target.value.toUpperCase())}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <TextField
+                    label="Kịch bản kiểm thử liên quan (Test Case Code)"
+                    placeholder="VD: TC-01-01"
+                    value={linkedTestCaseCode}
+                    onChange={(e) => setLinkedTestCaseCode(e.target.value)}
+                  />
+                  <div className="flex items-end pb-1 text-[11px] text-slate-500">
+                    Liên kết giúp tự động đồng bộ RTM và cảnh báo Stale khi đặc tả bị sửa đổi.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* ---------------------------------------------------- */}
+            {/* CỘT PHẢI (40%): NHÂN SỰ 4 VAI TRÒ & KẾ HOẠCH         */}
+            {/* ---------------------------------------------------- */}
+            <div className="lg:col-span-5 space-y-4 border-t lg:border-t-0 lg:border-l lg:border-slate-200 lg:pl-6">
+              {/* KHUNG NHÂN SỰ & TRÁCH NHIỆM */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3.5">
+                <h3 className="font-extrabold text-xs uppercase tracking-wider text-slate-600 border-b border-slate-200 pb-2 flex items-center justify-between">
+                  <span>Nhân sự & Trách nhiệm (People)</span>
+                  <span className="text-[10px] text-blue-600 font-bold">4 Vai trò</span>
+                </h3>
+
+                {/* 1. Người thực thi (Assignee) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-slate-700">
+                      Người thực thi (Assignee *)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setAssigneeName(user?.fullName || 'Sarah Lin')}
+                      className="text-[11px] font-bold text-blue-600 hover:underline"
+                    >
+                      [Giao cho tôi]
+                    </button>
+                  </div>
+                  <select
+                    value={assigneeName}
+                    onChange={(e) => setAssigneeName(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs font-semibold text-slate-800 outline-none focus:border-blue-500"
+                  >
+                    {members.map((m) => (
+                      <option key={m.fullName} value={m.fullName}>
+                        {m.fullName} ({m.role.name})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. Người sở hữu / Chịu trách nhiệm chính (Owner) */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    Người sở hữu tính năng (Issue Owner *)
+                  </label>
+                  <select
+                    value={ownerName}
+                    onChange={(e) => setOwnerName(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs font-semibold text-slate-800 outline-none focus:border-blue-500"
+                  >
+                    {members.map((m) => (
+                      <option key={m.fullName} value={m.fullName}>
+                        {m.fullName} ({m.role.name})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    Chịu trách nhiệm đầu cuối về mặt kỹ thuật và nghiệm thu tính năng.
+                  </p>
+                </div>
+
+                {/* 3. Người báo cáo / Khởi tạo (Reporter) */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    Người báo cáo / Khởi tạo (Reporter *)
+                  </label>
+                  <select
+                    value={reporterName}
+                    onChange={(e) => setReporterName(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-xs font-semibold text-slate-800 outline-none focus:border-blue-500"
+                  >
+                    {members.map((m) => (
+                      <option key={m.fullName} value={m.fullName}>
+                        {m.fullName} ({m.role.name})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 4. Người theo dõi (Watchers) */}
+                <div className="border-t border-slate-200 pt-2.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                      <span>👁️</span>
+                      <span>Người theo dõi ({selectedWatcherNames.length})</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400">Bấm để bật / tắt</span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                    {members.map((m) => {
+                      const isWatching = selectedWatcherNames.includes(m.fullName)
+                      return (
+                        <button
+                          key={m.fullName}
+                          type="button"
+                          onClick={() => toggleWatcherName(m.fullName)}
+                          className={clsx(
+                            'inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold border transition-all',
+                            isWatching
+                              ? 'border-blue-500 bg-blue-50 text-blue-800 shadow-2xs font-bold'
+                              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100',
+                          )}
+                        >
+                          <span>{isWatching ? '✓' : '+'}</span>
+                          <span>{m.fullName}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  <p className="text-[10px] text-slate-500 leading-tight">
+                    * Những người trong danh sách Watchers sẽ tự động nhận thông báo khi Issue chuyển trạng thái, có bình luận hoặc bị cảnh báo Stale.
+                  </p>
+                </div>
+              </div>
+
+              {/* KHUNG ĐỘ ƯU TIÊN & ƯỚC LƯỢNG KẾ HOẠCH */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3.5">
+                <h3 className="font-extrabold text-xs uppercase tracking-wider text-slate-600 border-b border-slate-200 pb-2">
+                  Kế hoạch & Ước lượng (Schedule)
+                </h3>
+
+                {/* Độ ưu tiên Priority */}
+                <SelectField
+                  label="Độ ưu tiên (Priority *)"
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as IssuePriority)}
+                >
+                  <option value="HIGHEST">🔴 Highest (Cao nhất - Chặn release)</option>
+                  <option value="HIGH">🟠 High (Cao)</option>
+                  <option value="MEDIUM">🟡 Medium (Trung bình)</option>
+                  <option value="LOW">🔵 Low (Thấp)</option>
+                </SelectField>
+
+                {/* Story Points (Điểm phức tạp) */}
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    Điểm phức tạp (Story Points *)
+                  </label>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    {[1, 2, 3, 5, 8, 13].map((pts) => (
+                      <button
+                        key={pts}
+                        type="button"
+                        onClick={() => setStoryPoints(pts)}
+                        className={clsx(
+                          'flex-1 py-1 rounded-lg border text-xs font-mono font-bold transition-all',
+                          storyPoints === pts
+                            ? 'border-blue-600 bg-blue-600 text-white shadow-2xs'
+                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100',
+                        )}
+                      >
+                        {pts}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="number"
+                    min={1}
+                    max={21}
+                    value={storyPoints}
+                    onChange={(e) => setStoryPoints(Number(e.target.value))}
+                    className="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs font-mono font-bold text-slate-800 outline-none"
+                    placeholder="Hoặc nhập số điểm..."
+                  />
+                </div>
+
+                {/* Thời gian ước lượng & Hạn chót */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      Ước lượng (Estimate)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="VD: 2h, 1d 4h, 3d"
+                      value={originalEstimate}
+                      onChange={(e) => setOriginalEstimate(e.target.value)}
+                      className="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs font-mono font-semibold text-slate-800 outline-none focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      Hạn hoàn thành (Due Date)
+                    </label>
+                    <input
+                      type="date"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      className="w-full rounded-xl border border-slate-300 bg-white p-2 text-xs font-mono font-semibold text-slate-800 outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </form>
+
+        {/* ======================================================== */}
+        {/* C. FOOTER CỐ ĐỊNH CHUẨN ATLASSIAN JIRA                   */}
+        {/* ======================================================== */}
+        <footer className="h-16 border-t border-slate-200 px-6 flex items-center justify-between shrink-0 bg-slate-50/70">
+          {/* Checkbox Tạo thêm Issue khác (Chuẩn Jira) */}
+          <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={createAnother}
+              onChange={(e) => setCreateAnother(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span>Tạo thêm Issue khác (Giữ nguyên Phase, Component & Nhóm quản lý sau khi tạo)</span>
+          </label>
+
+          {/* Cụm nút Hành động */}
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" inline onClick={onClose} disabled={isSubmitting}>
+              Hủy bỏ
+            </Button>
+            <Button
+              variant="primary"
+              inline
+              type="submit"
+              form="create-issue-form"
+              disabled={isSubmitting || !summary.trim()}
+            >
+              {isSubmitting ? 'Đang tạo...' : '✓ Tạo mới Issue'}
+            </Button>
+          </div>
+        </footer>
+      </div>
+    </div>
   )
 }

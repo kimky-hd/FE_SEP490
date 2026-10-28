@@ -1,13 +1,19 @@
 import type {
+  BugSeverity,
+  DataClassification,
+  DepartmentLabel,
+  EnvironmentType,
   IssueComment,
   IssuePriority,
   IssueType,
+  IssueWatcher,
   ProjectIssue,
   ProjectIssueStats,
 } from '@/types/issue'
 import type { StatusCategory } from '@/types/project'
 
-const STORAGE_KEY = 'ssam.issues.v1'
+const STORAGE_KEY = 'ssam.issues.v2'
+const OLD_STORAGE_KEY = 'ssam.issues.v1'
 
 interface StoredIssueData {
   issues: ProjectIssue[]
@@ -30,11 +36,29 @@ function createInitialSeed(): StoredIssueData {
       statusCategory: 'IN_PROGRESS',
       priority: 'HIGH',
       storyPoints: 5,
+      originalEstimate: '2d',
+      dueDate: '2026-10-31',
+
+      // Nhân sự 4 vai trò
       assigneeName: 'Sarah Lin',
       assigneeRole: 'Senior Developer',
       assigneeAvatar: 'SL',
+      ownerName: 'Sarah Lin',
+      ownerRole: 'Senior Developer',
       reporterName: 'Phạm Văn Khoa (PM)',
-      labels: ['Backend', 'Security', 'JWT'],
+      reporterRole: 'Project Manager',
+      watchers: [
+        { name: 'Phạm Văn Khoa (PM)', role: 'Project Manager' },
+        { name: 'Vũ Kim Kỳ', role: 'Backend Developer' },
+      ],
+
+      // Phân loại tổ chức & bảo mật
+      departmentLabel: 'Backend Team',
+      component: 'Authentication & SSO',
+      dataClassification: 'CONFIDENTIAL_PII',
+      environment: 'DEV',
+      labels: ['Backend', 'Security', 'JWT', 'Sprint-3'],
+
       createdAt: '2026-10-21T09:00:00.000Z',
       updatedAt: '2026-10-27T14:30:00.000Z',
       linkedDocumentId: 101,
@@ -102,11 +126,29 @@ function createInitialSeed(): StoredIssueData {
       statusCategory: 'TODO',
       priority: 'HIGHEST',
       storyPoints: 3,
+      originalEstimate: '1d',
+      dueDate: '2026-10-29',
+
+      // Nhân sự 4 vai trò
       assigneeName: 'Vũ Kim Kỳ',
       assigneeRole: 'Backend Developer',
       assigneeAvatar: 'KK',
+      ownerName: 'Sarah Lin',
+      ownerRole: 'Senior Developer',
       reporterName: 'Vũ Thị Mai (QA)',
-      labels: ['Bug', 'Security', 'Hotfix'],
+      reporterRole: 'QA Lead',
+      watchers: [
+        { name: 'Sarah Lin', role: 'Senior Developer' },
+        { name: 'Vũ Thị Mai (QA)', role: 'QA Lead' },
+      ],
+
+      // Phân loại tổ chức & bảo mật
+      departmentLabel: 'Backend Team',
+      component: 'Authentication & SSO',
+      dataClassification: 'RESTRICTED',
+      environment: 'STAGING',
+      labels: ['Bug', 'Security', 'Hotfix', 'Redis'],
+
       createdAt: '2026-10-25T14:00:00.000Z',
       updatedAt: '2026-10-26T16:00:00.000Z',
       linkedDocumentId: 101,
@@ -149,11 +191,29 @@ function createInitialSeed(): StoredIssueData {
       statusCategory: 'IN_PROGRESS',
       priority: 'HIGH',
       storyPoints: 8,
+      originalEstimate: '3d',
+      dueDate: '2026-11-02',
+
+      // Nhân sự 4 vai trò
       assigneeName: 'Phạm Minh Lương',
       assigneeRole: 'Backend Developer',
       assigneeAvatar: 'ML',
+      ownerName: 'Phạm Minh Lương',
+      ownerRole: 'Tech Lead / Payment',
       reporterName: 'Sarah Lin',
-      labels: ['Payment', 'VietQR', 'SDK'],
+      reporterRole: 'Senior Developer',
+      watchers: [
+        { name: 'Phạm Văn Khoa (PM)', role: 'Project Manager' },
+        { name: 'Vũ Kim Kỳ', role: 'Backend Developer' },
+      ],
+
+      // Phân loại tổ chức & bảo mật
+      departmentLabel: 'Backend Team',
+      component: 'Core Banking & VietQR',
+      dataClassification: 'RESTRICTED',
+      environment: 'DEV',
+      labels: ['Payment', 'VietQR', 'SDK', 'Napas'],
+
       createdAt: '2026-10-22T08:00:00.000Z',
       updatedAt: '2026-10-27T10:00:00.000Z',
       linkedDocumentId: 102,
@@ -191,11 +251,30 @@ function createInitialSeed(): StoredIssueData {
       statusCategory: 'IN_PROGRESS',
       priority: 'HIGHEST',
       storyPoints: 5,
+      originalEstimate: '1d 4h',
+      dueDate: '2026-10-28',
+
+      // Nhân sự 4 vai trò
       assigneeName: 'Phạm Minh Lương',
       assigneeRole: 'Backend Developer',
       assigneeAvatar: 'ML',
+      ownerName: 'Phạm Minh Lương',
+      ownerRole: 'Tech Lead / Payment',
       reporterName: 'Vũ Thị Mai (QA)',
-      labels: ['Bug', 'Webhook', 'Finance'],
+      reporterRole: 'QA Lead',
+      watchers: [
+        { name: 'Phạm Minh Lương', role: 'Backend Developer' },
+        { name: 'Vũ Thị Mai (QA)', role: 'QA Lead' },
+        { name: 'Phạm Văn Khoa (PM)', role: 'Project Manager' },
+      ],
+
+      // Phân loại tổ chức & bảo mật
+      departmentLabel: 'Backend Team',
+      component: 'Core Banking & VietQR',
+      dataClassification: 'RESTRICTED',
+      environment: 'PRODUCTION',
+      labels: ['Bug', 'Webhook', 'Finance', 'Blocker'],
+
       createdAt: '2026-10-26T11:00:00.000Z',
       updatedAt: '2026-10-27T15:20:00.000Z',
       linkedDocumentId: 102,
@@ -238,11 +317,26 @@ function createInitialSeed(): StoredIssueData {
       statusCategory: 'IN_PROGRESS',
       priority: 'MEDIUM',
       storyPoints: 3,
+      originalEstimate: '2d',
+      dueDate: '2026-11-04',
+
+      // Nhân sự 4 vai trò
       assigneeName: 'Sarah Lin',
       assigneeRole: 'Frontend Developer',
       assigneeAvatar: 'SL',
+      ownerName: 'Vũ Kim Kỳ (BA)',
+      ownerRole: 'Product Designer',
       reporterName: 'Phạm Minh Lương',
-      labels: ['Frontend', 'UI/UX'],
+      reporterRole: 'Backend Developer',
+      watchers: [{ name: 'Vũ Kim Kỳ (BA)', role: 'Product Designer' }],
+
+      // Phân loại tổ chức & bảo mật
+      departmentLabel: 'Frontend Team',
+      component: 'Confluence Spec Editor',
+      dataClassification: 'INTERNAL',
+      environment: 'DEV',
+      labels: ['Frontend', 'UI/UX', 'Table'],
+
       createdAt: '2026-10-23T10:00:00.000Z',
       updatedAt: '2026-10-26T17:00:00.000Z',
       linkedDocumentId: 102,
@@ -276,11 +370,26 @@ function createInitialSeed(): StoredIssueData {
       statusCategory: 'DONE',
       priority: 'MEDIUM',
       storyPoints: 3,
+      originalEstimate: '4d',
+      dueDate: '2026-10-20',
+
+      // Nhân sự 4 vai trò
       assigneeName: 'Phạm Minh Lương',
       assigneeRole: 'Business Analyst',
       assigneeAvatar: 'ML',
+      ownerName: 'Phạm Văn Khoa (PM)',
+      ownerRole: 'Project Manager',
       reporterName: 'Phạm Văn Khoa (PM)',
-      labels: ['BA', 'Design', 'eKYC'],
+      reporterRole: 'Project Manager',
+      watchers: [{ name: 'Sarah Lin', role: 'Senior Developer' }],
+
+      // Phân loại tổ chức & bảo mật
+      departmentLabel: 'BA & Product',
+      component: 'Traceability & RTM',
+      dataClassification: 'CONFIDENTIAL_PII',
+      environment: 'STAGING',
+      labels: ['BA', 'Design', 'eKYC', 'Wireframe'],
+
       createdAt: '2026-10-14T08:00:00.000Z',
       updatedAt: '2026-10-20T16:00:00.000Z',
       linkedDocumentId: 103,
@@ -314,12 +423,27 @@ function createInitialSeed(): StoredIssueData {
       statusCategory: 'DONE',
       priority: 'LOW',
       storyPoints: 2,
+      originalEstimate: '1d',
+      dueDate: '2026-10-24',
+
+      // Nhân sự 4 vai trò
       assigneeName: 'Vũ Kim Kỳ',
       assigneeRole: 'Backend Developer',
       assigneeAvatar: 'KK',
+      ownerName: 'Sarah Lin',
+      ownerRole: 'Senior Developer',
       reporterName: 'Phạm Văn Khoa (PM)',
-      labels: ['Documentation', 'Swagger'],
-      createdAt: '2026-10-18T09:00:00.000Z',
+      reporterRole: 'Project Manager',
+      watchers: [{ name: 'Phạm Văn Khoa (PM)', role: 'Project Manager' }],
+
+      // Phân loại tổ chức & bảo mật
+      departmentLabel: 'DevOps & SecOps',
+      component: 'AI Generation Engine',
+      dataClassification: 'PUBLIC',
+      environment: 'UAT',
+      labels: ['DevOps', 'Swagger', 'Docs'],
+
+      createdAt: '2026-10-20T09:00:00.000Z',
       updatedAt: '2026-10-24T12:00:00.000Z',
       traceabilityStatus: 'FRESH',
       comments: [],
@@ -340,7 +464,12 @@ function createInitialSeed(): StoredIssueData {
 
 function loadStorage(): StoredIssueData {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    let raw = localStorage.getItem(STORAGE_KEY)
+    let isMigrated = false
+    if (!raw) {
+      raw = localStorage.getItem(OLD_STORAGE_KEY)
+      if (raw) isMigrated = true
+    }
     if (!raw) {
       const seeded = createInitialSeed()
       saveStorage(seeded)
@@ -351,6 +480,69 @@ function loadStorage(): StoredIssueData {
       const seeded = createInitialSeed()
       saveStorage(seeded)
       return seeded
+    }
+
+    // Tự động kiểm tra và nâng cấp dữ liệu cũ (auto-migration)
+    let hasChanges = isMigrated
+    parsed.issues = parsed.issues.map((iss) => {
+      let changed = false
+      const copy: ProjectIssue = { ...iss }
+
+      if (!copy.ownerName) {
+        copy.ownerName = copy.assigneeName || 'Sarah Lin'
+        copy.ownerRole = copy.assigneeRole || 'Senior Developer'
+        changed = true
+      }
+      if (!copy.ownerRole) {
+        copy.ownerRole = 'Senior Developer'
+        changed = true
+      }
+      if (!copy.reporterRole) {
+        copy.reporterRole = 'QA Lead'
+        changed = true
+      }
+      if (!copy.watchers || !Array.isArray(copy.watchers) || copy.watchers.length === 0) {
+        copy.watchers = [
+          { name: 'Phạm Văn Khoa (PM)', role: 'Project Manager' },
+          { name: 'Sarah Lin', role: 'Senior Developer' },
+        ]
+        changed = true
+      }
+      if (!copy.departmentLabel) {
+        copy.departmentLabel = 'Backend Team'
+        changed = true
+      }
+      if (!copy.component) {
+        copy.component = 'Authentication & SSO'
+        changed = true
+      }
+      if (!copy.dataClassification) {
+        copy.dataClassification = 'INTERNAL'
+        changed = true
+      }
+      if (!copy.environment) {
+        copy.environment = 'DEV'
+        changed = true
+      }
+      if (!copy.labels || !Array.isArray(copy.labels)) {
+        copy.labels = [copy.type === 'BUG' ? 'Bug' : 'Task']
+        changed = true
+      }
+      if (!copy.originalEstimate) {
+        copy.originalEstimate = '2d'
+        changed = true
+      }
+      if (!copy.dueDate) {
+        copy.dueDate = '2026-11-05'
+        changed = true
+      }
+
+      if (changed) hasChanges = true
+      return copy
+    })
+
+    if (hasChanges) {
+      saveStorage(parsed)
     }
     return parsed
   } catch {
@@ -420,11 +612,21 @@ export const issueApi = {
     statusCategory: StatusCategory
     priority: IssuePriority
     storyPoints?: number
+    originalEstimate?: string
+    dueDate?: string
     assigneeName: string
     assigneeRole: string
+    ownerName?: string
+    ownerRole?: string
     reporterName: string
+    reporterRole?: string
+    watchers?: IssueWatcher[]
+    departmentLabel?: DepartmentLabel
+    component?: string
+    dataClassification?: DataClassification
+    environment?: EnvironmentType
     labels?: string[]
-    severity?: 'BLOCKER' | 'CRITICAL' | 'MAJOR' | 'MINOR'
+    severity?: BugSeverity
     stepsToReproduce?: string
     linkedTestCaseCode?: string
     linkedDocumentId?: number
@@ -474,11 +676,32 @@ export const issueApi = {
       statusCategory: params.statusCategory,
       priority: params.priority,
       storyPoints: params.storyPoints || (params.type === 'BUG' ? 3 : 5),
+      originalEstimate: params.originalEstimate || '1d',
+      dueDate: params.dueDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+
+      // Nhân sự 4 vai trò
       assigneeName: params.assigneeName,
       assigneeRole: params.assigneeRole,
       assigneeAvatar: initials,
+      ownerName: params.ownerName || params.assigneeName,
+      ownerRole: params.ownerRole || params.assigneeRole,
       reporterName: params.reporterName,
+      reporterRole: params.reporterRole || 'QA Lead',
+      watchers:
+        params.watchers && params.watchers.length > 0
+          ? params.watchers
+          : [
+              { name: params.reporterName, role: params.reporterRole || 'Reporter' },
+              { name: params.assigneeName, role: params.assigneeRole },
+            ],
+
+      // Phân loại tổ chức & bảo mật
+      departmentLabel: params.departmentLabel || 'Backend Team',
+      component: params.component || 'Authentication & SSO',
+      dataClassification: params.dataClassification || 'INTERNAL',
+      environment: params.environment || 'DEV',
       labels: params.labels || [params.type === 'BUG' ? 'Bug' : 'Task'],
+
       createdAt: now,
       updatedAt: now,
       linkedDocumentId: params.linkedDocumentId,
@@ -527,6 +750,45 @@ export const issueApi = {
       })
     }
 
+    saveStorage(data)
+    return issue
+  },
+
+  /** Bật/Tắt theo dõi Issue (Watch/Unwatch) */
+  toggleWatcher: async (
+    id: string,
+    watcher: IssueWatcher,
+    actor = 'Người dùng',
+  ): Promise<ProjectIssue> => {
+    const data = loadStorage()
+    const issue = data.issues.find((i) => i.id === id)
+    if (!issue) throw new Error(`Không tìm thấy Issue #${id}`)
+
+    const now = new Date().toISOString()
+    if (!Array.isArray(issue.watchers)) issue.watchers = []
+    const exists = issue.watchers.some((w) => w.name === watcher.name)
+
+    if (exists) {
+      issue.watchers = issue.watchers.filter((w) => w.name !== watcher.name)
+      issue.activityLog.unshift({
+        id: `act-${Date.now()}`,
+        authorName: actor,
+        action: 'Bỏ theo dõi (Unwatch)',
+        details: `${watcher.name} đã ngừng theo dõi Issue này`,
+        timestamp: now,
+      })
+    } else {
+      issue.watchers.push(watcher)
+      issue.activityLog.unshift({
+        id: `act-${Date.now()}`,
+        authorName: actor,
+        action: 'Theo dõi Issue (Watch)',
+        details: `${watcher.name} đã bắt đầu theo dõi Issue này`,
+        timestamp: now,
+      })
+    }
+
+    issue.updatedAt = now
     saveStorage(data)
     return issue
   },
@@ -832,7 +1094,6 @@ export const issueApi = {
   /** Lấy danh sách việc của tôi (My Issues) cho Dashboard Home */
   getMyIssues: async (userFullName = 'Sarah Lin'): Promise<ProjectIssue[]> => {
     const data = loadStorage()
-    // Khớp tên người dùng hoặc trả về các task của Sarah Lin / Vũ Kim Kỳ
     return data.issues
       .filter((i) => i.assigneeName.toLowerCase().includes(userFullName.toLowerCase()) || i.assigneeName.includes('Sarah'))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
