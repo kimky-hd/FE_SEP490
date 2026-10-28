@@ -3,13 +3,17 @@ import { DashboardEmptyState, DashboardLayout } from '@/components/layout/Dashbo
 import { useAuth } from '@/context/AuthContext'
 import { DocumentIcon, FolderIcon, ListChecksIcon } from '@/components/ui/icons'
 import { projectApi } from '@/api/projectApi'
+import { issueApi } from '@/api/issueApi'
 import { useAsync } from '@/lib/useAsync'
+import clsx from 'clsx'
 
 export function DashboardHomePage() {
   const { user, companies, workspaces, currentCompany } = useAuth()
   const companyId = currentCompany?.companyId ?? null
   const projects = useAsync(() => projectApi.listMine(companyId, { status: 'ACTIVE' }), [companyId])
+  const myIssues = useAsync(() => issueApi.getMyIssues(user?.fullName), [user?.fullName])
   const projectList = projects.data ?? []
+  const issueList = myIssues.data ?? []
 
   return (
     <DashboardLayout>
@@ -56,15 +60,63 @@ export function DashboardHomePage() {
             description="Tạo dự án đầu tiên để bắt đầu theo dõi công việc."
           />
         )}
+        {issueList.length > 0 ? (
+          <div className="flex flex-col justify-between rounded-md border border-gray-200 bg-white p-5">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-blue-50 text-blue-700">
+                  <ListChecksIcon className="h-5 w-5" />
+                </span>
+                <span className="text-xs font-semibold text-blue-700">
+                  {issueList.filter((i) => i.statusCategory !== 'DONE').length} đang mở
+                </span>
+              </div>
+              <h2 className="mt-3 text-sm font-semibold text-gray-900">Công việc của tôi (My Issues)</h2>
+              <ul className="mt-2 space-y-1.5 text-sm">
+                {issueList.slice(0, 3).map((iss) => (
+                  <li key={iss.id} className="flex items-center justify-between gap-2 truncate">
+                    <Link
+                      to={`/projects/${iss.projectId}/issues?issueId=${iss.id}`}
+                      className="truncate font-medium text-gray-800 hover:text-brand-700 hover:underline flex items-center gap-1.5"
+                    >
+                      <span
+                        className={clsx(
+                          'inline-block h-2 w-2 rounded-full shrink-0',
+                          iss.type === 'BUG' ? 'bg-rose-500' : 'bg-blue-600',
+                        )}
+                        title={iss.type}
+                      />
+                      <span className="font-mono text-xs text-gray-400">[{iss.key}]</span>
+                      <span className="truncate">{iss.summary}</span>
+                    </Link>
+                    <span
+                      className={clsx(
+                        'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold',
+                        iss.statusCategory === 'DONE'
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : iss.statusCategory === 'IN_PROGRESS'
+                            ? 'bg-blue-50 text-blue-700'
+                            : 'bg-slate-100 text-slate-600',
+                      )}
+                    >
+                      {iss.statusName}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        ) : (
+          <DashboardEmptyState
+            icon={<ListChecksIcon className="h-5 w-5" />}
+            title="Chưa có công việc được giao"
+            description="Mọi công việc hoặc lỗi được gán cho bạn sẽ hiển thị tại đây."
+          />
+        )}
         <DashboardEmptyState
           icon={<DocumentIcon className="h-5 w-5" />}
-          title="Chưa có tài liệu yêu cầu"
-          description="Module AI sinh URD từ ghi chú thô đang được phát triển."
-        />
-        <DashboardEmptyState
-          icon={<ListChecksIcon className="h-5 w-5" />}
-          title="Chưa có testcase"
-          description="Module AI sinh testcase & truy xuất nguồn gốc đang được phát triển."
+          title="Tài liệu & Confluence Workspace"
+          description="Soạn thảo URD, BRD, SRS tự do toàn màn hình kèm bóc tách REQ tự động."
         />
       </div>
 

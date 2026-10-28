@@ -6,8 +6,11 @@ import {
   documentApi,
   extractRequirementsFromBlocks,
 } from '@/api/documentApi'
+import { issueApi } from '@/api/issueApi'
 import { projectApi } from '@/api/projectApi'
 import { useAuth } from '@/context/AuthContext'
+import { useAsync } from '@/lib/useAsync'
+import type { IssuePriority, IssueType } from '@/types/issue'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
@@ -235,6 +238,23 @@ export function ConfluenceWorkspacePage() {
   const [addingTcForReqId, setAddingTcForReqId] = useState<string | null>(null)
   const [newTcCode, setNewTcCode] = useState('')
 
+  // Tải danh sách Jira Issues của dự án để hiển thị và liên kết 2 chiều
+  const issuesAsync = useAsync(() => issueApi.getIssues(activeProjectId), [activeProjectId])
+  const projectIssues = issuesAsync.data ?? []
+
+  // Modal Tạo Jira Issue trực tiếp từ Confluence REQ
+  const [creatingJiraForReq, setCreatingJiraForReq] = useState<{
+    docId: number
+    reqId: string
+    reqKey: string
+    reqTitle: string
+  } | null>(null)
+  const [jiraIssueType, setJiraIssueType] = useState<IssueType>('TASK')
+  const [jiraIssueSummary, setJiraIssueSummary] = useState('')
+  const [jiraIssueDesc, setJiraIssueDesc] = useState('')
+  const [jiraIssuePriority, setJiraIssuePriority] = useState<IssuePriority>('HIGH')
+  const [jiraStoryPoints, setJiraStoryPoints] = useState<number>(5)
+
   const showToast = (msg: string) => {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(null), 4200)
@@ -381,8 +401,12 @@ export function ConfluenceWorkspacePage() {
       setComments(detail.comments)
 
       if (result.changedKeys.length > 0) {
+        for (const k of result.changedKeys) {
+          await issueApi.markRequirementStale(currentPage.id, k, 'UNCONFIRMED_STALE')
+        }
+        issuesAsync.reload()
         showToast(
-          `Đã lưu trang & bóc tách ${result.items.length} mục REQ! Các mục [${result.changedKeys.join(', ')}] vừa thay đổi đã được ghi History Diff & bật cờ Unconfirmed Stale.`,
+          `Đã lưu trang & bóc tách ${result.items.length} mục REQ! Các mục [${result.changedKeys.join(', ')}] vừa thay đổi đã bật cờ Unconfirmed Stale cho Jira Tasks/Bugs liên quan.`,
         )
       } else {
         showToast(`Đã lưu trang tài liệu và đồng bộ ${result.items.length} mục REQ vào CSDL!`)
@@ -740,7 +764,14 @@ export function ConfluenceWorkspacePage() {
     )
     if (!ok) return
     await documentApi.approve(currentPage.id, user?.fullName || 'Sarah Lin')
-    showToast('Đã phê duyệt Baseline thành công! Trang đã kích hoạt khóa Safe Mode.')
+    // Cập nhật các Jira Task/Bug liên quan sang CONFIRMED_STALE
+    for (const item of savedItems) {
+      if (item.syncStatus !== 'FRESH') {
+        await issueApi.markRequirementStale(currentPage.id, item.keyCode, 'CONFIRMED_STALE')
+      }
+    }
+    issuesAsync.reload()
+    showToast('Đã phê duyệt Baseline thành công! Trang đã kích hoạt khóa Safe Mode và đồng bộ cờ Confirmed Stale sang Jira.')
     await loadWorkspace(currentPage.id)
   }
 
@@ -1706,63 +1737,117 @@ export function ConfluenceWorkspacePage() {
                               {/* Pill Badge [REQ-xx · Fresh / Stale] hoặc nút [+ Đánh dấu là REQ] */}
                               <div className="flex items-center gap-1.5 shrink-0">
                                 {block.isReq ? (
-                                  <div className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50/90 pl-2.5 pr-1.5 py-0.5 text-[11px] font-semibold text-emerald-900 shadow-2xs">
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        setFocusedReqId(matchedReq?.id || block.reqId || null)
-                                        setDrawerTab('req')
-                                      }}
-                                      className="inline-flex items-center gap-1.5 hover:underline"
-                                      title="Bấm để mở Ngăn bóc tách REQ & Ma trận RTM bên phải"
-                                    >
-                                      <span
-                                        className={clsx(
-                                          'h-2 w-2 rounded-full',
-                                          matchedReq?.syncStatus === 'UNCONFIRMED_STALE'
-                                            ? 'bg-amber-500 animate-pulse'
-                                            : matchedReq?.syncStatus === 'CONFIRMED_STALE'
-                                              ? 'bg-rose-500'
-                                              : 'bg-emerald-500',
-                                        )}
-                                      />
-                                      <span className="font-mono font-bold">
-                                        {block.reqKeyCode || matchedReq?.keyCode || 'REQ'}
-                                      </span>
-                                      <span className="text-slate-400">·</span>
-                                      <span
-                                        className={clsx(
-                                          matchedReq?.syncStatus === 'UNCONFIRMED_STALE'
-                                            ? 'text-amber-700 font-bold'
-                                            : matchedReq?.syncStatus === 'CONFIRMED_STALE'
-                                              ? 'text-rose-700 font-bold'
-                                              : 'text-emerald-700',
-                                        )}
-                                      >
-                                        {matchedReq?.syncStatus === 'UNCONFIRMED_STALE'
-                                          ? 'Unconfirmed Stale'
-                                          : matchedReq?.syncStatus === 'CONFIRMED_STALE'
-                                            ? 'Confirmed Stale'
-                                            : 'Fresh'}
-                                      </span>
-                                    </button>
-
-                                    {/* Nút bỏ gắn nhãn REQ */}
-                                    {!isSafeMode && (
+                                  <>
+                                    <div className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50/90 pl-2.5 pr-1.5 py-0.5 text-[11px] font-semibold text-emerald-900 shadow-2xs">
                                       <button
                                         type="button"
-                                        title="Chuyển về Heading thường (Không đưa vào RTM)"
                                         onClick={(e) => {
                                           e.stopPropagation()
-                                          toggleHeadingReq(block)
+                                          setFocusedReqId(matchedReq?.id || block.reqId || null)
+                                          setDrawerTab('req')
                                         }}
-                                        className="ml-1 rounded-full px-1 text-[10px] text-slate-400 hover:bg-slate-200 hover:text-rose-600"
+                                        className="inline-flex items-center gap-1.5 hover:underline"
+                                        title="Bấm để mở Ngăn bóc tách REQ & Ma trận RTM bên phải"
                                       >
-                                        ✕
+                                        <span
+                                          className={clsx(
+                                            'h-2 w-2 rounded-full',
+                                            matchedReq?.syncStatus === 'UNCONFIRMED_STALE'
+                                              ? 'bg-amber-500 animate-pulse'
+                                              : matchedReq?.syncStatus === 'CONFIRMED_STALE'
+                                                ? 'bg-rose-500'
+                                                : 'bg-emerald-500',
+                                          )}
+                                        />
+                                        <span className="font-mono font-bold">
+                                          {block.reqKeyCode || matchedReq?.keyCode || 'REQ'}
+                                        </span>
+                                        <span className="text-slate-400">·</span>
+                                        <span
+                                          className={clsx(
+                                            matchedReq?.syncStatus === 'UNCONFIRMED_STALE'
+                                              ? 'text-amber-700 font-bold'
+                                              : matchedReq?.syncStatus === 'CONFIRMED_STALE'
+                                                ? 'text-rose-700 font-bold'
+                                                : 'text-emerald-700',
+                                          )}
+                                        >
+                                          {matchedReq?.syncStatus === 'UNCONFIRMED_STALE'
+                                            ? 'Unconfirmed Stale'
+                                            : matchedReq?.syncStatus === 'CONFIRMED_STALE'
+                                              ? 'Confirmed Stale'
+                                              : 'Fresh'}
+                                        </span>
                                       </button>
-                                    )}
-                                  </div>
+
+                                      {/* Nút bỏ gắn nhãn REQ */}
+                                      {!isSafeMode && (
+                                        <button
+                                          type="button"
+                                          title="Chuyển về Heading thường (Không đưa vào RTM)"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            toggleHeadingReq(block)
+                                          }}
+                                          className="ml-1 rounded-full px-1 text-[10px] text-slate-400 hover:bg-slate-200 hover:text-rose-600"
+                                        >
+                                          ✕
+                                        </button>
+                                      )}
+                                    </div>
+
+                                    {/* Hiển thị các Jira Issues đã liên kết & Nút tạo Jira Issue */}
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      {projectIssues
+                                        .filter(
+                                          (iss) =>
+                                            iss.linkedRequirementKeyCode ===
+                                            (block.reqKeyCode || matchedReq?.keyCode),
+                                        )
+                                        .map((iss) => (
+                                          <Link
+                                            key={iss.id}
+                                            to={`/projects/${activeProjectId}/issues?issueId=${iss.id}`}
+                                            target="_blank"
+                                            className={clsx(
+                                              'inline-flex items-center gap-1 rounded px-2 py-0.5 font-mono text-[10px] font-bold shadow-2xs hover:opacity-85 transition-opacity',
+                                              iss.type === 'BUG'
+                                                ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                                : 'bg-blue-100 text-blue-800 border border-blue-200',
+                                            )}
+                                            title={`Xem ${iss.key}: ${iss.summary} trên Jira Kanban`}
+                                          >
+                                            <span>{iss.type === 'BUG' ? '🐞' : '☑️'}</span>
+                                            <span>{iss.key}</span>
+                                          </Link>
+                                        ))}
+
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          const reqKey = block.reqKeyCode || matchedReq?.keyCode || 'REQ-01'
+                                          const reqTitle = block.text || 'Mục yêu cầu'
+                                          setCreatingJiraForReq({
+                                            docId: currentPage?.id || 101,
+                                            reqId: matchedReq?.id || block.reqId || `req-${block.id}`,
+                                            reqKey,
+                                            reqTitle,
+                                          })
+                                          setJiraIssueSummary(
+                                            `Triển khai & Test cho ${reqKey}: ${reqTitle.replace(/^\d+(\.\d+)*\.?\s*/, '')}`,
+                                          )
+                                          setJiraIssueDesc(
+                                            `Đặc tả chi tiết theo tài liệu Confluence [${currentPage?.code || 'SRS'}] mục [${reqKey}].`,
+                                          )
+                                        }}
+                                        className="opacity-0 group-hover/blk:opacity-100 inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-100 transition-all shadow-2xs"
+                                        title="Tạo Jira Task hoặc Bug liên kết trực tiếp với mục yêu cầu này"
+                                      >
+                                        <span>+ Jira Issue</span>
+                                      </button>
+                                    </div>
+                                  </>
                                 ) : (
                                   !isSafeMode && (
                                     <button
@@ -2530,14 +2615,50 @@ export function ConfluenceWorkspacePage() {
                                 <span>🧪 {tc}</span>
                               </span>
                             ))}
-                            {req.linkedIssues.map((iss) => (
-                              <span
-                                key={iss}
-                                className="inline-flex items-center gap-1 rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-blue-800"
-                              >
-                                📌 {iss}
-                              </span>
-                            ))}
+                            {/* Jira Issues thực tế từ kho lưu trữ issueApi */}
+                            {projectIssues
+                              .filter((iss) => iss.linkedRequirementKeyCode === req.keyCode)
+                              .map((iss) => (
+                                <Link
+                                  key={iss.id}
+                                  to={`/projects/${activeProjectId}/issues?issueId=${iss.id}`}
+                                  target="_blank"
+                                  className={clsx(
+                                    'inline-flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[10px] font-bold shadow-2xs hover:opacity-80 transition-opacity',
+                                    iss.type === 'BUG'
+                                      ? 'border-rose-300 bg-rose-50 text-rose-800'
+                                      : 'border-blue-300 bg-blue-50 text-blue-800',
+                                  )}
+                                  title={`Xem chi tiết ${iss.key}: ${iss.summary} trên Jira`}
+                                >
+                                  <span>{iss.type === 'BUG' ? '🐞' : '☑️'}</span>
+                                  <span>{iss.key}</span>
+                                </Link>
+                              ))}
+                          </div>
+
+                          {/* Nút Tạo Jira Task/Bug trực tiếp từ REQ này */}
+                          <div className="mt-2 flex items-center justify-between">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCreatingJiraForReq({
+                                  docId: currentPage?.id || 101,
+                                  reqId: req.id,
+                                  reqKey: req.keyCode,
+                                  reqTitle: req.headingTitle,
+                                })
+                                setJiraIssueSummary(
+                                  `Triển khai cho ${req.keyCode}: ${req.headingTitle.replace(/^\d+(\.\d+)*\.?\s*/, '')}`,
+                                )
+                                setJiraIssueDesc(
+                                  `Đặc tả chi tiết theo mục [${req.keyCode}] trong tài liệu ${currentPage?.title}.`,
+                                )
+                              }}
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 hover:underline"
+                            >
+                              <span>+ Tạo Jira Task/Bug từ REQ này</span>
+                            </button>
                           </div>
 
                           {/* Ô nhập thêm mã Test Case */}
@@ -2998,6 +3119,135 @@ export function ConfluenceWorkspacePage() {
           </div>
         </div>
       </Modal>
+
+      {/* 8. Modal Tạo Jira Task / Bug từ Requirement Item */}
+      {creatingJiraForReq && (
+        <Modal
+          open={true}
+          onClose={() => setCreatingJiraForReq(null)}
+          title={`+ Tạo Jira Issue cho [${creatingJiraForReq.reqKey}]`}
+          size="md"
+        >
+          <div className="space-y-4">
+            <div className="rounded-lg bg-blue-50/70 border border-blue-200 p-3 text-xs text-blue-900">
+              <p className="font-bold">Đang liên kết với Yêu cầu Confluence:</p>
+              <p className="mt-0.5 font-mono text-[11px] text-blue-800">
+                [{creatingJiraForReq.reqKey}] - {creatingJiraForReq.reqTitle}
+              </p>
+            </div>
+
+            {/* Chọn Loại Task / Bug */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setJiraIssueType('TASK')}
+                className={clsx(
+                  'flex-1 flex items-center justify-center gap-1.5 rounded-lg border py-2 text-xs font-bold transition-colors',
+                  jiraIssueType === 'TASK'
+                    ? 'border-blue-600 bg-blue-50 text-blue-800'
+                    : 'border-slate-200 text-slate-600',
+                )}
+              >
+                <span>☑️</span>
+                <span>Task (Công việc)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setJiraIssueType('BUG')}
+                className={clsx(
+                  'flex-1 flex items-center justify-center gap-1.5 rounded-lg border py-2 text-xs font-bold transition-colors',
+                  jiraIssueType === 'BUG'
+                    ? 'border-rose-600 bg-rose-50 text-rose-800'
+                    : 'border-slate-200 text-slate-600',
+                )}
+              >
+                <span>🐞</span>
+                <span>Bug (Lỗi phần mềm)</span>
+              </button>
+            </div>
+
+            <TextField
+              label="Tiêu đề Issue (Summary)"
+              value={jiraIssueSummary}
+              onChange={(e) => setJiraIssueSummary(e.target.value)}
+              placeholder="VD: Triển khai kiểm soát đăng nhập..."
+              required
+            />
+
+            <TextAreaField
+              label="Mô tả chi tiết"
+              value={jiraIssueDesc}
+              onChange={(e) => setJiraIssueDesc(e.target.value)}
+              rows={3}
+            />
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-700 block mb-1">Độ ưu tiên</label>
+                <select
+                  value={jiraIssuePriority}
+                  onChange={(e) => setJiraIssuePriority(e.target.value as IssuePriority)}
+                  className="w-full rounded-lg border border-slate-300 p-2 text-xs text-slate-800 outline-none"
+                >
+                  <option value="HIGHEST">Highest (Cao nhất)</option>
+                  <option value="HIGH">High (Cao)</option>
+                  <option value="MEDIUM">Medium (Trung bình)</option>
+                  <option value="LOW">Low (Thấp)</option>
+                </select>
+              </div>
+
+              <TextField
+                label="Story Points (pts)"
+                type="number"
+                min={1}
+                max={21}
+                value={String(jiraStoryPoints)}
+                onChange={(e) => setJiraStoryPoints(Number(e.target.value))}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 border-t pt-3">
+              <Button variant="secondary" inline onClick={() => setCreatingJiraForReq(null)}>
+                Hủy
+              </Button>
+              <Button
+                variant="primary"
+                inline
+                onClick={async () => {
+                  if (!jiraIssueSummary.trim()) return
+                  const newIss = await issueApi.createIssue({
+                    projectId: activeProjectId,
+                    type: jiraIssueType,
+                    summary: jiraIssueSummary.trim(),
+                    description: jiraIssueDesc.trim(),
+                    phaseId: 3,
+                    phaseName: 'Phase 3: Sprint Execution & Coding',
+                    statusId: 301,
+                    statusName: 'To Do',
+                    statusCategory: 'TODO',
+                    priority: jiraIssuePriority,
+                    storyPoints: jiraStoryPoints,
+                    assigneeName: user?.fullName || 'Sarah Lin',
+                    assigneeRole: 'Thành viên dự án',
+                    reporterName: user?.fullName || 'Sarah Lin',
+                    linkedDocumentId: creatingJiraForReq.docId,
+                    linkedRequirementItemId: creatingJiraForReq.reqId,
+                    linkedRequirementKeyCode: creatingJiraForReq.reqKey,
+                    linkedRequirementTitle: creatingJiraForReq.reqTitle,
+                  })
+                  setCreatingJiraForReq(null)
+                  issuesAsync.reload()
+                  showToast(
+                    `Đã tạo thành công Issue ${newIss.key} trên Jira Kanban và kết nối với [${creatingJiraForReq.reqKey}]!`,
+                  )
+                }}
+              >
+                + Khởi tạo trên Jira
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

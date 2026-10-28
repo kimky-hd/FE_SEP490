@@ -34,6 +34,7 @@ import { ProjectOverviewPage } from '@/pages/projects/ProjectOverviewPage'
 import { ProjectWorkflowPage } from '@/pages/projects/ProjectWorkflowPage'
 import { ProjectMembersPage } from '@/pages/projects/ProjectMembersPage'
 import { ProjectSettingsPage } from '@/pages/projects/ProjectSettingsPage'
+import { ProjectIssuesPage } from '@/pages/projects/ProjectIssuesPage'
 import { ConfluenceWorkspacePage } from '@/pages/projects/ConfluenceWorkspacePage'
 import { RoleListPage } from '@/pages/admin/RoleListPage'
 import { RoleEditorPage } from '@/pages/admin/RoleEditorPage'
@@ -215,6 +216,8 @@ function AppRoutes() {
         }
       >
         <Route index element={<ProjectOverviewPage />} />
+        <Route path="issues" element={<ProjectIssuesPage />} />
+        <Route path="kanban" element={<ProjectIssuesPage />} />
         <Route path="workflow" element={<ProjectWorkflowPage />} />
         <Route path="members" element={<ProjectMembersPage />} />
         <Route path="settings" element={<ProjectSettingsPage />} />

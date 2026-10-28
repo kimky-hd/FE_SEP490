@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Alert } from '@/components/ui/Alert'
 import { projectApi } from '@/api/projectApi'
 import { documentApi } from '@/api/documentApi'
+import { issueApi } from '@/api/issueApi'
 import { useAsync } from '@/lib/useAsync'
 import { apiErrorMessage, isForbidden } from '@/lib/apiErrors'
 import { hasPermission } from '@/lib/permissions'
@@ -29,6 +30,7 @@ export function ProjectLayout() {
   const location = useLocation()
   const { data: project, error, isLoading, reload, setData } = useAsync(() => projectApi.get(projectId), [projectId])
   const docStats = useAsync(() => documentApi.getProjectStats(projectId), [projectId])
+  const issueStats = useAsync(() => issueApi.getProjectIssueStats(projectId), [projectId])
   const justCreated = (location.state as { created?: boolean } | null)?.created === true
 
   if (isLoading && !project) {
@@ -108,7 +110,7 @@ export function ProjectLayout() {
         items={[
           { label: 'Tổng quan', to: base, end: true },
           { label: 'Tài liệu yêu cầu', to: `${base}/documents`, count: docStats.data?.totalDocs },
-          { label: 'Kanban', to: `${base}/kanban`, soon: true },
+          { label: 'Kanban', to: `${base}/issues`, count: issueStats.data?.open },
           { label: 'Testcase', to: `${base}/testcases`, soon: true },
           { label: 'Workflow', to: `${base}/workflow`, count: project.phaseCount },
           { label: 'Thành viên', to: `${base}/members`, count: project.memberCount, hidden: !can(PERMISSIONS.projectView) },

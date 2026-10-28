@@ -4,6 +4,7 @@ import { Card, SectionTitle } from '@/components/layout/PageParts'
 import { Badge } from '@/components/ui/Badge'
 import { projectApi } from '@/api/projectApi'
 import { documentApi } from '@/api/documentApi'
+import { issueApi } from '@/api/issueApi'
 import { useAsync } from '@/lib/useAsync'
 import { formatDate } from '@/lib/format'
 import { PERMISSIONS } from '@/types/rbac'
@@ -22,12 +23,23 @@ export function ProjectOverviewPage() {
   )
   const workflow = useAsync(() => projectApi.workflow(project.projectId), [project.projectId])
   const docStats = useAsync(() => documentApi.getProjectStats(project.projectId), [project.projectId])
+  const issueStats = useAsync(() => issueApi.getProjectIssueStats(project.projectId), [project.projectId])
   const activePhases = (workflow.data?.phases ?? []).filter((p) => p.isActive)
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Issue mở / đóng" value={`${project.openIssueCount} / ${project.doneIssueCount}`} hint="Module Issue sắp ra mắt" />
+        <Link to="issues" className="block hover:opacity-90 transition-opacity">
+          <Stat
+            label="Issue mở / đóng"
+            value={`${issueStats.data?.open ?? project.openIssueCount} / ${issueStats.data?.done ?? project.doneIssueCount}`}
+            hint={
+              issueStats.data
+                ? `${issueStats.data.tasks} Task · ${issueStats.data.bugs} Bug${issueStats.data.staleCount > 0 ? ` (${issueStats.data.staleCount} cảnh báo Stale)` : ''}`
+                : 'Đang tải dữ liệu Issue…'
+            }
+          />
+        </Link>
         <Link to="documents" className="block hover:opacity-90 transition-opacity">
           <Stat
             label="Tài liệu"
