@@ -206,6 +206,23 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      {/* Không gian làm việc Quản lý Công việc & Lỗi Toàn màn hình Độc lập (Jira Workspace 100vw x 100vh) */}
+      <Route
+        path="/projects/:projectId/issues"
+        element={
+          <ProtectedRoute>
+            <ProjectIssuesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/projects/:projectId/kanban"
+        element={
+          <ProtectedRoute>
+            <ProjectIssuesPage />
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path="/projects/:projectId"
@@ -216,8 +233,6 @@ function AppRoutes() {
         }
       >
         <Route index element={<ProjectOverviewPage />} />
-        <Route path="issues" element={<ProjectIssuesPage />} />
-        <Route path="kanban" element={<ProjectIssuesPage />} />
         <Route path="workflow" element={<ProjectWorkflowPage />} />
         <Route path="members" element={<ProjectMembersPage />} />
         <Route path="settings" element={<ProjectSettingsPage />} />
