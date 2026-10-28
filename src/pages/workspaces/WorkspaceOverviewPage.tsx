@@ -18,35 +18,35 @@ export function WorkspaceOverviewPage() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile icon={<FolderIcon className="h-4 w-4" />} label="Dự án" value={workspace.projectCount} to={isPersonal ? undefined : 'projects'} />
+        <StatTile icon={<FolderIcon className="h-4 w-4" />} label="Projects" value={workspace.projectCount} to={isPersonal ? undefined : 'projects'} />
         <StatTile
           icon={<UsersIcon className="h-4 w-4" />}
-          label="Thành viên"
+          label="Members"
           value={workspace.memberCount}
           to={!isPersonal && can(PERMISSIONS.workspaceMemberView) ? 'members' : undefined}
         />
-        <StatTile icon={<DocumentIcon className="h-4 w-4" />} label="Tài liệu" value="—" soon />
-        <StatTile icon={<ListChecksIcon className="h-4 w-4" />} label="Testcase" value="—" soon />
+        <StatTile icon={<DocumentIcon className="h-4 w-4" />} label="Requirements" value="—" soon />
+        <StatTile icon={<ListChecksIcon className="h-4 w-4" />} label="Test Cases" value="—" soon />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
         <Card className="p-4 lg:col-span-3">
-          <SectionTitle>Thông tin workspace</SectionTitle>
+          <SectionTitle>Workspace Information</SectionTitle>
           <dl className="mt-3 divide-y divide-gray-100 text-sm">
-            <InfoRow label="Mã (code)">
+            <InfoRow label="Code">
               <span className="font-mono text-gray-800">{workspace.code}</span>
             </InfoRow>
-            <InfoRow label="Người tạo">{workspace.createdBy.fullName}</InfoRow>
-            <InfoRow label="Ngày tạo">{formatDate(workspace.createdAt)}</InfoRow>
-            <InfoRow label="Cập nhật lần cuối">{formatDate(workspace.updatedAt)}</InfoRow>
-            <InfoRow label="Trạng thái">
+            <InfoRow label="Created By">{workspace.createdBy.fullName}</InfoRow>
+            <InfoRow label="Created At">{formatDate(workspace.createdAt)}</InfoRow>
+            <InfoRow label="Last Updated">{formatDate(workspace.updatedAt)}</InfoRow>
+            <InfoRow label="Status">
               {workspace.status === 'ACTIVE' ? (
                 <Badge tone="brand" dot>
-                  Đang hoạt động
+                  Active
                 </Badge>
               ) : (
                 <Badge tone="amber" dot>
-                  Đã lưu trữ {formatDate(workspace.archivedAt)}
+                  Archived {formatDate(workspace.archivedAt)}
                 </Badge>
               )}
             </InfoRow>
@@ -54,11 +54,11 @@ export function WorkspaceOverviewPage() {
         </Card>
 
         <Card className="p-4 lg:col-span-2">
-          <SectionTitle description="Quyền hiệu lực của bạn — do role trong workspace quyết định.">
-            Quyền của bạn {workspace.myRole && <span className="font-normal text-gray-500">· {workspace.myRole.name}</span>}
+          <SectionTitle description="Effective permissions determined by your role in this workspace.">
+            Your Permissions {workspace.myRole && <span className="font-normal text-gray-500">· {workspace.myRole.name}</span>}
           </SectionTitle>
           {myPermissions.length === 0 ? (
-            <p className="mt-3 text-sm text-gray-400">{catalog.isLoading ? 'Đang tải…' : 'Bạn chỉ có quyền xem.'}</p>
+            <p className="mt-3 text-sm text-gray-400">{catalog.isLoading ? 'Loading…' : 'You have view-only access.'}</p>
           ) : (
             <ul className="mt-3 space-y-1.5">
               {myPermissions.map((p) => (
@@ -95,7 +95,7 @@ function StatTile({
         {icon}
       </div>
       <p className="mt-2 text-2xl font-semibold text-gray-950">{value}</p>
-      {soon && <p className="mt-0.5 text-[11px] text-gray-400">Module đang phát triển</p>}
+      {soon && <p className="mt-0.5 text-[11px] text-gray-400">Coming soon</p>}
     </>
   )
   const className = 'block rounded-md border border-gray-200 bg-white p-4'

@@ -43,8 +43,8 @@ export function WorkspaceProjectsPage() {
           <div className="inline-flex rounded-md border border-gray-200 bg-white p-0.5 text-sm">
             {(
               [
-                ['ACTIVE', 'Đang chạy'],
-                ['ARCHIVED', 'Lưu trữ'],
+                ['ACTIVE', 'Active'],
+                ['ARCHIVED', 'Archived'],
               ] as const
             ).map(([value, label]) => (
               <button
@@ -64,25 +64,25 @@ export function WorkspaceProjectsPage() {
             ))}
           </div>
           <label className="relative block sm:w-64">
-            <span className="sr-only">Tìm dự án</span>
+            <span className="sr-only">Search projects</span>
             <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Tìm theo tên hoặc mã…"
+              placeholder="Search by name or key…"
               className="h-9 w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
             />
           </label>
         </div>
         {!isArchived && !isPersonal && (
           <Button inline onClick={onCreate}>
-            <PlusIcon className="h-4 w-4" /> Tạo dự án
+            <PlusIcon className="h-4 w-4" /> Create Project
           </Button>
         )}
       </div>
 
       <p className="mt-3 text-sm text-gray-500">
-        {all.filter((p) => p.status === 'ACTIVE').length} dự án đang chạy trong workspace {workspace.name}.
+        {all.filter((p) => p.status === 'ACTIVE').length} active projects in workspace {workspace.name}.
       </p>
 
       <div className="mt-4">
@@ -93,7 +93,7 @@ export function WorkspaceProjectsPage() {
         ) : (
           <ProjectTable
             projects={visible}
-            emptyText={keyword ? 'Không có dự án phù hợp.' : status === 'ACTIVE' ? 'Chưa có dự án nào — bấm “Tạo dự án” để bắt đầu.' : 'Không có dự án đã lưu trữ.'}
+            emptyText={keyword ? 'No matching projects found.' : status === 'ACTIVE' ? 'No projects yet — click “Create Project” to get started.' : 'No archived projects.'}
           />
         )}
       </div>

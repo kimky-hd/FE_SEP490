@@ -24,25 +24,25 @@ export function ProjectsPage() {
   return (
     <DashboardLayout>
       <PageHeader
-        eyebrow="// Dự án"
-        title="Dự án"
+        eyebrow="// Projects"
+        title="Projects"
         description={
           <>
-            Dự án đang chạy bạn tham gia hoặc được xem. Tạo dự án mới trong trang{' '}
+            Active projects you participate in or are authorized to view. Create a new project in{' '}
             <Link to="/workspaces" className="font-medium text-brand-700 hover:underline">
-              Workspace
+              Workspaces
             </Link>{' '}
-            → tab Dự án.
+            → Projects tab.
           </>
         }
       />
       <label className="relative mt-6 block sm:w-72">
-        <span className="sr-only">Tìm dự án</span>
+        <span className="sr-only">Search projects</span>
         <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Tìm theo tên hoặc mã…"
+          placeholder="Search by name or key…"
           className="h-9 w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
         />
       </label>
@@ -52,7 +52,7 @@ export function ProjectsPage() {
         ) : projects.error ? (
           <ErrorState message={apiErrorMessage(projects.error)} onRetry={projects.reload} />
         ) : (
-          <ProjectTable projects={visible} showWorkspace emptyText="Bạn chưa tham gia dự án nào." />
+          <ProjectTable projects={visible} showWorkspace emptyText="You haven't joined any projects yet." />
         )}
       </div>
     </DashboardLayout>

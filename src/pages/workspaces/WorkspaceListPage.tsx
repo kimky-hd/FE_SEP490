@@ -46,16 +46,16 @@ export function WorkspaceListPage() {
   return (
     <DashboardLayout>
       <PageHeader
-        eyebrow="// Workspace"
-        title="Workspace"
+        eyebrow="// Workspaces"
+        title="Workspaces"
         description={
-          currentCompany ? `Các không gian làm việc trong ${currentCompany.companyName}.` : 'Không gian làm việc của bạn.'
+          currentCompany ? `Workspaces within ${currentCompany.companyName}.` : 'Your personal workspace.'
         }
         actions={
           canCreate && (
             <Button inline onClick={() => setCreateOpen(true)}>
               <PlusIcon className="h-4 w-4" />
-              Tạo Workspace
+              Create Workspace
             </Button>
           )
         }
@@ -67,8 +67,8 @@ export function WorkspaceListPage() {
             <div className="inline-flex rounded-md border border-gray-200 bg-white p-0.5 text-sm">
               {(
                 [
-                  ['ACTIVE', 'Đang hoạt động', all.length - archivedCount],
-                  ['ARCHIVED', 'Đã lưu trữ', archivedCount],
+                  ['ACTIVE', 'Active', all.length - archivedCount],
+                  ['ARCHIVED', 'Archived', archivedCount],
                 ] as const
               ).map(([value, label, count]) => (
                 <button
@@ -88,12 +88,12 @@ export function WorkspaceListPage() {
               ))}
             </div>
             <label className="relative block sm:w-72">
-              <span className="sr-only">Tìm workspace</span>
+              <span className="sr-only">Search workspaces</span>
               <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Tìm theo tên hoặc mã…"
+                placeholder="Search by name or code…"
                 className="h-9 w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
               />
             </label>
@@ -116,20 +116,20 @@ export function WorkspaceListPage() {
                     className="flex min-h-[9.5rem] items-center justify-center gap-2 rounded-md border border-dashed border-gray-300 bg-white/60 text-sm font-medium text-gray-500 transition-colors hover:border-brand-400 hover:text-brand-700"
                   >
                     <PlusIcon className="h-4 w-4" />
-                    Tạo Workspace mới
+                    Create New Workspace
                   </button>
                 )}
                 {visible.length === 0 && !(status === 'ACTIVE' && canCreate && !keyword) && (
                   <div className="md:col-span-2 xl:col-span-3">
                     <DashboardEmptyState
                       icon={<BuildingIcon className="h-5 w-5" />}
-                      title={keyword ? 'Không có workspace phù hợp' : status === 'ACTIVE' ? 'Chưa có workspace' : 'Không có workspace đã lưu trữ'}
+                      title={keyword ? 'No matching workspaces' : status === 'ACTIVE' ? 'No workspaces yet' : 'No archived workspaces'}
                       description={
                         keyword
-                          ? 'Thử từ khoá khác.'
+                          ? 'Try another search term.'
                           : status === 'ACTIVE'
-                            ? 'Bạn chưa được thêm vào workspace nào. Liên hệ quản trị viên để được mời.'
-                            : 'Workspace bị lưu trữ sẽ hiện ở đây, có thể khôi phục trong phần Cài đặt.'
+                            ? 'You have not been added to any workspace yet. Contact an administrator to get invited.'
+                            : 'Archived workspaces will appear here and can be restored in Settings.'
                       }
                     />
                   </div>
@@ -142,7 +142,7 @@ export function WorkspaceListPage() {
 
       {(personalWorkspaces.data?.length ?? 0) > 0 && (
         <section className="mt-8">
-          <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-gray-500">Không gian cá nhân</h2>
+          <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-gray-500">Personal Workspace</h2>
           <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {personalWorkspaces.data!.map((w) => (
               <WorkspaceCard key={w.workspaceId} workspace={w} />
@@ -155,8 +155,8 @@ export function WorkspaceListPage() {
         <div className="mt-6">
           <DashboardEmptyState
             icon={<BuildingIcon className="h-5 w-5" />}
-            title="Chưa có workspace"
-            description="Tài khoản cá nhân chỉ có 1 workspace cá nhân, tạo ở bước onboarding."
+            title="No workspaces yet"
+            description="Personal accounts have 1 personal workspace created during onboarding."
           />
         </div>
       )}
@@ -175,7 +175,7 @@ export function WorkspaceListPage() {
 }
 
 function WorkspaceCard({ workspace: w }: { workspace: WorkspaceDto }) {
-  const roleLabel = w.companyId === null ? 'Cá nhân' : w.myRole?.name ?? 'Chỉ xem'
+  const roleLabel = w.companyId === null ? 'Personal' : w.myRole?.name ?? 'Viewer'
   return (
     <Link
       to={`/workspaces/${w.workspaceId}`}
@@ -191,12 +191,12 @@ function WorkspaceCard({ workspace: w }: { workspace: WorkspaceDto }) {
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           <Badge tone={w.myRole?.code === 'WORKSPACE_ADMIN' ? 'brand' : 'neutral'}>{roleLabel}</Badge>
-          {w.status === 'ARCHIVED' && <Badge tone="amber">Đã lưu trữ</Badge>}
+          {w.status === 'ARCHIVED' && <Badge tone="amber">Archived</Badge>}
         </div>
       </div>
-      <p className="mt-2 line-clamp-2 flex-1 text-sm text-gray-500">{w.description || 'Chưa có mô tả.'}</p>
+      <p className="mt-2 line-clamp-2 flex-1 text-sm text-gray-500">{w.description || 'No description provided.'}</p>
       <p className="mt-3 text-xs text-gray-400">
-        {w.projectCount} dự án · {w.memberCount} thành viên · {formatRelative(w.updatedAt)}
+        {w.projectCount} projects · {w.memberCount} members · {formatRelative(w.updatedAt)}
       </p>
     </Link>
   )

@@ -31,24 +31,24 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Tổng quan', icon: <HomeIcon className="h-5 w-5" />, to: '/' },
-  { label: 'Workspace', icon: <BuildingIcon className="h-5 w-5" />, to: '/workspaces', activePrefix: '/workspaces' },
-  { label: 'Dự án', icon: <FolderIcon className="h-5 w-5" />, to: '/projects', activePrefix: '/projects' },
-  { label: 'Tài liệu yêu cầu', icon: <DocumentIcon className="h-5 w-5" />, to: '/documents', activePrefix: '/documents' },
-  { label: 'Testcase', icon: <ListChecksIcon className="h-5 w-5" />, comingSoon: true },
+  { label: 'Overview', icon: <HomeIcon className="h-5 w-5" />, to: '/' },
+  { label: 'Workspaces', icon: <BuildingIcon className="h-5 w-5" />, to: '/workspaces', activePrefix: '/workspaces' },
+  { label: 'Projects', icon: <FolderIcon className="h-5 w-5" />, to: '/projects', activePrefix: '/projects' },
+  { label: 'Requirements', icon: <DocumentIcon className="h-5 w-5" />, to: '/documents', activePrefix: '/documents' },
+  { label: 'Test Cases', icon: <ListChecksIcon className="h-5 w-5" />, comingSoon: true },
 ]
 
-// Khu "Quản trị công ty" (Figma Tenant Admin Console) — thiếu quyền thì ẩn hẳn mục đó.
+// Organization Admin Console — hidden if lacking permission.
 const ADMIN_NAV_ITEMS: NavItem[] = [
   {
-    label: 'Role & Phân quyền',
+    label: 'Roles & Permissions',
     icon: <ShieldIcon className="h-5 w-5" />,
     to: '/admin/roles',
     activePrefix: '/admin/roles',
     permission: PERMISSIONS.roleView,
   },
   {
-    label: 'Người dùng',
+    label: 'Users',
     icon: <UsersIcon className="h-5 w-5" />,
     to: '/admin/users',
     activePrefix: '/admin/users',
@@ -62,13 +62,13 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const workspaceMenuRef = useRef<HTMLDivElement>(null)
-  const currentCompanyName = currentCompany?.companyName ?? 'Không gian cá nhân'
+  const currentCompanyName = currentCompany?.companyName ?? 'Personal Space'
   const adminItems = currentCompany ? ADMIN_NAV_ITEMS.filter((item) => !item.permission || can(item.permission)) : []
   const activeWorkspaceId = Number(location.pathname.match(/^\/workspaces\/(\d+)/)?.[1] ?? NaN)
   const activeWorkspace = workspaces.find((w) => w.workspaceId === activeWorkspaceId)
   const switcherWorkspaces = workspaces.filter((w) => w.status !== 'ARCHIVED')
 
-  // Đóng menu chuyển workspace khi click ra ngoài hoặc đổi trang.
+  // Close workspace dropdown on outside click or navigation
   useEffect(() => {
     if (!workspaceMenuOpen) return
     const onClick = (e: MouseEvent) => {
@@ -94,10 +94,10 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
 
     if (item.comingSoon || !item.to) {
       return (
-        <button key={item.label} type="button" disabled title="Sắp ra mắt" className={itemClassName}>
+        <button key={item.label} type="button" disabled title="Coming soon" className={itemClassName}>
           {item.icon}
           <span className="flex-1 text-left">{item.label}</span>
-          <span className="rounded-sm bg-gray-100 px-1.5 py-0.5 text-[9px] font-semibold text-gray-400">SỚM</span>
+          <span className="rounded-sm bg-gray-100 px-1.5 py-0.5 text-[9px] font-semibold text-gray-400">SOON</span>
         </button>
       )
     }
@@ -118,7 +118,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
           type="button"
           onClick={() => setMobileNavOpen(false)}
           className="rounded-md p-1 text-gray-400 hover:bg-gray-50 lg:hidden"
-          aria-label="Đóng menu"
+          aria-label="Close menu"
         >
           <CloseIcon className="h-5 w-5" />
         </button>
@@ -130,7 +130,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
         {adminItems.length > 0 && (
           <>
             <p className="px-3 pb-1 pt-5 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-gray-400">
-              Quản trị công ty
+              Organization Admin
             </p>
             {adminItems.map(renderNavItem)}
           </>
@@ -153,11 +153,11 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-gray-50 lg:flex">
-      {/* Mobile: drawer trượt từ trái + backdrop. Desktop (lg+): cột cố định, luôn hiện. */}
+      {/* Mobile: drawer + backdrop. Desktop (lg+): fixed sidebar */}
       {mobileNavOpen && (
         <button
           type="button"
-          aria-label="Đóng menu"
+          aria-label="Close menu"
           onClick={() => setMobileNavOpen(false)}
           className="fixed inset-0 z-30 bg-gray-950/40 lg:hidden"
         />
@@ -179,7 +179,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
               type="button"
               onClick={() => setMobileNavOpen(true)}
               className="rounded-md p-2 text-gray-500 hover:bg-gray-50 lg:hidden"
-              aria-label="Mở menu"
+              aria-label="Open menu"
             >
               <MenuIcon className="h-5 w-5" />
             </button>
@@ -200,10 +200,10 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
               {workspaceMenuOpen && (
                 <div className="absolute left-0 top-full z-20 mt-1 w-72 max-w-[calc(100vw-2rem)] rounded-md border border-gray-200 bg-white p-1 text-sm shadow-lg">
                   <p className="px-3 pb-1 pt-2 font-mono text-[10px] uppercase tracking-[0.16em] text-gray-400">
-                    Chuyển workspace
+                    Switch workspace
                   </p>
                   {switcherWorkspaces.length === 0 && (
-                    <p className="px-3 py-2 text-xs text-gray-400">Bạn chưa tham gia workspace nào.</p>
+                    <p className="px-3 py-2 text-xs text-gray-400">You haven't joined any workspaces yet.</p>
                   )}
                   {switcherWorkspaces.map((w) => (
                     <Link
@@ -220,7 +220,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
                   ))}
                   <div className="mt-1 border-t border-gray-100 pt-1">
                     <Link to="/workspaces" className="block rounded px-3 py-2 text-xs font-medium text-gray-500 hover:bg-gray-50">
-                      Xem tất cả workspace →
+                      View all workspaces →
                     </Link>
                   </div>
                 </div>
@@ -229,7 +229,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
           </div>
 
           <div className="flex items-center gap-1 sm:gap-3">
-            <button type="button" title="Sắp ra mắt" className="rounded-md p-2 text-gray-400 hover:bg-gray-50">
+            <button type="button" title="Coming soon" className="rounded-md p-2 text-gray-400 hover:bg-gray-50">
               <BellIcon className="h-5 w-5" />
             </button>
             <LogoutButton />
@@ -253,7 +253,7 @@ function LogoutButton() {
       className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50 sm:px-3"
     >
       <LogoutIcon className="h-4 w-4" />
-      <span className="hidden sm:inline">Đăng xuất</span>
+      <span className="hidden sm:inline">Log out</span>
     </button>
   )
 }

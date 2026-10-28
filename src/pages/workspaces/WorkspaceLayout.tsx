@@ -42,7 +42,7 @@ export function WorkspaceLayout() {
     return (
       <DashboardLayout>
         {isForbidden(error) ? (
-          <ForbiddenState message="Workspace không tồn tại hoặc bạn không phải thành viên." />
+          <ForbiddenState message="Workspace does not exist or you are not a member." />
         ) : (
           <ErrorState message={apiErrorMessage(error)} onRetry={reload} />
         )}
@@ -72,13 +72,13 @@ export function WorkspaceLayout() {
         meta={
           <>
             {isPersonal ? (
-              <Badge>Cá nhân</Badge>
+              <Badge>Personal</Badge>
             ) : (
               <Badge tone={workspace.myRole?.code === 'WORKSPACE_ADMIN' ? 'brand' : 'neutral'}>
-                {workspace.myRole?.name ?? 'Chỉ xem'}
+                {workspace.myRole?.name ?? 'Viewer'}
               </Badge>
             )}
-            {isArchived && <Badge tone="amber">Đã lưu trữ</Badge>}
+            {isArchived && <Badge tone="amber">Archived</Badge>}
           </>
         }
         description={workspace.description ?? undefined}
@@ -87,23 +87,23 @@ export function WorkspaceLayout() {
       {isArchived && (
         <div className="mt-4">
           <Alert tone="warning">
-            Workspace đã được lưu trữ — toàn bộ dữ liệu bên trong chỉ đọc. Có thể khôi phục trong tab Cài đặt.
+            This workspace is archived — all contents are read-only. It can be restored from the Settings tab.
           </Alert>
         </div>
       )}
 
       <PageTabs
         items={[
-          { label: 'Tổng quan', to: base, end: true },
-          { label: 'Dự án', to: `${base}/projects`, count: workspace.projectCount, hidden: isPersonal },
+          { label: 'Overview', to: base, end: true },
+          { label: 'Projects', to: `${base}/projects`, count: workspace.projectCount, hidden: isPersonal },
           {
-            label: 'Thành viên',
+            label: 'Members',
             to: `${base}/members`,
             count: workspace.memberCount,
             hidden: isPersonal || !can(PERMISSIONS.workspaceMemberView),
           },
           {
-            label: 'Cài đặt',
+            label: 'Settings',
             to: `${base}/settings`,
             hidden: !can(PERMISSIONS.workspaceUpdate) && !can(PERMISSIONS.workspaceArchive),
           },

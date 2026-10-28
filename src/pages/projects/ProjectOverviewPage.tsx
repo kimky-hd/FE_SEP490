@@ -31,49 +31,49 @@ export function ProjectOverviewPage() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Link to="issues" className="block hover:opacity-90 transition-opacity">
           <Stat
-            label="Issue mở / đóng"
+            label="Open / Closed Issues"
             value={`${issueStats.data?.open ?? project.openIssueCount} / ${issueStats.data?.done ?? project.doneIssueCount}`}
             hint={
               issueStats.data
-                ? `${issueStats.data.tasks} Task · ${issueStats.data.bugs} Bug${issueStats.data.staleCount > 0 ? ` (${issueStats.data.staleCount} cảnh báo Stale)` : ''}`
-                : 'Đang tải dữ liệu Issue…'
+                ? `${issueStats.data.tasks} Task · ${issueStats.data.bugs} Bug${issueStats.data.staleCount > 0 ? ` (${issueStats.data.staleCount} stale warnings)` : ''}`
+                : 'Loading issue data…'
             }
           />
         </Link>
         <Link to="documents" className="block hover:opacity-90 transition-opacity">
           <Stat
-            label="Tài liệu"
+            label="Requirements"
             value={docStats.data?.totalDocs ?? project.documentCount}
-            hint={`${docStats.data?.approvedDocs ?? 0} đã duyệt · ${docStats.data?.totalItems ?? 0} mục yêu cầu`}
+            hint={`${docStats.data?.approvedDocs ?? 0} approved · ${docStats.data?.totalItems ?? 0} requirement items`}
           />
         </Link>
-        <Stat label="Testcase" value="—" hint="Module Testcase sắp ra mắt" />
-        <Stat label="Thành viên" value={project.memberCount} />
+        <Stat label="Test Cases" value="—" hint="Test case module coming soon" />
+        <Stat label="Members" value={project.memberCount} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="p-4">
-          <SectionTitle>Thông tin dự án</SectionTitle>
+          <SectionTitle>Project Details</SectionTitle>
           <dl className="mt-3 divide-y divide-gray-100 text-sm">
-            <Row label="Issue Key prefix">
+            <Row label="Issue Key Prefix">
               <span className="font-mono">{project.key}-</span>
             </Row>
-            <Row label="Workflow đang dùng">
+            <Row label="Active Workflow">
               <Link to="workflow" className="text-brand-700 hover:underline">
-                {SDLC_LABEL[project.sdlcMethod]} · {project.phaseCount} phase
+                {SDLC_LABEL[project.sdlcMethod]} · {project.phaseCount} phases
               </Link>
             </Row>
-            <Row label="Module AI (BA/QA)">{project.aiEnabled ? <Badge tone="brand">Bật</Badge> : <Badge>Tắt</Badge>}</Row>
+            <Row label="AI Module (BA/QA)">{project.aiEnabled ? <Badge tone="brand">Enabled</Badge> : <Badge>Disabled</Badge>}</Row>
             <Row label="Project Manager">{project.lead?.fullName ?? '—'}</Row>
-            <Row label="Tạo bởi">{project.createdBy.fullName}</Row>
-            <Row label="Tạo lúc">{formatDate(project.createdAt)}</Row>
+            <Row label="Created By">{project.createdBy.fullName}</Row>
+            <Row label="Created At">{formatDate(project.createdAt)}</Row>
           </dl>
         </Card>
 
         <Card className="p-4">
-          <SectionTitle>Thành viên dự án</SectionTitle>
+          <SectionTitle>Project Members</SectionTitle>
           {!canSeeMembers ? (
-            <p className="mt-3 text-sm text-gray-400">Bạn không có quyền xem thành viên dự án.</p>
+            <p className="mt-3 text-sm text-gray-400">You do not have permission to view project members.</p>
           ) : (
             <ul className="mt-3 divide-y divide-gray-100 text-sm">
               {(members.data ?? []).slice(0, 6).map((m) => (
@@ -82,18 +82,18 @@ export function ProjectOverviewPage() {
                   <span className="text-gray-500">{m.role.name}</span>
                 </li>
               ))}
-              {members.isLoading && !members.data && <li className="py-2 text-gray-400">Đang tải…</li>}
+              {members.isLoading && !members.data && <li className="py-2 text-gray-400">Loading…</li>}
             </ul>
           )}
           {can(PERMISSIONS.projectMemberManage) && project.status === 'ACTIVE' ? (
             <Link to="members?add=1" className="mt-2 inline-block text-sm font-medium text-brand-700 hover:underline">
-              + Thêm thành viên vào dự án
+              + Add member to project
             </Link>
           ) : (
             canSeeMembers &&
             project.memberCount > 6 && (
               <Link to="members" className="mt-2 inline-block text-sm font-medium text-brand-700 hover:underline">
-                Xem tất cả {project.memberCount} thành viên →
+                View all {project.memberCount} members →
               </Link>
             )
           )}
@@ -101,7 +101,7 @@ export function ProjectOverviewPage() {
       </div>
 
       <Card className="p-4">
-        <SectionTitle description="Thứ tự giai đoạn SDLC và trạng thái issue trong từng giai đoạn.">Pipeline phase</SectionTitle>
+        <SectionTitle description="Sequence of SDLC phases and issue statuses within each phase.">Phase Pipeline</SectionTitle>
         <ol className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           {activePhases.map((phase, index) => (
             <li key={phase.phaseId} className="rounded-md border border-gray-200 p-3">
@@ -119,7 +119,7 @@ export function ProjectOverviewPage() {
               </div>
             </li>
           ))}
-          {workflow.isLoading && !workflow.data && <li className="text-sm text-gray-400">Đang tải…</li>}
+          {workflow.isLoading && !workflow.data && <li className="text-sm text-gray-400">Loading…</li>}
         </ol>
       </Card>
     </div>

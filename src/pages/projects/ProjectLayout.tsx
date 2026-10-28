@@ -44,7 +44,7 @@ export function ProjectLayout() {
     return (
       <DashboardLayout>
         {isForbidden(error) ? (
-          <ForbiddenState message="Dự án không tồn tại hoặc bạn không phải thành viên." />
+          <ForbiddenState message="Project does not exist or you are not a member." />
         ) : (
           <ErrorState message={apiErrorMessage(error)} onRetry={reload} />
         )}
@@ -65,7 +65,7 @@ export function ProjectLayout() {
         </Link>
         <span className="text-gray-300">/</span>
         <Link to={`/workspaces/${project.workspaceId}/projects`} className="hover:text-gray-800 hover:underline">
-          Dự án
+          Projects
         </Link>
         <span className="text-gray-300">/</span>
         <span className="font-medium text-gray-800">
@@ -75,16 +75,16 @@ export function ProjectLayout() {
 
       <div className="mt-3">
         <PageHeader
-          eyebrow={`// Dự án · ${project.key}`}
+          eyebrow={`// Project · ${project.key}`}
           title={project.name}
           meta={
             <>
-              {isArchived ? <Badge tone="amber">Lưu trữ</Badge> : <Badge tone="brand" dot>Đang chạy</Badge>}
+              {isArchived ? <Badge tone="amber">Archived</Badge> : <Badge tone="brand" dot>Active</Badge>}
               <Badge>{SDLC_LABEL[project.sdlcMethod]}</Badge>
               {project.myRole ? (
                 <Badge tone={project.myRole.code === 'PROJECT_MANAGER' ? 'brand' : 'blue'}>{project.myRole.name}</Badge>
               ) : (
-                <Badge>Chỉ xem</Badge>
+                <Badge>Read-only</Badge>
               )}
             </>
           }
@@ -95,27 +95,27 @@ export function ProjectLayout() {
       {justCreated && (
         <div className="mt-4">
           <Alert tone="success">
-            Đã khởi tạo dự án <b>{project.name}</b> với {project.phaseCount} phase và {project.memberCount} thành viên. Bạn là Project
-            Manager của dự án này.
+            Project <b>{project.name}</b> has been created with {project.phaseCount} phases and {project.memberCount} members. You are the
+            Project Manager of this project.
           </Alert>
         </div>
       )}
       {isArchived && (
         <div className="mt-4">
-          <Alert tone="warning">Dự án đã được lưu trữ — mọi tài liệu, issue và cấu hình chỉ đọc.</Alert>
+          <Alert tone="warning">This project is archived — all documents, issues, and configurations are read-only.</Alert>
         </div>
       )}
 
       <PageTabs
         items={[
-          { label: 'Tổng quan', to: base, end: true },
-          { label: 'Tài liệu yêu cầu', to: `${base}/documents`, count: docStats.data?.totalDocs },
-          { label: 'Kanban', to: `${base}/issues`, count: issueStats.data?.open },
-          { label: 'Testcase', to: `${base}/testcases`, soon: true },
+          { label: 'Overview', to: base, end: true },
+          { label: 'Requirements', to: `${base}/documents`, count: docStats.data?.totalDocs },
+          { label: 'Kanban Board', to: `${base}/issues`, count: issueStats.data?.open },
+          { label: 'Test Cases', to: `${base}/testcases`, soon: true },
           { label: 'Workflow', to: `${base}/workflow`, count: project.phaseCount },
-          { label: 'Thành viên', to: `${base}/members`, count: project.memberCount, hidden: !can(PERMISSIONS.projectView) },
+          { label: 'Members', to: `${base}/members`, count: project.memberCount, hidden: !can(PERMISSIONS.projectView) },
           {
-            label: 'Cài đặt',
+            label: 'Settings',
             to: `${base}/settings`,
             hidden: !can(PERMISSIONS.projectUpdate) && !can(PERMISSIONS.projectArchive),
           },

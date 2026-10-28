@@ -17,11 +17,11 @@ export function DashboardHomePage() {
 
   return (
     <DashboardLayout>
-      <h1 className="text-2xl font-semibold tracking-tight text-gray-950">Chào {user?.fullName}!</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-gray-950">Welcome back, {user?.fullName}!</h1>
       <p className="mt-1 text-sm text-gray-500">
         {companies[0]
-          ? `Đây là không gian làm việc của ${companies[0].companyName}.`
-          : 'Đây là không gian làm việc cá nhân của bạn.'}
+          ? `This is the workspace for ${companies[0].companyName}.`
+          : 'This is your personal workspace.'}
       </p>
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -33,10 +33,10 @@ export function DashboardHomePage() {
                   <FolderIcon className="h-5 w-5" />
                 </span>
                 <Link to="/projects" className="text-xs font-medium text-brand-700 hover:underline">
-                  Xem tất cả ({projectList.length}) →
+                  View all ({projectList.length}) →
                 </Link>
               </div>
-              <h2 className="mt-3 text-sm font-semibold text-gray-900">Dự án đang hoạt động</h2>
+              <h2 className="mt-3 text-sm font-semibold text-gray-900">Active Projects</h2>
               <ul className="mt-2 space-y-1.5 text-sm">
                 {projectList.slice(0, 3).map((p) => (
                   <li key={p.projectId} className="flex items-center justify-between gap-2 truncate">
@@ -56,8 +56,8 @@ export function DashboardHomePage() {
         ) : (
           <DashboardEmptyState
             icon={<FolderIcon className="h-5 w-5" />}
-            title="Chưa có dự án"
-            description="Tạo dự án đầu tiên để bắt đầu theo dõi công việc."
+            title="No projects yet"
+            description="Create your first project to start tracking work."
           />
         )}
         {issueList.length > 0 ? (
@@ -68,10 +68,10 @@ export function DashboardHomePage() {
                   <ListChecksIcon className="h-5 w-5" />
                 </span>
                 <span className="text-xs font-semibold text-blue-700">
-                  {issueList.filter((i) => i.statusCategory !== 'DONE').length} đang mở
+                  {issueList.filter((i) => i.statusCategory !== 'DONE').length} open
                 </span>
               </div>
-              <h2 className="mt-3 text-sm font-semibold text-gray-900">Công việc của tôi (My Issues)</h2>
+              <h2 className="mt-3 text-sm font-semibold text-gray-900">My Assigned Issues</h2>
               <ul className="mt-2 space-y-1.5 text-sm">
                 {issueList.slice(0, 3).map((iss) => (
                   <li key={iss.id} className="flex items-center justify-between gap-2 truncate">
@@ -109,24 +109,24 @@ export function DashboardHomePage() {
         ) : (
           <DashboardEmptyState
             icon={<ListChecksIcon className="h-5 w-5" />}
-            title="Chưa có công việc được giao"
-            description="Mọi công việc hoặc lỗi được gán cho bạn sẽ hiển thị tại đây."
+            title="No assigned issues"
+            description="Tasks or bugs assigned to you will show up here."
           />
         )}
         <DashboardEmptyState
           icon={<DocumentIcon className="h-5 w-5" />}
-          title="Tài liệu & Confluence Workspace"
-          description="Soạn thảo URD, BRD, SRS tự do toàn màn hình kèm bóc tách REQ tự động."
+          title="Requirements & Confluence Workspace"
+          description="Full-screen distraction-free authoring for URD, BRD, SRS with auto REQ tracking."
         />
       </div>
 
       {(companies.length > 0 || workspaces.length > 0) && (
         <div className="mt-6 rounded-md border border-gray-200 bg-white p-4 text-sm">
-          <p className="font-semibold text-gray-700">Thông tin tài khoản</p>
+          <p className="font-semibold text-gray-700">Account Information</p>
           <dl className="mt-2 space-y-1 text-gray-500">
             {companies.map((c) => (
               <div key={c.companyId} className="flex justify-between">
-                <dt>Công ty</dt>
+                <dt>Company</dt>
                 <dd className="font-medium text-gray-700">
                   {c.companyName} · {c.roleName}
                 </dd>

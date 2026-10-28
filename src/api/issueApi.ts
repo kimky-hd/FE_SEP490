@@ -12,8 +12,8 @@ import type {
 } from '@/types/issue'
 import type { StatusCategory } from '@/types/project'
 
-const STORAGE_KEY = 'ssam.issues.v2'
-const OLD_STORAGE_KEY = 'ssam.issues.v1'
+const STORAGE_KEY = 'ssam.issues.v3'
+const PREV_KEYS = ['ssam.issues.v2', 'ssam.issues.v1']
 
 interface StoredIssueData {
   issues: ProjectIssue[]
@@ -26,9 +26,9 @@ function createInitialSeed(): StoredIssueData {
       projectId: 20,
       key: 'CORE-101',
       type: 'TASK',
-      summary: 'Cấu hình Spring Security OAuth2 và Token JWT Filter',
+      summary: 'Configure Spring Security OAuth2 and JWT Token Filter',
       description:
-        'Cài đặt bộ lọc xác thực JWT tại Gateway và Resource Server. Kiểm tra thời hạn Access Token (15 phút), chữ ký RSA và cơ chế tự động làm mới Refresh Token theo chuẩn OWASP ASVS.',
+        'Implement JWT authentication filters at API Gateway and Resource Server. Validate Access Token expiration (15 mins), RSA signatures, and automated Refresh Token rotation per OWASP ASVS guidelines.',
       phaseId: 3,
       phaseName: 'Phase 3: Sprint Execution & Coding',
       statusId: 302,
@@ -39,20 +39,20 @@ function createInitialSeed(): StoredIssueData {
       originalEstimate: '2d',
       dueDate: '2026-10-31',
 
-      // Nhân sự 4 vai trò
+      // 4-Role Ownership
       assigneeName: 'Sarah Lin',
       assigneeRole: 'Senior Developer',
       assigneeAvatar: 'SL',
       ownerName: 'Sarah Lin',
       ownerRole: 'Senior Developer',
-      reporterName: 'Phạm Văn Khoa (PM)',
+      reporterName: 'Pham Van Khoa (PM)',
       reporterRole: 'Project Manager',
       watchers: [
-        { name: 'Phạm Văn Khoa (PM)', role: 'Project Manager' },
-        { name: 'Vũ Kim Kỳ', role: 'Backend Developer' },
+        { name: 'Pham Van Khoa (PM)', role: 'Project Manager' },
+        { name: 'Vu Kim Ky', role: 'Backend Developer' },
       ],
 
-      // Phân loại tổ chức & bảo mật
+      // Organization & Security Classification
       departmentLabel: 'Backend Team',
       component: 'Authentication & SSO',
       dataClassification: 'CONFIDENTIAL_PII',
@@ -64,14 +64,14 @@ function createInitialSeed(): StoredIssueData {
       linkedDocumentId: 101,
       linkedRequirementItemId: 'item-101-1',
       linkedRequirementKeyCode: 'REQ-01',
-      linkedRequirementTitle: '2.1. Xác thực Đăng nhập Đa yếu tố & Khóa Tài khoản Tạm thời',
+      linkedRequirementTitle: '2.1. Multi-factor Authentication & Temporary Account Lockout',
       traceabilityStatus: 'FRESH',
       comments: [
         {
           id: 'cmt-iss-1',
-          authorName: 'Phạm Văn Khoa (PM)',
+          authorName: 'Pham Van Khoa (PM)',
           authorRole: 'Project Manager',
-          body: '@Sarah Lin nhớ kiểm tra kỹ trường hợp token hết hạn khi đang tải dở file lớn nhé.',
+          body: '@Sarah Lin Please make sure to handle token expiration gracefully during large multipart file uploads.',
           mentions: ['Sarah Lin'],
           createdAt: '2026-10-22T10:00:00.000Z',
         },
@@ -79,30 +79,30 @@ function createInitialSeed(): StoredIssueData {
           id: 'cmt-iss-2',
           authorName: 'Sarah Lin',
           authorRole: 'Senior Developer',
-          body: 'Đã bổ sung cấu hình axios interceptor retry 1 lần khi gặp 401 token expired.',
+          body: 'Added Axios interceptor with single retry on 401 token expired.',
           createdAt: '2026-10-23T11:15:00.000Z',
         },
       ],
       activityLog: [
         {
           id: 'act-1',
-          authorName: 'Phạm Văn Khoa (PM)',
-          action: 'Tạo mới Issue',
-          details: 'Khởi tạo Task CORE-101 và gán cho Sarah Lin',
+          authorName: 'Pham Van Khoa (PM)',
+          action: 'Created Issue',
+          details: 'Created Task CORE-101 and assigned to Sarah Lin',
           timestamp: '2026-10-21T09:00:00.000Z',
         },
         {
           id: 'act-2',
           authorName: 'Sarah Lin',
-          action: 'Chuyển trạng thái',
-          details: 'Từ "To Do" sang "In Progress"',
+          action: 'Transitioned Status',
+          details: 'From "To Do" to "In Progress"',
           timestamp: '2026-10-22T08:30:00.000Z',
         },
         {
           id: 'act-3',
           authorName: 'Sarah Lin',
-          action: 'Liên kết Yêu cầu Confluence',
-          details: 'Đã gắn liên kết với REQ-01 thuộc SRS-01',
+          action: 'Linked Confluence Requirement',
+          details: 'Linked with REQ-01 in SRS-01',
           timestamp: '2026-10-22T08:35:00.000Z',
         },
       ],
@@ -112,12 +112,12 @@ function createInitialSeed(): StoredIssueData {
       projectId: 20,
       key: 'CORE-102',
       type: 'BUG',
-      summary: 'Lỗi Brute-force không khóa tài khoản sau 5 lần nhập sai',
+      summary: 'Redis brute-force lockout failure after 5 invalid login attempts',
       description:
-        'Hệ thống không ghi nhận số lần nhập sai vào Redis cache dẫn đến sau 5 lần đăng nhập thất bại tài khoản vẫn ở trạng thái ACTIVE thay vì TEMP_LOCKED.',
+        'The system fails to increment failed attempt counters in Redis cache, leaving accounts in ACTIVE state rather than transitioning to TEMP_LOCKED after 5 consecutive failures.',
       severity: 'CRITICAL',
       stepsToReproduce:
-        '1. Truy cập trang /login\n2. Nhập email: test@company.com và mật khẩu sai\n3. Bấm Đăng nhập liên tiếp 6 lần\n4. Quan sát: Hệ thống vẫn báo lỗi mật khẩu sai mà không khóa tài khoản 15 phút như REQ-01 quy định.',
+        '1. Navigate to /login\n2. Enter email: test@company.com with incorrect password\n3. Click Login 6 consecutive times\n4. Observed: System continues displaying invalid credentials without triggering the 15-minute account lockout required by REQ-01.',
       linkedTestCaseCode: 'TC-01-01',
       phaseId: 3,
       phaseName: 'Phase 3: Sprint Execution & Coding',
@@ -129,20 +129,20 @@ function createInitialSeed(): StoredIssueData {
       originalEstimate: '1d',
       dueDate: '2026-10-29',
 
-      // Nhân sự 4 vai trò
-      assigneeName: 'Vũ Kim Kỳ',
+      // 4-Role Ownership
+      assigneeName: 'Vu Kim Ky',
       assigneeRole: 'Backend Developer',
       assigneeAvatar: 'KK',
       ownerName: 'Sarah Lin',
       ownerRole: 'Senior Developer',
-      reporterName: 'Vũ Thị Mai (QA)',
+      reporterName: 'Vu Thi Mai (QA)',
       reporterRole: 'QA Lead',
       watchers: [
         { name: 'Sarah Lin', role: 'Senior Developer' },
-        { name: 'Vũ Thị Mai (QA)', role: 'QA Lead' },
+        { name: 'Vu Thi Mai (QA)', role: 'QA Lead' },
       ],
 
-      // Phân loại tổ chức & bảo mật
+      // Organization & Security Classification
       departmentLabel: 'Backend Team',
       component: 'Authentication & SSO',
       dataClassification: 'RESTRICTED',
@@ -154,24 +154,24 @@ function createInitialSeed(): StoredIssueData {
       linkedDocumentId: 101,
       linkedRequirementItemId: 'item-101-1',
       linkedRequirementKeyCode: 'REQ-01',
-      linkedRequirementTitle: '2.1. Xác thực Đăng nhập Đa yếu tố & Khóa Tài khoản Tạm thời',
+      linkedRequirementTitle: '2.1. Multi-factor Authentication & Temporary Account Lockout',
       traceabilityStatus: 'FRESH',
       comments: [
         {
           id: 'cmt-iss-3',
-          authorName: 'Vũ Thị Mai (QA)',
+          authorName: 'Vu Thi Mai (QA)',
           authorRole: 'QA Lead',
-          body: '@Vũ Kim Kỳ fix gấp con bug này để kịp demo UAT chiều nay nhé.',
-          mentions: ['Vũ Kim Kỳ'],
+          body: '@Vu Kim Ky Urgent fix needed for afternoon UAT demonstration.',
+          mentions: ['Vu Kim Ky'],
           createdAt: '2026-10-25T14:10:00.000Z',
         },
       ],
       activityLog: [
         {
           id: 'act-4',
-          authorName: 'Vũ Thị Mai (QA)',
-          action: 'Tạo Bug mới',
-          details: 'Ghi nhận lỗi từ Test Case TC-01-01 và gán cho Vũ Kim Kỳ',
+          authorName: 'Vu Thi Mai (QA)',
+          action: 'Created Defect',
+          details: 'Reported defect from Test Case TC-01-01 and assigned to Vu Kim Ky',
           timestamp: '2026-10-25T14:00:00.000Z',
         },
       ],
@@ -181,9 +181,9 @@ function createInitialSeed(): StoredIssueData {
       projectId: 20,
       key: 'CORE-103',
       type: 'TASK',
-      summary: 'Tích hợp SDK VietQR Napas247 và sinh mã QR động',
+      summary: 'Integrate Napas247 VietQR SDK and Dynamic QR Code Generation',
       description:
-        'Triển khai hàm sinh mã QR động chứa số tiền và mã đơn hàng theo chuẩn EMVCo Napas. Tự động kiểm tra hết hạn sau 15 phút.',
+        'Implement dynamic EMVCo Napas QR generation with transaction amounts and order reference IDs. Enforce 15-minute expiration timestamp and checksum validation.',
       phaseId: 3,
       phaseName: 'Phase 3: Sprint Execution & Coding',
       statusId: 302,
@@ -194,20 +194,20 @@ function createInitialSeed(): StoredIssueData {
       originalEstimate: '3d',
       dueDate: '2026-11-02',
 
-      // Nhân sự 4 vai trò
-      assigneeName: 'Phạm Minh Lương',
+      // 4-Role Ownership
+      assigneeName: 'Pham Minh Luong',
       assigneeRole: 'Backend Developer',
       assigneeAvatar: 'ML',
-      ownerName: 'Phạm Minh Lương',
+      ownerName: 'Pham Minh Luong',
       ownerRole: 'Tech Lead / Payment',
       reporterName: 'Sarah Lin',
       reporterRole: 'Senior Developer',
       watchers: [
-        { name: 'Phạm Văn Khoa (PM)', role: 'Project Manager' },
-        { name: 'Vũ Kim Kỳ', role: 'Backend Developer' },
+        { name: 'Pham Van Khoa (PM)', role: 'Project Manager' },
+        { name: 'Vu Kim Ky', role: 'Backend Developer' },
       ],
 
-      // Phân loại tổ chức & bảo mật
+      // Organization & Security Classification
       departmentLabel: 'Backend Team',
       component: 'Core Banking & VietQR',
       dataClassification: 'RESTRICTED',
@@ -219,15 +219,15 @@ function createInitialSeed(): StoredIssueData {
       linkedDocumentId: 102,
       linkedRequirementItemId: 'item-102-1',
       linkedRequirementKeyCode: 'REQ-01',
-      linkedRequirementTitle: '2.1. Sinh mã VietQR Động theo Đơn hàng & Kiểm soát Thời hạn Hiệu lực',
+      linkedRequirementTitle: '2.1. Dynamic VietQR Generation & Expiration Control',
       traceabilityStatus: 'FRESH',
       comments: [],
       activityLog: [
         {
           id: 'act-5',
           authorName: 'Sarah Lin',
-          action: 'Tạo mới Issue',
-          details: 'Khởi tạo Task tích hợp VietQR',
+          action: 'Created Issue',
+          details: 'Created VietQR payment integration Task',
           timestamp: '2026-10-22T08:00:00.000Z',
         },
       ],
@@ -237,12 +237,12 @@ function createInitialSeed(): StoredIssueData {
       projectId: 20,
       key: 'CORE-104',
       type: 'BUG',
-      summary: 'Webhook Ngân hàng bị xử lý 2 lần khi mạng chập chờn (Duplicate Credit)',
+      summary: 'Duplicate Credit on Bank Webhook Retries under Network Flapping',
       description:
-        'Cổng thanh toán bắn 2 webhook retry liên tiếp cách nhau 200ms khiến đơn hàng bị kích hoạt 2 lần. Cần bổ sung Redis Distributed Lock theo transactionId.',
+        'Payment gateway dispatches retry webhooks 200ms apart during latency spikes, triggering double balance credit. Must implement Redis Distributed Lock by transactionId with idempotency key.',
       severity: 'BLOCKER',
       stepsToReproduce:
-        '1. Gửi request Webhook Napas với transactionId = "TXN-9999"\n2. Trong lúc đang xử lý, gửi tiếp request thứ 2 cùng ID\n3. Quan sát: Cả 2 request đều trả 200 và cộng tiền 2 lần.',
+        '1. Dispatch Napas Webhook request with transactionId = "TXN-9999"\n2. While processing, send identical second request\n3. Observed: Both return HTTP 200 and credit user balance twice.',
       linkedTestCaseCode: 'TC-02-02',
       phaseId: 3,
       phaseName: 'Phase 3: Sprint Execution & Coding',
@@ -254,21 +254,21 @@ function createInitialSeed(): StoredIssueData {
       originalEstimate: '1d 4h',
       dueDate: '2026-10-28',
 
-      // Nhân sự 4 vai trò
-      assigneeName: 'Phạm Minh Lương',
+      // 4-Role Ownership
+      assigneeName: 'Pham Minh Luong',
       assigneeRole: 'Backend Developer',
       assigneeAvatar: 'ML',
-      ownerName: 'Phạm Minh Lương',
+      ownerName: 'Pham Minh Luong',
       ownerRole: 'Tech Lead / Payment',
-      reporterName: 'Vũ Thị Mai (QA)',
+      reporterName: 'Vu Thi Mai (QA)',
       reporterRole: 'QA Lead',
       watchers: [
-        { name: 'Phạm Minh Lương', role: 'Backend Developer' },
-        { name: 'Vũ Thị Mai (QA)', role: 'QA Lead' },
-        { name: 'Phạm Văn Khoa (PM)', role: 'Project Manager' },
+        { name: 'Pham Minh Luong', role: 'Backend Developer' },
+        { name: 'Vu Thi Mai (QA)', role: 'QA Lead' },
+        { name: 'Pham Van Khoa (PM)', role: 'Project Manager' },
       ],
 
-      // Phân loại tổ chức & bảo mật
+      // Organization & Security Classification
       departmentLabel: 'Backend Team',
       component: 'Core Banking & VietQR',
       dataClassification: 'RESTRICTED',
@@ -280,24 +280,24 @@ function createInitialSeed(): StoredIssueData {
       linkedDocumentId: 102,
       linkedRequirementItemId: 'item-102-2',
       linkedRequirementKeyCode: 'REQ-02',
-      linkedRequirementTitle: '2.2. Xử lý Webhook Ngân hàng & Đối soát Giao dịch Bất đồng bộ',
-      traceabilityStatus: 'UNCONFIRMED_STALE', // Cảnh báo Stale mẫu cho demo!
+      linkedRequirementTitle: '2.2. Bank Webhook Processing & Asynchronous Reconciliation',
+      traceabilityStatus: 'UNCONFIRMED_STALE',
       comments: [
         {
           id: 'cmt-iss-4',
-          authorName: 'Vũ Kim Kỳ (BA)',
+          authorName: 'Vu Kim Ky (BA)',
           authorRole: 'Business Analyst',
-          body: 'Lưu ý: Tôi vừa cập nhật thêm quy tắc chuyển thừa / thiếu tiền trong tài liệu Confluence (v1.1). @Phạm Minh Lương xem bản diff nhé!',
-          mentions: ['Phạm Minh Lương'],
+          body: 'Note: Partial payment rules were just updated in Confluence spec v1.1. Please inspect the diff before patching!',
+          mentions: ['Pham Minh Luong'],
           createdAt: '2026-10-27T09:30:00.000Z',
         },
       ],
       activityLog: [
         {
           id: 'act-6',
-          authorName: 'Hệ thống SSAM (Traceability)',
-          action: 'Cảnh báo Lạc hậu (Stale Alert)',
-          details: 'Yêu cầu REQ-02 bên tài liệu SRS-02 vừa bị chỉnh sửa nháp. Cần kiểm tra lại mã nguồn!',
+          authorName: 'SSAM Traceability Engine',
+          action: 'Stale Alert',
+          details: 'Requirement REQ-02 in SRS-02 draft was updated. Source code verification required!',
           timestamp: '2026-10-27T10:00:00.000Z',
         },
       ],
@@ -307,9 +307,9 @@ function createInitialSeed(): StoredIssueData {
       projectId: 20,
       key: 'CORE-105',
       type: 'TASK',
-      summary: 'Xây dựng màn hình hiển thị danh sách giao dịch VietQR',
+      summary: 'Build VietQR Transaction History and Settlement Table',
       description:
-        'Giao diện hiển thị bảng lịch sử thanh toán, trạng thái giao dịch, nút xem chi tiết mã QR và bộ lọc theo ngày.',
+        'Construct interactive payment history dashboard with real-time transaction statuses, QR modal viewer, and date range filtering.',
       phaseId: 2,
       phaseName: 'Phase 2: UI/UX Design',
       statusId: 203,
@@ -320,17 +320,17 @@ function createInitialSeed(): StoredIssueData {
       originalEstimate: '2d',
       dueDate: '2026-11-04',
 
-      // Nhân sự 4 vai trò
+      // 4-Role Ownership
       assigneeName: 'Sarah Lin',
       assigneeRole: 'Frontend Developer',
       assigneeAvatar: 'SL',
-      ownerName: 'Vũ Kim Kỳ (BA)',
+      ownerName: 'Vu Kim Ky (BA)',
       ownerRole: 'Product Designer',
-      reporterName: 'Phạm Minh Lương',
+      reporterName: 'Pham Minh Luong',
       reporterRole: 'Backend Developer',
-      watchers: [{ name: 'Vũ Kim Kỳ (BA)', role: 'Product Designer' }],
+      watchers: [{ name: 'Vu Kim Ky (BA)', role: 'Product Designer' }],
 
-      // Phân loại tổ chức & bảo mật
+      // Organization & Security Classification
       departmentLabel: 'Frontend Team',
       component: 'Confluence Spec Editor',
       dataClassification: 'INTERNAL',
@@ -342,15 +342,15 @@ function createInitialSeed(): StoredIssueData {
       linkedDocumentId: 102,
       linkedRequirementItemId: 'item-102-3',
       linkedRequirementKeyCode: 'REQ-03',
-      linkedRequirementTitle: '2.3. Tự động Bóc tách Requirement Items & Cảnh báo Lạc hậu (Stale RTM)',
+      linkedRequirementTitle: '2.3. Requirement Item Parsing & Stale RTM Alerts',
       traceabilityStatus: 'FRESH',
       comments: [],
       activityLog: [
         {
           id: 'act-7',
-          authorName: 'Phạm Minh Lương',
-          action: 'Tạo mới Issue',
-          details: 'Tạo task giao diện bảng giao dịch',
+          authorName: 'Pham Minh Luong',
+          action: 'Created Issue',
+          details: 'Created payment transactions table task',
           timestamp: '2026-10-23T10:00:00.000Z',
         },
       ],
@@ -360,9 +360,9 @@ function createInitialSeed(): StoredIssueData {
       projectId: 20,
       key: 'CORE-106',
       type: 'TASK',
-      summary: 'Đặc tả Use Case và Wireframe luồng eKYC 3 bước',
+      summary: 'Draft 3-Step Mobile eKYC Use Case Specs and Wireframes',
       description:
-        'Hoàn thiện tài liệu URD và bản vẽ Wireframe Figma cho quy trình định danh eKYC trên thiết bị di động.',
+        'Finalize URD specification and Figma wireframe components for 3-step digital identity verification on mobile devices.',
       phaseId: 1,
       phaseName: 'Phase 1: Requirement & Analysis',
       statusId: 104,
@@ -373,17 +373,17 @@ function createInitialSeed(): StoredIssueData {
       originalEstimate: '4d',
       dueDate: '2026-10-20',
 
-      // Nhân sự 4 vai trò
-      assigneeName: 'Phạm Minh Lương',
+      // 4-Role Ownership
+      assigneeName: 'Pham Minh Luong',
       assigneeRole: 'Business Analyst',
       assigneeAvatar: 'ML',
-      ownerName: 'Phạm Văn Khoa (PM)',
+      ownerName: 'Pham Van Khoa (PM)',
       ownerRole: 'Project Manager',
-      reporterName: 'Phạm Văn Khoa (PM)',
+      reporterName: 'Pham Van Khoa (PM)',
       reporterRole: 'Project Manager',
       watchers: [{ name: 'Sarah Lin', role: 'Senior Developer' }],
 
-      // Phân loại tổ chức & bảo mật
+      // Organization & Security Classification
       departmentLabel: 'BA & Product',
       component: 'Traceability & RTM',
       dataClassification: 'CONFIDENTIAL_PII',
@@ -395,15 +395,15 @@ function createInitialSeed(): StoredIssueData {
       linkedDocumentId: 103,
       linkedRequirementItemId: 'item-103-1',
       linkedRequirementKeyCode: 'REQ-01',
-      linkedRequirementTitle: '1. Hành trình Định danh Điện tử eKYC 3 Bước',
+      linkedRequirementTitle: '1. 3-Step Mobile eKYC Verification Journey',
       traceabilityStatus: 'FRESH',
       comments: [],
       activityLog: [
         {
           id: 'act-8',
-          authorName: 'Phạm Minh Lương',
-          action: 'Hoàn thành công việc',
-          details: 'Đã hoàn thành và được PM nghiệm thu',
+          authorName: 'Pham Minh Luong',
+          action: 'Completed Work',
+          details: 'Reviewed and accepted by PM',
           timestamp: '2026-10-20T16:00:00.000Z',
         },
       ],
@@ -413,9 +413,9 @@ function createInitialSeed(): StoredIssueData {
       projectId: 20,
       key: 'CORE-107',
       type: 'TASK',
-      summary: 'Viết tài liệu hướng dẫn vận hành và API Swagger',
+      summary: 'Publish OpenAPI 3.0 Swagger Documentation for Core APIs',
       description:
-        'Tổng hợp danh mục API phân hệ Core và viết tài liệu OpenAPI 3.0 cho các đối tác tích hợp.',
+        'Consolidate core service endpoints and publish OpenAPI 3.0 interactive Swagger documentation for external integration partners.',
       phaseId: 4,
       phaseName: 'Phase 4: UAT & Deployment',
       statusId: 404,
@@ -426,17 +426,17 @@ function createInitialSeed(): StoredIssueData {
       originalEstimate: '1d',
       dueDate: '2026-10-24',
 
-      // Nhân sự 4 vai trò
-      assigneeName: 'Vũ Kim Kỳ',
+      // 4-Role Ownership
+      assigneeName: 'Vu Kim Ky',
       assigneeRole: 'Backend Developer',
       assigneeAvatar: 'KK',
       ownerName: 'Sarah Lin',
       ownerRole: 'Senior Developer',
-      reporterName: 'Phạm Văn Khoa (PM)',
+      reporterName: 'Pham Van Khoa (PM)',
       reporterRole: 'Project Manager',
-      watchers: [{ name: 'Phạm Văn Khoa (PM)', role: 'Project Manager' }],
+      watchers: [{ name: 'Pham Van Khoa (PM)', role: 'Project Manager' }],
 
-      // Phân loại tổ chức & bảo mật
+      // Organization & Security Classification
       departmentLabel: 'DevOps & SecOps',
       component: 'AI Generation Engine',
       dataClassification: 'PUBLIC',
@@ -450,9 +450,9 @@ function createInitialSeed(): StoredIssueData {
       activityLog: [
         {
           id: 'act-9',
-          authorName: 'Vũ Kim Kỳ',
-          action: 'Hoàn thành công việc',
-          details: 'Xuất bản Swagger docs tại /api-docs',
+          authorName: 'Vu Kim Ky',
+          action: 'Completed Work',
+          details: 'Published Swagger documentation at /api-docs',
           timestamp: '2026-10-24T12:00:00.000Z',
         },
       ],
@@ -465,10 +465,11 @@ function createInitialSeed(): StoredIssueData {
 function loadStorage(): StoredIssueData {
   try {
     let raw = localStorage.getItem(STORAGE_KEY)
-    let isMigrated = false
     if (!raw) {
-      raw = localStorage.getItem(OLD_STORAGE_KEY)
-      if (raw) isMigrated = true
+      for (const oldKey of PREV_KEYS) {
+        raw = localStorage.getItem(oldKey)
+        if (raw) break
+      }
     }
     if (!raw) {
       const seeded = createInitialSeed()
@@ -482,8 +483,16 @@ function loadStorage(): StoredIssueData {
       return seeded
     }
 
-    // Tự động kiểm tra và nâng cấp dữ liệu cũ (auto-migration)
-    let hasChanges = isMigrated
+    // Check if issues contain legacy Vietnamese text; if so, replace with clean English seed
+    const hasLegacyVietnamese = parsed.issues.some((i) => i.summary.includes('Cấu hình') || i.summary.includes('Lỗi'))
+    if (hasLegacyVietnamese) {
+      const seeded = createInitialSeed()
+      saveStorage(seeded)
+      return seeded
+    }
+
+    // Ensure all modern fields exist
+    let modified = false
     parsed.issues = parsed.issues.map((iss) => {
       let changed = false
       const copy: ProjectIssue = { ...iss }
@@ -503,7 +512,7 @@ function loadStorage(): StoredIssueData {
       }
       if (!copy.watchers || !Array.isArray(copy.watchers) || copy.watchers.length === 0) {
         copy.watchers = [
-          { name: 'Phạm Văn Khoa (PM)', role: 'Project Manager' },
+          { name: 'Pham Van Khoa (PM)', role: 'Project Manager' },
           { name: 'Sarah Lin', role: 'Senior Developer' },
         ]
         changed = true
@@ -537,11 +546,11 @@ function loadStorage(): StoredIssueData {
         changed = true
       }
 
-      if (changed) hasChanges = true
+      if (changed) modified = true
       return copy
     })
 
-    if (hasChanges) {
+    if (modified) {
       saveStorage(parsed)
     }
     return parsed
@@ -556,11 +565,11 @@ function saveStorage(data: StoredIssueData): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   } catch (err) {
-    console.error('Không thể lưu issues vào localStorage', err)
+    console.error('Failed to persist issues to localStorage', err)
   }
 }
 
-/** Tự động khởi tạo dữ liệu mẫu nếu một Project chưa có Issue nào */
+/** Automatically seeds sample issues if a project has no issues yet */
 function ensureProjectSeeded(projectId: number, projectKey = 'PRJ'): StoredIssueData {
   const data = loadStorage()
   const exists = data.issues.some((i) => i.projectId === projectId)
@@ -580,11 +589,11 @@ function ensureProjectSeeded(projectId: number, projectKey = 'PRJ'): StoredIssue
 }
 
 export const issueApi = {
-  /** Lấy danh sách Issues theo Dự án */
+  /** Fetch issues for a project */
   getIssues: async (projectId?: number, projectKey?: string): Promise<ProjectIssue[]> => {
     let data = loadStorage()
     if (projectId) {
-      data = ensureProjectSeeded(projectId, projectKey || 'TEST')
+      data = ensureProjectSeeded(projectId, projectKey || 'CORE')
       return data.issues
         .filter((i) => i.projectId === projectId)
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -592,13 +601,13 @@ export const issueApi = {
     return data.issues.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
   },
 
-  /** Lấy chi tiết 1 Issue theo ID */
+  /** Get issue detail by ID */
   getIssueById: async (id: string): Promise<ProjectIssue | null> => {
     const data = loadStorage()
     return data.issues.find((i) => i.id === id) || null
   },
 
-  /** Tạo mới Task hoặc Bug chuẩn Jira */
+  /** Create new Task or Bug */
   createIssue: async (params: {
     projectId: number
     projectKey?: string
@@ -638,7 +647,7 @@ export const issueApi = {
     const now = new Date().toISOString()
     const projectKey = params.projectKey || 'CORE'
 
-    // Tính mã Key tăng dần (VD: CORE-108)
+    // Compute incrementing key (e.g., CORE-108)
     const projectIssues = data.issues.filter((i) => i.projectId === params.projectId)
     const existingNums = projectIssues
       .map((i) => {
@@ -651,7 +660,7 @@ export const issueApi = {
     const key = `${projectKey}-${nextNum}`
     const id = `iss-${params.projectId}-${Date.now()}`
 
-    // Lấy avatar viết tắt
+    // Initials for avatar
     const initials = params.assigneeName
       .split(' ')
       .map((w) => w[0])
@@ -679,7 +688,7 @@ export const issueApi = {
       originalEstimate: params.originalEstimate || '1d',
       dueDate: params.dueDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
 
-      // Nhân sự 4 vai trò
+      // 4-Role Ownership
       assigneeName: params.assigneeName,
       assigneeRole: params.assigneeRole,
       assigneeAvatar: initials,
@@ -695,7 +704,7 @@ export const issueApi = {
               { name: params.assigneeName, role: params.assigneeRole },
             ],
 
-      // Phân loại tổ chức & bảo mật
+      // Classification & Organization
       departmentLabel: params.departmentLabel || 'Backend Team',
       component: params.component || 'Authentication & SSO',
       dataClassification: params.dataClassification || 'INTERNAL',
@@ -714,8 +723,8 @@ export const issueApi = {
         {
           id: `act-${Date.now()}`,
           authorName: params.reporterName,
-          action: `Tạo mới ${params.type === 'BUG' ? 'Bug' : 'Task'}`,
-          details: `Khởi tạo ${key}: "${params.summary}" và gán cho ${params.assigneeName}`,
+          action: `Created ${params.type === 'BUG' ? 'Defect' : 'Task'}`,
+          details: `Created ${key}: "${params.summary}" and assigned to ${params.assigneeName}`,
           timestamp: now,
         },
       ],
@@ -726,16 +735,16 @@ export const issueApi = {
     return newIssue
   },
 
-  /** Cập nhật thông tin Issue */
+  /** Update issue details */
   updateIssue: async (
     id: string,
     updates: Partial<ProjectIssue>,
-    actor = 'Người dùng',
+    actor = 'User',
     reason?: string,
   ): Promise<ProjectIssue> => {
     const data = loadStorage()
     const issue = data.issues.find((i) => i.id === id)
-    if (!issue) throw new Error(`Không tìm thấy Issue #${id}`)
+    if (!issue) throw new Error(`Issue #${id} not found`)
 
     const now = new Date().toISOString()
     Object.assign(issue, updates, { updatedAt: now })
@@ -744,7 +753,7 @@ export const issueApi = {
       issue.activityLog.unshift({
         id: `act-${Date.now()}`,
         authorName: actor,
-        action: 'Cập nhật Issue',
+        action: 'Updated Issue',
         details: reason,
         timestamp: now,
       })
@@ -754,15 +763,15 @@ export const issueApi = {
     return issue
   },
 
-  /** Bật/Tắt theo dõi Issue (Watch/Unwatch) */
+  /** Toggle Watch/Unwatch on an Issue */
   toggleWatcher: async (
     id: string,
     watcher: IssueWatcher,
-    actor = 'Người dùng',
+    actor = 'User',
   ): Promise<ProjectIssue> => {
     const data = loadStorage()
     const issue = data.issues.find((i) => i.id === id)
-    if (!issue) throw new Error(`Không tìm thấy Issue #${id}`)
+    if (!issue) throw new Error(`Issue #${id} not found`)
 
     const now = new Date().toISOString()
     if (!Array.isArray(issue.watchers)) issue.watchers = []
@@ -773,8 +782,8 @@ export const issueApi = {
       issue.activityLog.unshift({
         id: `act-${Date.now()}`,
         authorName: actor,
-        action: 'Bỏ theo dõi (Unwatch)',
-        details: `${watcher.name} đã ngừng theo dõi Issue này`,
+        action: 'Stopped Watching',
+        details: `${watcher.name} stopped watching this issue`,
         timestamp: now,
       })
     } else {
@@ -782,8 +791,8 @@ export const issueApi = {
       issue.activityLog.unshift({
         id: `act-${Date.now()}`,
         authorName: actor,
-        action: 'Theo dõi Issue (Watch)',
-        details: `${watcher.name} đã bắt đầu theo dõi Issue này`,
+        action: 'Started Watching',
+        details: `${watcher.name} started watching this issue`,
         timestamp: now,
       })
     }
@@ -794,13 +803,12 @@ export const issueApi = {
   },
 
   /**
-   * Xóa Issue có kiểm tra quy tắc bảo vệ RTM (GB-07):
-   * Nếu Issue đang có liên kết truy xuất tới REQ-xx hoặc Test Case, bắt buộc phải có force = true
+   * Delete issue with RTM protection check (GB-07)
    */
   deleteIssue: async (id: string, force = false): Promise<{ success: boolean; error?: string }> => {
     const data = loadStorage()
     const idx = data.issues.findIndex((i) => i.id === id)
-    if (idx === -1) throw new Error(`Không tìm thấy Issue #${id}`)
+    if (idx === -1) throw new Error(`Issue #${id} not found`)
 
     const issue = data.issues[idx]
     const hasReqLink = !!issue.linkedRequirementKeyCode
@@ -809,9 +817,9 @@ export const issueApi = {
     if ((hasReqLink || hasTcLink) && !force) {
       return {
         success: false,
-        error: `MSG04: Cảnh báo xóa Issue có liên kết truy xuất! Issue ${issue.key} đang được liên kết với ${
-          hasReqLink ? `yêu cầu [${issue.linkedRequirementKeyCode}]` : ''
-        } ${hasTcLink ? `và Test Case [${issue.linkedTestCaseCode}]` : ''}. Xóa issue này có thể làm đứt gãy ma trận RTM. Bạn có chắc chắn muốn xóa vĩnh viễn?`,
+        error: `MSG04: Warning: Deleting an issue linked to traceability matrix! Issue ${issue.key} is linked to ${
+          hasReqLink ? `Requirement [${issue.linkedRequirementKeyCode}]` : ''
+        } ${hasTcLink ? `and Test Case [${issue.linkedTestCaseCode}]` : ''}. Deleting this issue may break the RTM matrix. Are you sure you want to permanently delete it?`,
       }
     }
 
@@ -820,18 +828,18 @@ export const issueApi = {
     return { success: true }
   },
 
-  /** Chuyển trạng thái Workflow của Issue (có kiểm tra Transition Rules) */
+  /** Transition workflow status with transition rules check */
   transitionIssue: async (
     id: string,
     newStatusId: number,
     newStatusName: string,
     newStatusCategory: StatusCategory,
     comment?: string,
-    actor = 'Người dùng',
+    actor = 'User',
   ): Promise<ProjectIssue> => {
     const data = loadStorage()
     const issue = data.issues.find((i) => i.id === id)
-    if (!issue) throw new Error(`Không tìm thấy Issue #${id}`)
+    if (!issue) throw new Error(`Issue #${id} not found`)
 
     const prevStatusName = issue.statusName
     const now = new Date().toISOString()
@@ -844,8 +852,8 @@ export const issueApi = {
     issue.activityLog.unshift({
       id: `act-${Date.now()}`,
       authorName: actor,
-      action: 'Chuyển trạng thái',
-      details: `Đổi trạng thái từ "${prevStatusName}" sang "${newStatusName}"${comment ? ` (Ghi chú: ${comment})` : ''}`,
+      action: 'Transitioned Status',
+      details: `Moved from "${prevStatusName}" to "${newStatusName}"${comment ? ` (Note: ${comment})` : ''}`,
       timestamp: now,
     })
 
@@ -853,8 +861,8 @@ export const issueApi = {
       issue.comments.unshift({
         id: `cmt-${Date.now()}`,
         authorName: actor,
-        authorRole: 'Thành viên',
-        body: `[Chuyển trạng thái sang ${newStatusName}]: ${comment}`,
+        authorRole: 'Team Member',
+        body: `[Transitioned to ${newStatusName}]: ${comment}`,
         createdAt: now,
       })
     }
@@ -863,17 +871,17 @@ export const issueApi = {
     return issue
   },
 
-  /** Bàn giao lại công việc (Re-assign) kèm ghi chú bàn giao */
+  /** Re-assign issue with handover note */
   reassignIssue: async (
     id: string,
     newAssigneeName: string,
     newAssigneeRole: string,
     handoverNote?: string,
-    actor = 'Người dùng',
+    actor = 'User',
   ): Promise<ProjectIssue> => {
     const data = loadStorage()
     const issue = data.issues.find((i) => i.id === id)
-    if (!issue) throw new Error(`Không tìm thấy Issue #${id}`)
+    if (!issue) throw new Error(`Issue #${id} not found`)
 
     const prevAssignee = issue.assigneeName
     const now = new Date().toISOString()
@@ -892,8 +900,8 @@ export const issueApi = {
     issue.activityLog.unshift({
       id: `act-${Date.now()}`,
       authorName: actor,
-      action: 'Bàn giao công việc (Re-assign)',
-      details: `Bàn giao từ ${prevAssignee} sang @${newAssigneeName}${handoverNote ? ` · Ghi chú: "${handoverNote}"` : ''}`,
+      action: 'Reassigned Issue',
+      details: `Reassigned from ${prevAssignee} to @${newAssigneeName}${handoverNote ? ` · Note: "${handoverNote}"` : ''}`,
       timestamp: now,
     })
 
@@ -901,8 +909,8 @@ export const issueApi = {
       issue.comments.unshift({
         id: `cmt-${Date.now()}`,
         authorName: actor,
-        authorRole: 'Thành viên',
-        body: `@${newAssigneeName} Bàn giao công việc: ${handoverNote}`,
+        authorRole: 'Team Member',
+        body: `@${newAssigneeName} Handover Note: ${handoverNote}`,
         mentions: [newAssigneeName],
         createdAt: now,
       })
@@ -912,15 +920,15 @@ export const issueApi = {
     return issue
   },
 
-  /** Gắn liên kết với một Requirement Item Confluence */
+  /** Link Confluence Requirement */
   linkRequirement: async (
     id: string,
     req: { docId: number; reqId: string; reqKey: string; reqTitle: string },
-    actor = 'Người dùng',
+    actor = 'User',
   ): Promise<ProjectIssue> => {
     const data = loadStorage()
     const issue = data.issues.find((i) => i.id === id)
-    if (!issue) throw new Error(`Không tìm thấy Issue #${id}`)
+    if (!issue) throw new Error(`Issue #${id} not found`)
 
     const now = new Date().toISOString()
     issue.linkedDocumentId = req.docId
@@ -933,8 +941,8 @@ export const issueApi = {
     issue.activityLog.unshift({
       id: `act-${Date.now()}`,
       authorName: actor,
-      action: 'Liên kết Yêu cầu Confluence',
-      details: `Đã gắn liên kết với [${req.reqKey}] - ${req.reqTitle}`,
+      action: 'Linked Confluence Requirement',
+      details: `Linked with [${req.reqKey}] - ${req.reqTitle}`,
       timestamp: now,
     })
 
@@ -942,11 +950,11 @@ export const issueApi = {
     return issue
   },
 
-  /** Gỡ liên kết Requirement */
-  unlinkRequirement: async (id: string, actor = 'Người dùng'): Promise<ProjectIssue> => {
+  /** Unlink Requirement */
+  unlinkRequirement: async (id: string, actor = 'User'): Promise<ProjectIssue> => {
     const data = loadStorage()
     const issue = data.issues.find((i) => i.id === id)
-    if (!issue) throw new Error(`Không tìm thấy Issue #${id}`)
+    if (!issue) throw new Error(`Issue #${id} not found`)
 
     const prevKey = issue.linkedRequirementKeyCode
     const now = new Date().toISOString()
@@ -961,8 +969,8 @@ export const issueApi = {
     issue.activityLog.unshift({
       id: `act-${Date.now()}`,
       authorName: actor,
-      action: 'Gỡ liên kết Yêu cầu',
-      details: `Đã gỡ liên kết với yêu cầu [${prevKey}]`,
+      action: 'Unlinked Requirement',
+      details: `Removed link with [${prevKey}]`,
       timestamp: now,
     })
 
@@ -970,14 +978,11 @@ export const issueApi = {
     return issue
   },
 
-  /**
-   * Reset trạng thái Stale về FRESH:
-   * Khi lập trình viên hoặc Tester xác nhận đã cập nhật code theo bản đặc tả mới
-   */
-  resetStaleStatus: async (id: string, actor = 'Người dùng'): Promise<ProjectIssue> => {
+  /** Reset Stale status back to FRESH */
+  resetStaleStatus: async (id: string, actor = 'User'): Promise<ProjectIssue> => {
     const data = loadStorage()
     const issue = data.issues.find((i) => i.id === id)
-    if (!issue) throw new Error(`Không tìm thấy Issue #${id}`)
+    if (!issue) throw new Error(`Issue #${id} not found`)
 
     const now = new Date().toISOString()
     issue.traceabilityStatus = 'FRESH'
@@ -986,8 +991,8 @@ export const issueApi = {
     issue.activityLog.unshift({
       id: `act-${Date.now()}`,
       authorName: actor,
-      action: 'Đồng bộ Trạng thái Truy xuất',
-      details: `Đã xác nhận cập nhật theo đặc tả mới của [${issue.linkedRequirementKeyCode || 'REQ'}] → Trạng thái trở về Fresh.`,
+      action: 'Synchronized Traceability Status',
+      details: `Confirmed update according to spec [${issue.linkedRequirementKeyCode || 'REQ'}] → Status reset to Fresh.`,
       timestamp: now,
     })
 
@@ -995,10 +1000,7 @@ export const issueApi = {
     return issue
   },
 
-  /**
-   * Đồng bộ 2 chiều: Khi một Requirement bên Confluence bị chỉnh sửa nháp hoặc duyệt thay đổi mới,
-   * tự động cập nhật cờ Stale lên các Jira Task / Bug liên kết
-   */
+  /** Bidirectional sync: mark issues Stale when Confluence requirement is edited */
   markRequirementStale: async (
     docId: number,
     reqKeyCode: string,
@@ -1017,12 +1019,12 @@ export const issueApi = {
         iss.updatedAt = now
         iss.activityLog.unshift({
           id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-          authorName: 'Hệ thống SSAM (Confluence Sync)',
+          authorName: 'SSAM Confluence Sync',
           action:
             status === 'UNCONFIRMED_STALE'
-              ? 'Cảnh báo REQ sửa nháp (Unconfirmed Stale)'
-              : 'Cảnh báo REQ đã duyệt thay đổi (Confirmed Stale)',
-          details: `Yêu cầu [${reqKeyCode}] vừa có thay đổi nội dung đặc tả. Vui lòng kiểm tra và cập nhật mã nguồn / kịch bản kiểm thử tương ứng.`,
+              ? 'Draft Revision Alert (Unconfirmed Stale)'
+              : 'Approved Revision Alert (Confirmed Stale)',
+          details: `Requirement [${reqKeyCode}] content was modified. Please review and update associated implementation and test cases.`,
           timestamp: now,
         })
         changed = true
@@ -1034,14 +1036,14 @@ export const issueApi = {
     }
   },
 
-  /** Thêm bình luận vào Issue hỗ trợ @mention */
+  /** Add comment with @mention support */
   addComment: async (
     issueId: string,
     comment: { authorName: string; authorRole: string; body: string; mentions?: string[] },
   ): Promise<ProjectIssue> => {
     const data = loadStorage()
     const issue = data.issues.find((i) => i.id === issueId)
-    if (!issue) throw new Error(`Không tìm thấy Issue #${issueId}`)
+    if (!issue) throw new Error(`Issue #${issueId} not found`)
 
     const now = new Date().toISOString()
     const newComment: IssueComment = {
@@ -1058,10 +1060,10 @@ export const issueApi = {
     issue.activityLog.unshift({
       id: `act-${Date.now()}`,
       authorName: comment.authorName,
-      action: 'Thêm bình luận',
+      action: 'Added Comment',
       details: comment.mentions?.length
-        ? `Đã nhắc đến @${comment.mentions.join(', @')}`
-        : 'Đã gửi một bình luận mới',
+        ? `Mentioned @${comment.mentions.join(', @')}`
+        : 'Posted a comment',
       timestamp: now,
     })
 
@@ -1069,7 +1071,7 @@ export const issueApi = {
     return issue
   },
 
-  /** Thống kê số lượng Issue cho Project Header & Overview */
+  /** Get issue statistics for Project Header & KPI cards */
   getProjectIssueStats: async (
     projectId: number,
   ): Promise<ProjectIssueStats> => {
@@ -1091,7 +1093,7 @@ export const issueApi = {
     }
   },
 
-  /** Lấy danh sách việc của tôi (My Issues) cho Dashboard Home */
+  /** Get current user issues */
   getMyIssues: async (userFullName = 'Sarah Lin'): Promise<ProjectIssue[]> => {
     const data = loadStorage()
     return data.issues

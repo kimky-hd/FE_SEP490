@@ -63,7 +63,7 @@ export function CompanyUsersPage() {
   if (!canView) {
     return (
       <DashboardLayout>
-        <ForbiddenState message="Cần quyền “Xem danh sách người dùng” (user.view)." />
+        <ForbiddenState message="Requires “View users” permission (user.view)." />
       </DashboardLayout>
     )
   }
@@ -74,7 +74,7 @@ export function CompanyUsersPage() {
     try {
       const updated = await companyApi.changeUserRole(companyId!, target.userId, nextRoleId)
       users.setData((prev) => prev && { ...prev, items: prev.items.map((u) => (u.userId === updated.userId ? updated : u)) })
-      setNotice({ tone: 'success', text: `Đã đổi role của ${target.fullName} thành ${updated.role.name}.` })
+      setNotice({ tone: 'success', text: `Changed role for ${target.fullName} to ${updated.role.name}.` })
       if (target.userId === user?.id) await refreshMe()
     } catch (err) {
       setNotice({ tone: 'error', text: apiErrorMessage(err) })
@@ -89,14 +89,14 @@ export function CompanyUsersPage() {
   return (
     <DashboardLayout>
       <PageHeader
-        eyebrow="// Quản trị công ty"
-        title="Người dùng"
-        description={`Nhân sự của ${currentCompany!.companyName} và role cấp công ty của từng người.`}
+        eyebrow="// Organization Admin"
+        title="Users"
+        description={`Team members in ${currentCompany!.companyName} and their company-level roles.`}
         actions={
           can(PERMISSIONS.userInvite) && (
             <Link to="/members/invite" className={buttonClasses({ inline: true })}>
               <MailIcon className="h-4 w-4" />
-              Mời thành viên
+              Invite Member
             </Link>
           )
         }
@@ -104,19 +104,19 @@ export function CompanyUsersPage() {
 
       <div className="mt-6 flex flex-col gap-3 lg:flex-row lg:items-center">
         <label className="relative block lg:w-72">
-          <span className="sr-only">Tìm người dùng</span>
+          <span className="sr-only">Search users</span>
           <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Tìm theo tên hoặc email…"
+            placeholder="Search by name or email…"
             className="h-9 w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
           />
         </label>
         <div className="flex gap-3">
           <SelectField
             compact
-            aria-label="Lọc theo role"
+            aria-label="Filter by role"
             value={roleId}
             onChange={(e) => {
               setRoleId(e.target.value ? Number(e.target.value) : '')
@@ -124,7 +124,7 @@ export function CompanyUsersPage() {
             }}
             className="!h-9 min-w-[10rem] text-sm"
           >
-            <option value="">Mọi role</option>
+            <option value="">All roles</option>
             {(tenantRoles.data ?? []).map((r) => (
               <option key={r.roleId} value={r.roleId}>
                 {r.name}
@@ -133,7 +133,7 @@ export function CompanyUsersPage() {
           </SelectField>
           <SelectField
             compact
-            aria-label="Lọc theo trạng thái"
+            aria-label="Filter by status"
             value={status}
             onChange={(e) => {
               setStatus(e.target.value as MemberStatus | '')
@@ -141,9 +141,9 @@ export function CompanyUsersPage() {
             }}
             className="!h-9 min-w-[9rem] text-sm"
           >
-            <option value="">Mọi trạng thái</option>
-            <option value="ACTIVE">Đang hoạt động</option>
-            <option value="DEACTIVATED">Đã vô hiệu hoá</option>
+            <option value="">All statuses</option>
+            <option value="ACTIVE">Active</option>
+            <option value="DEACTIVATED">Deactivated</option>
           </SelectField>
         </div>
       </div>
@@ -164,11 +164,11 @@ export function CompanyUsersPage() {
             <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b border-gray-200 text-left font-mono text-[10px] uppercase tracking-[0.12em] text-gray-500">
-                  <th className="px-4 py-3 font-medium">Người dùng</th>
-                  <th className="px-4 py-3 font-medium">Role công ty</th>
-                  <th className="px-4 py-3 font-medium">Workspace</th>
-                  <th className="px-4 py-3 font-medium">Trạng thái</th>
-                  <th className="px-4 py-3 font-medium">Tham gia</th>
+                  <th className="px-4 py-3 font-medium">User</th>
+                  <th className="px-4 py-3 font-medium">Company Role</th>
+                  <th className="px-4 py-3 font-medium">Workspaces</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Joined</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -180,7 +180,7 @@ export function CompanyUsersPage() {
                         <div className="min-w-0">
                           <p className="truncate font-medium text-gray-900">
                             {u.fullName}
-                            {u.userId === user?.id && <span className="ml-1.5 text-xs font-normal text-gray-400">(bạn)</span>}
+                            {u.userId === user?.id && <span className="ml-1.5 text-xs font-normal text-gray-400">(you)</span>}
                           </p>
                           <p className="truncate text-xs text-gray-500">{u.email}</p>
                         </div>
@@ -190,7 +190,7 @@ export function CompanyUsersPage() {
                       {canAssign && u.status === 'ACTIVE' && tenantRoles.data ? (
                         <SelectField
                           compact
-                          aria-label={`Role của ${u.fullName}`}
+                          aria-label={`Role for ${u.fullName}`}
                           value={u.role.roleId}
                           disabled={savingUserId === u.userId}
                           onChange={(e) => void changeRole(u, Number(e.target.value))}
@@ -212,7 +212,7 @@ export function CompanyUsersPage() {
                     <td className="px-4 py-3 text-gray-500">{u.workspaceCount}</td>
                     <td className="px-4 py-3">
                       <Badge tone={u.status === 'ACTIVE' ? 'brand' : 'neutral'} dot>
-                        {u.status === 'ACTIVE' ? 'Đang hoạt động' : 'Đã vô hiệu hoá'}
+                        {u.status === 'ACTIVE' ? 'Active' : 'Deactivated'}
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-gray-500">{formatDate(u.joinedAt)}</td>
@@ -221,7 +221,7 @@ export function CompanyUsersPage() {
                 {data!.items.length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-4 py-10 text-center text-sm text-gray-400">
-                      Không có người dùng phù hợp.
+                      No matching users found.
                     </td>
                   </tr>
                 )}
@@ -230,11 +230,11 @@ export function CompanyUsersPage() {
             {data!.total > PAGE_SIZE && (
               <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3 text-xs text-gray-500">
                 <span>
-                  {data!.total} người · trang {page}/{totalPages}
+                  {data!.total} users · page {page}/{totalPages}
                 </span>
                 <div className="flex gap-2">
                   <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="rounded border border-gray-200 px-2.5 py-1 disabled:opacity-40">
-                    Trang trước
+                    Previous
                   </button>
                   <button
                     type="button"
@@ -242,7 +242,7 @@ export function CompanyUsersPage() {
                     onClick={() => setPage((p) => p + 1)}
                     className="rounded border border-gray-200 px-2.5 py-1 disabled:opacity-40"
                   >
-                    Trang sau
+                    Next
                   </button>
                 </div>
               </div>

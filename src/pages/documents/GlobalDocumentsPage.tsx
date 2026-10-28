@@ -62,12 +62,12 @@ export function GlobalDocumentsPage() {
   return (
     <DashboardLayout>
       <PageHeader
-        eyebrow="// TRUNG TÂM TÀI LIỆU YÊU CẦU"
-        title="Quản lý Tài liệu Yêu cầu & Đặc tả Hệ thống"
-        description="Tra cứu nhanh toàn bộ bộ tài liệu (SRS, URD, BRD), trạng thái phê duyệt Baseline và ma trận phân rã Requirement Items của tất cả dự án."
+        eyebrow="// REQUIREMENTS DOCUMENT CENTER"
+        title="Requirements & System Specifications"
+        description="Quickly search and explore all specification documents (SRS, URD, BRD), baseline approval statuses, and requirement item decomposition matrices across projects."
         meta={
           <Badge tone="brand" dot>
-            {documents.length} Bộ tài liệu
+            {documents.length} Documents
           </Badge>
         }
       />
@@ -75,27 +75,27 @@ export function GlobalDocumentsPage() {
       {/* KPI Stats */}
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Card className="p-4 border-l-4 border-l-emerald-600">
-          <p className="font-mono text-[10px] uppercase tracking-wider text-slate-400">Tổng bộ tài liệu</p>
+          <p className="font-mono text-[10px] uppercase tracking-wider text-slate-400">Total Documents</p>
           <p className="mt-1 text-2xl font-bold text-slate-900">{documents.length}</p>
-          <p className="text-[11px] text-slate-500">Trên tất cả dự án trong workspace</p>
+          <p className="text-[11px] text-slate-500">Across all workspace projects</p>
         </Card>
 
         <Card className="p-4 border-l-4 border-l-emerald-500">
-          <p className="font-mono text-[10px] uppercase tracking-wider text-slate-400">Đã phê duyệt Baseline</p>
+          <p className="font-mono text-[10px] uppercase tracking-wider text-slate-400">Baseline Approved</p>
           <p className="mt-1 text-2xl font-bold text-emerald-700">{totalApproved}</p>
-          <p className="text-[11px] text-emerald-600">Khóa Safe Mode (GB-01)</p>
+          <p className="text-[11px] text-emerald-600">Safe Mode Locked (GB-01)</p>
         </Card>
 
         <Card className="p-4 border-l-4 border-l-blue-500">
-          <p className="font-mono text-[10px] uppercase tracking-wider text-slate-400">Đang rà soát</p>
+          <p className="font-mono text-[10px] uppercase tracking-wider text-slate-400">In Review</p>
           <p className="mt-1 text-2xl font-bold text-blue-700">{totalInReview}</p>
-          <p className="text-[11px] text-blue-600">Chờ duyệt phê duyệt</p>
+          <p className="text-[11px] text-blue-600">Pending sign-off</p>
         </Card>
 
         <Card className="p-4 border-l-4 border-l-amber-500">
-          <p className="font-mono text-[10px] uppercase tracking-wider text-slate-400">Bản nháp đang soạn</p>
+          <p className="font-mono text-[10px] uppercase tracking-wider text-slate-400">Drafts in Progress</p>
           <p className="mt-1 text-2xl font-bold text-amber-700">{totalDraft}</p>
-          <p className="text-[11px] text-amber-600">Đang cập nhật hoặc sinh từ AI</p>
+          <p className="text-[11px] text-amber-600">Authoring or AI-assisted</p>
         </Card>
       </div>
 
@@ -109,7 +109,7 @@ export function GlobalDocumentsPage() {
               onChange={(e) => setSelectedProjectId(e.target.value === 'ALL' ? 'ALL' : Number(e.target.value))}
               className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none"
             >
-              <option value="ALL">Tất cả dự án ({projects.length})</option>
+              <option value="ALL">All Projects ({projects.length})</option>
               {projects.map((p) => (
                 <option key={p.projectId} value={p.projectId}>
                   [{p.key}] {p.name}
@@ -123,7 +123,7 @@ export function GlobalDocumentsPage() {
               onChange={(e) => setSelectedType(e.target.value as DocumentType | 'ALL')}
               className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none"
             >
-              <option value="ALL">Tất cả loại (SRS/URD/BRD)</option>
+              <option value="ALL">All Types (SRS/URD/BRD)</option>
               <option value="SRS">SRS - Software Requirements</option>
               <option value="URD">URD - User Requirements</option>
               <option value="BRD">BRD - Business Requirements</option>
@@ -135,10 +135,10 @@ export function GlobalDocumentsPage() {
               onChange={(e) => setSelectedStatus(e.target.value as DocumentStatus | 'ALL')}
               className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 focus:border-emerald-500 focus:outline-none"
             >
-              <option value="ALL">Tất cả trạng thái</option>
-              <option value="APPROVED">APPROVED (Đã duyệt)</option>
-              <option value="IN_REVIEW">IN_REVIEW (Đang rà soát)</option>
-              <option value="DRAFT">DRAFT (Bản nháp)</option>
+              <option value="ALL">All Statuses</option>
+              <option value="APPROVED">Approved</option>
+              <option value="IN_REVIEW">In Review</option>
+              <option value="DRAFT">Draft</option>
             </select>
           </div>
 
@@ -148,7 +148,7 @@ export function GlobalDocumentsPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm kiếm tài liệu, mã SRS-01..."
+              placeholder="Search documents, SRS-01..."
               className="w-full rounded-md border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-3 text-xs text-slate-800 placeholder-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none"
             />
             <svg
@@ -177,8 +177,8 @@ export function GlobalDocumentsPage() {
         ) : filteredDocs.length === 0 ? (
           <Card className="p-8 text-center">
             <span className="text-3xl">📂</span>
-            <p className="mt-2 text-sm font-semibold text-slate-700">Không tìm thấy tài liệu nào phù hợp</p>
-            <p className="text-xs text-slate-400">Hãy thử xóa bộ lọc hoặc chọn dự án khác.</p>
+            <p className="mt-2 text-sm font-semibold text-slate-700">No matching documents found</p>
+            <p className="text-xs text-slate-400">Try clearing your filters or selecting a different project.</p>
           </Card>
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -210,10 +210,10 @@ export function GlobalDocumentsPage() {
                         dot={doc.status === 'APPROVED'}
                       >
                         {doc.status === 'APPROVED'
-                          ? 'Đã duyệt'
+                          ? 'Approved'
                           : doc.status === 'IN_REVIEW'
-                            ? 'Đang rà soát'
-                            : 'Bản nháp'}
+                            ? 'In Review'
+                            : 'Draft'}
                       </Badge>
                     </div>
 
@@ -221,13 +221,13 @@ export function GlobalDocumentsPage() {
                       {doc.title}
                     </h3>
                     <p className="mt-1 text-xs text-slate-500 line-clamp-2 leading-relaxed">
-                      {doc.description || 'Không có mô tả chi tiết.'}
+                      {doc.description || 'No detailed description provided.'}
                     </p>
                   </div>
 
                   <div className="mt-4 border-t border-slate-100 pt-3 flex items-center justify-between text-[11px] text-slate-400">
-                    <span>Dự án: {project?.name || `ID #${doc.projectId}`}</span>
-                    <span className="font-medium text-emerald-600 group-hover:underline">Mở tài liệu →</span>
+                    <span>Project: {project?.name || `ID #${doc.projectId}`}</span>
+                    <span className="font-medium text-emerald-600 group-hover:underline">Open document →</span>
                   </div>
                 </div>
               )

@@ -14,15 +14,15 @@ export function ProjectTable({ projects, emptyText, showWorkspace }: { projects:
       <table className="w-full min-w-[820px] text-sm">
         <thead>
           <tr className="border-b border-gray-200 text-left font-mono text-[10px] uppercase tracking-[0.12em] text-gray-500">
-            <th className="px-4 py-3 font-medium">Mã</th>
-            <th className="px-4 py-3 font-medium">Dự án</th>
+            <th className="px-4 py-3 font-medium">Key</th>
+            <th className="px-4 py-3 font-medium">Project</th>
             {showWorkspace && <th className="px-4 py-3 font-medium">Workspace</th>}
-            <th className="px-4 py-3 font-medium">Trạng thái</th>
-            <th className="px-4 py-3 font-medium">Issue</th>
-            <th className="px-4 py-3 font-medium">Tài liệu</th>
-            <th className="px-4 py-3 font-medium">Phụ trách</th>
-            <th className="px-4 py-3 font-medium">Role của bạn</th>
-            <th className="px-4 py-3 font-medium">Cập nhật</th>
+            <th className="px-4 py-3 font-medium">Status</th>
+            <th className="px-4 py-3 font-medium">Issues</th>
+            <th className="px-4 py-3 font-medium">Requirements</th>
+            <th className="px-4 py-3 font-medium">Lead</th>
+            <th className="px-4 py-3 font-medium">Your Role</th>
+            <th className="px-4 py-3 font-medium">Updated</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
@@ -36,28 +36,28 @@ export function ProjectTable({ projects, emptyText, showWorkspace }: { projects:
                   {p.name}
                 </Link>
                 <p className="text-xs text-gray-400">
-                  {SDLC_LABEL[p.sdlcMethod]} · {p.phaseCount} phase
+                  {SDLC_LABEL[p.sdlcMethod]} · {p.phaseCount} phases
                 </p>
               </td>
               {showWorkspace && <td className="px-4 py-3 text-gray-500">{p.workspaceName}</td>}
               <td className="px-4 py-3">
                 {p.status === 'ACTIVE' ? (
                   <Badge tone="brand" dot>
-                    Đang chạy
+                    Active
                   </Badge>
                 ) : (
                   <Badge tone="amber" dot>
-                    Lưu trữ
+                    Archived
                   </Badge>
                 )}
               </td>
               <td className="px-4 py-3 text-gray-600">
-                {p.openIssueCount} mở / {p.doneIssueCount} xong
+                {p.openIssueCount} open / {p.doneIssueCount} done
               </td>
               <td className="px-4 py-3 text-gray-600">{p.documentCount}</td>
               <td className="px-4 py-3 text-gray-700">{p.lead?.fullName ?? '—'}</td>
               <td className="px-4 py-3">
-                {p.myRole ? <Badge tone={p.myRole.code === 'PROJECT_MANAGER' ? 'brand' : 'neutral'}>{p.myRole.name}</Badge> : <span className="text-xs text-gray-400">Chỉ xem</span>}
+                {p.myRole ? <Badge tone={p.myRole.code === 'PROJECT_MANAGER' ? 'brand' : 'neutral'}>{p.myRole.name}</Badge> : <span className="text-xs text-gray-400">Viewer</span>}
               </td>
               <td className="px-4 py-3 text-xs text-gray-400">{formatRelative(p.updatedAt)}</td>
             </tr>
