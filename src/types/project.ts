@@ -2,7 +2,15 @@
 
 import type { RoleRefDto, UserRefDto } from './rbac'
 
-export type SdlcMethod = 'SCRUM' | 'KANBAN' | 'CUSTOM'
+export type SdlcMethod =
+  | 'SCRUM'
+  | 'WATERFALL'
+  | 'ITERATIVE'
+  | 'V_MODEL'
+  | 'KANBAN'
+  | 'SPIRAL'
+  | 'RAD'
+  | 'CUSTOM'
 export type ProjectStatus = 'ACTIVE' | 'ARCHIVED'
 export type StatusCategory = 'TODO' | 'IN_PROGRESS' | 'DONE'
 
@@ -111,6 +119,7 @@ export interface SdlcTemplateDto {
   method: SdlcMethod
   name: string
   description: string
+  tag?: string
   phasesEditable: boolean
   phases: TemplatePhase[]
 }

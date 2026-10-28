@@ -196,7 +196,7 @@ export function CreateProjectWizardPage() {
   const applyMethod = (method: SdlcMethod) => {
     const t = templates.data!.find((x) => x.method === method)!
     setServerIssues(null)
-    update({ sdlcMethod: method, phases: templateToDraft(t.phases, roles), phasesTouched: false })
+    update({ sdlcMethod: method, phases: templateToDraft(t.phases, roles), phasesTouched: false, baseTemplateName: undefined })
     setActivePhaseKey(null)
   }
 

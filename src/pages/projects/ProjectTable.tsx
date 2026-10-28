@@ -5,7 +5,16 @@ import { Badge } from '@/components/ui/Badge'
 import { formatRelative } from '@/lib/format'
 import type { ProjectDto, SdlcMethod } from '@/types/project'
 
-export const SDLC_LABEL: Record<SdlcMethod, string> = { SCRUM: 'Agile Scrum', KANBAN: 'Kanban', CUSTOM: 'Custom SDLC' }
+export const SDLC_LABEL: Record<SdlcMethod, string> = {
+  SCRUM: 'Agile Scrum',
+  WATERFALL: 'Waterfall',
+  ITERATIVE: 'Iterative & Incremental',
+  V_MODEL: 'V-Model',
+  KANBAN: 'Kanban',
+  SPIRAL: 'Spiral Model',
+  RAD: 'RAD / Rapid Prototyping',
+  CUSTOM: 'Custom SDLC',
+}
 
 // Bảng dự án — mockup "Dự án" (cột Mã · Dự án · Trạng thái · Issue · Tài liệu · Phụ trách · Cập nhật), FR §III.5.1.
 export function ProjectTable({ projects, emptyText, showWorkspace }: { projects: ProjectDto[]; emptyText: string; showWorkspace?: boolean }) {

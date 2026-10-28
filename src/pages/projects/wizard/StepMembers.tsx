@@ -247,7 +247,10 @@ export function StepMembers({ state, update, me, workspaceName, workspaceMembers
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-gray-400">Configuration review</p>
             <dl className="mt-2 space-y-1.5 text-sm">
-              <ReviewRow label="SDLC Methodology" value={`${template?.name ?? state.sdlcMethod} (${state.phases.length} phase)`} />
+              <ReviewRow
+                label="SDLC Methodology"
+                value={`${template?.name ?? state.sdlcMethod}${state.baseTemplateName ? ` (tùy biến từ ${state.baseTemplateName})` : ''} (${state.phases.length} phase)`}
+              />
               <ReviewRow label="Issue Workflow" value={`${statusCount} trạng thái · ${ruleCount} luật`} />
               <ReviewRow label="Assigned Team Roster" value={`${roster.length} thành viên`} />
               <ReviewRow label="Module AI (BA/QA)" value={state.aiEnabled ? 'Bật' : 'Tắt'} />

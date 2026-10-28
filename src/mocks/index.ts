@@ -1214,7 +1214,7 @@ on('post', '/workspaces/(\\d+)/projects', ({ match, body, userId }) => {
   if (name.length < 2 || name.length > 100) errors.name = ['Tên dự án từ 2 đến 100 ký tự']
   if (!PROJECT_KEY_PATTERN.test(key)) errors.key = ['Key 2–10 ký tự, chữ HOA và số, bắt đầu bằng chữ']
   if (description && description.length > 500) errors.description = ['Mô tả tối đa 500 ký tự']
-  if (!['SCRUM', 'KANBAN', 'CUSTOM'].includes(sdlcMethod)) errors.sdlcMethod = ['Chọn phương pháp SDLC']
+  if (!['SCRUM', 'WATERFALL', 'ITERATIVE', 'V_MODEL', 'KANBAN', 'SPIRAL', 'RAD', 'CUSTOM'].includes(sdlcMethod)) errors.sdlcMethod = ['Chọn phương pháp SDLC']
   const phases = Array.isArray(body.phases) ? (body.phases as CreateProjectBody['phases']) : []
   if (phases.length === 0 || phases.length > 10) errors.phases = ['Dự án cần 1–10 phase']
   if (phases.some((ph) => !ph.name?.trim())) errors.phases = ['Phase phải có tên']

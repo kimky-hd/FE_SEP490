@@ -20,6 +20,7 @@ export interface WizardState {
   description: string
   aiEnabled: boolean
   sdlcMethod: SdlcMethod
+  baseTemplateName?: string
   phases: DraftPhase[]
   /** Đã sửa phase/trạng thái → đổi phương pháp SDLC phải xác nhận vì sẽ mất chỉnh sửa. */
   phasesTouched: boolean
