@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import clsx from 'clsx'
 
-export type ActiveModule = 'overview' | 'confluence' | 'jira' | 'testcases'
+export type ActiveModule = 'overview' | 'documents' | 'issues' | 'testcases' | 'confluence' | 'jira'
 
 export function QuickModuleSwitcher({
   projectId,
@@ -14,8 +14,8 @@ export function QuickModuleSwitcher({
 }) {
   const items = [
     { key: 'overview', icon: '📊', label: 'Overview', to: `/projects/${projectId}` },
-    { key: 'confluence', icon: '📄', label: 'Confluence', to: `/projects/${projectId}/documents` },
-    { key: 'jira', icon: '📋', label: 'Kanban', to: `/projects/${projectId}/issues` },
+    { key: 'documents', icon: '📄', label: 'Documents', to: `/projects/${projectId}/documents` },
+    { key: 'issues', icon: '📋', label: 'Issues', to: `/projects/${projectId}/issues` },
     { key: 'testcases', icon: '🧪', label: 'Test Cases', to: `/projects/${projectId}/testcases` },
   ] as const
 
@@ -28,7 +28,10 @@ export function QuickModuleSwitcher({
       )}
     >
       {items.map((item) => {
-        const isActive = active === item.key
+        const isActive =
+          active === item.key ||
+          (item.key === 'documents' && active === 'confluence') ||
+          (item.key === 'issues' && active === 'jira')
         return (
           <Link
             key={item.key}

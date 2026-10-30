@@ -24,8 +24,8 @@ import { formatDate } from '@/lib/format'
 import type { ProjectDto } from '@/types/project'
 import type {
   CalloutTone,
-  ConfluenceBlock,
-  ConfluenceBlockType,
+  DocumentBlock,
+  DocumentBlockType,
   DiagramType,
   DocumentComment,
   ItemPriority,
@@ -34,7 +34,7 @@ import type {
   SpecificationDocument,
 } from '@/types/document'
 
-/** Ô nhập văn bản tự động co giãn chiều cao theo nội dung (Confluence Free-form Block Textarea) */
+/** Ô nhập văn bản tự động co giãn chiều cao theo nội dung (Document Free-form Block Textarea) */
 function AutoResizeTextarea({
   value,
   onChange,
@@ -82,7 +82,7 @@ const SLASH_COMMANDS: {
   label: string
   desc: string
   icon: string
-  type: ConfluenceBlockType
+  type: DocumentBlockType
   makeReq?: boolean
 }[] = [
   {
@@ -123,7 +123,7 @@ const SLASH_COMMANDS: {
   },
   {
     cmd: '/callout',
-    label: 'Hộp Ghi chú / Quy tắc (Confluence Panel)',
+    label: 'Hộp Ghi chú / Quy tắc (Note Panel)',
     desc: 'Khung Info, Warning, Business Rule nổi bật',
     icon: '💡',
     type: 'callout',
@@ -158,7 +158,7 @@ const SLASH_COMMANDS: {
   },
 ]
 
-export function ConfluenceWorkspacePage() {
+export function DocumentWorkspacePage() {
   const { projectId: projectIdParam, docId: docIdParam } = useParams<{ projectId?: string; docId?: string }>()
   const navigate = useNavigate()
   const { user, currentCompany } = useAuth()
@@ -171,7 +171,7 @@ export function ConfluenceWorkspacePage() {
   // Cây trang tài liệu của dự án & trang đang mở
   const [allPages, setAllPages] = useState<SpecificationDocument[]>([])
   const [currentPage, setCurrentPage] = useState<SpecificationDocument | null>(null)
-  const [blocks, setBlocks] = useState<ConfluenceBlock[]>([])
+  const [blocks, setBlocks] = useState<DocumentBlock[]>([])
   const [savedItems, setSavedItems] = useState<RequirementItem[]>([])
   const [history, setHistory] = useState<RequirementHistoryLog[]>([])
   const [comments, setComments] = useState<DocumentComment[]>([])
@@ -200,7 +200,7 @@ export function ConfluenceWorkspacePage() {
   const [drawerTab, setDrawerTab] = useState<'req' | 'history' | 'comments' | null>(null)
   const [focusedReqId, setFocusedReqId] = useState<string | null>(null)
 
-  // Modal tạo trang mới trên cây Confluence
+  // Modal tạo trang mới trên cây tài liệu
   const [showCreatePageModal, setShowCreatePageModal] = useState(false)
   const [createParentId, setCreateParentId] = useState<number | null>(null)
   const [newPageTitle, setNewPageTitle] = useState('')
@@ -213,7 +213,7 @@ export function ConfluenceWorkspacePage() {
   const [renameText, setRenameText] = useState('')
 
   // Modal sửa Sơ đồ Mermaid
-  const [editingDiagramBlock, setEditingDiagramBlock] = useState<ConfluenceBlock | null>(null)
+  const [editingDiagramBlock, setEditingDiagramBlock] = useState<DocumentBlock | null>(null)
   const [tempDiagramTitle, setTempDiagramTitle] = useState('')
   const [tempDiagramCode, setTempDiagramCode] = useState('')
   const [tempDiagramType, setTempDiagramType] = useState<DiagramType>('MERMAID_PLANTUML')
@@ -237,22 +237,22 @@ export function ConfluenceWorkspacePage() {
   const [addingTcForReqId, setAddingTcForReqId] = useState<string | null>(null)
   const [newTcCode, setNewTcCode] = useState('')
 
-  // Tải danh sách Jira Issues của dự án để hiển thị và liên kết 2 chiều
+  // Tải danh sách Issues của dự án để hiển thị và liên kết 2 chiều
   const issuesAsync = useAsync(() => issueApi.getIssues(activeProjectId), [activeProjectId])
   const projectIssues = issuesAsync.data ?? []
 
-  // Modal Tạo Jira Issue trực tiếp từ Confluence REQ
-  const [creatingJiraForReq, setCreatingJiraForReq] = useState<{
+  // Modal Tạo Issue trực tiếp từ Document REQ
+  const [creatingIssueForReq, setCreatingIssueForReq] = useState<{
     docId: number
     reqId: string
     reqKey: string
     reqTitle: string
   } | null>(null)
-  const [jiraIssueType, setJiraIssueType] = useState<IssueType>('TASK')
-  const [jiraIssueSummary, setJiraIssueSummary] = useState('')
-  const [jiraIssueDesc, setJiraIssueDesc] = useState('')
-  const [jiraIssuePriority, setJiraIssuePriority] = useState<IssuePriority>('HIGH')
-  const [jiraStoryPoints, setJiraStoryPoints] = useState<number>(5)
+  const [linkedIssueType, setIssueIssueType] = useState<IssueType>('TASK')
+  const [linkedIssueSummary, setIssueIssueSummary] = useState('')
+  const [linkedIssueDesc, setIssueIssueDesc] = useState('')
+  const [linkedIssuePriority, setIssueIssuePriority] = useState<IssuePriority>('HIGH')
+  const [linkedStoryPoints, setIssueStoryPoints] = useState<number>(5)
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -297,7 +297,7 @@ export function ConfluenceWorkspacePage() {
         }
       }
     } catch (err) {
-      console.error('Lỗi tải Confluence Workspace:', err)
+      console.error('Lỗi tải Document Workspace:', err)
     } finally {
       setIsLoading(false)
     }
@@ -322,7 +322,7 @@ export function ConfluenceWorkspacePage() {
     return blocks.filter((b) => b.type === 'h1' || b.type === 'h2' || b.type === 'h3')
   }, [blocks])
 
-  // Đường dẫn Breadcrumb của nhánh trang đang mở trên cây Confluence
+  // Đường dẫn Breadcrumb của nhánh trang đang mở trên cây tài liệu
   const pageBreadcrumb = useMemo(() => {
     if (!currentPage) return []
     const trail: SpecificationDocument[] = [currentPage]
@@ -363,13 +363,13 @@ export function ConfluenceWorkspacePage() {
     navigate(`/projects/${activeProjectId}/documents/${pageId}`)
   }
 
-  // Lưu toàn bộ nội dung trang Confluence & chạy Parser đồng bộ xuống Database
+  // Lưu toàn bộ nội dung trang tài liệu & chạy Parser đồng bộ xuống Database
   const handleSavePage = async () => {
     if (!currentPage || isSafeMode) return
     setIsSaving(true)
     try {
       const author = user?.fullName || 'Sarah Lin'
-      const result = await documentApi.saveConfluencePage(
+      const result = await documentApi.saveDocumentPage(
         currentPage.id,
         {
           title: pageTitle.trim() || currentPage.title,
@@ -397,7 +397,7 @@ export function ConfluenceWorkspacePage() {
         }
         issuesAsync.reload()
         showToast(
-          `Đã lưu trang & bóc tách ${result.items.length} mục REQ! Các mục [${result.changedKeys.join(', ')}] vừa thay đổi đã bật cờ Unconfirmed Stale cho Jira Tasks/Bugs liên quan.`,
+          `Đã lưu trang & bóc tách ${result.items.length} mục REQ! Các mục [${result.changedKeys.join(', ')}] vừa thay đổi đã bật cờ Unconfirmed Stale cho Tasks/Bugs liên quan.`,
         )
       } else {
         showToast(`Đã lưu trang tài liệu và đồng bộ ${result.items.length} mục REQ vào CSDL!`)
@@ -424,15 +424,15 @@ export function ConfluenceWorkspacePage() {
   })
 
   // ============================================================================
-  // CÁC THAO TÁC TRÊN KHỐI SOẠN THẢO (CONFLUENCE BLOCK OPERATIONS)
+  // CÁC THAO TÁC TRÊN KHỐI SOẠN THẢO (DOCUMENT BLOCK OPERATIONS)
   // ============================================================================
-  const updateBlock = (blockId: string, patch: Partial<ConfluenceBlock>) => {
+  const updateBlock = (blockId: string, patch: Partial<DocumentBlock>) => {
     if (isSafeMode) return
     setBlocks((prev) => prev.map((b) => (b.id === blockId ? { ...b, ...patch } : b)))
     setIsDirty(true)
   }
 
-  const insertBlockAfter = (afterBlockId: string | null, newBlock: ConfluenceBlock) => {
+  const insertBlockAfter = (afterBlockId: string | null, newBlock: DocumentBlock) => {
     if (isSafeMode) return
     setBlocks((prev) => {
       if (!afterBlockId) return [...prev, newBlock]
@@ -469,7 +469,7 @@ export function ConfluenceWorkspacePage() {
   }
 
   // Cấp mã REQ-xx mới cho một dòng Heading (hoặc gỡ nhãn REQ)
-  const toggleHeadingReq = (block: ConfluenceBlock) => {
+  const toggleHeadingReq = (block: DocumentBlock) => {
     if (isSafeMode) return
     if (block.isReq) {
       updateBlock(block.id, { isReq: false })
@@ -521,11 +521,11 @@ export function ConfluenceWorkspacePage() {
   }
 
   // Công cụ trên thanh Toolbar: Chèn nhanh khối mới sau khối đang chọn
-  const handleToolbarInsertBlock = (type: ConfluenceBlockType, makeReq = false) => {
+  const handleToolbarInsertBlock = (type: DocumentBlockType, makeReq = false) => {
     if (isSafeMode) return
     const ts = Date.now()
     const baseId = `blk-${ts}`
-    let newBlock: ConfluenceBlock = { id: baseId, type: 'paragraph', text: '' }
+    let newBlock: DocumentBlock = { id: baseId, type: 'paragraph', text: '' }
 
     if (type === 'h1' || type === 'h2' || type === 'h3') {
       const usedCount = blocks.filter((b) => b.isReq).length + 1
@@ -595,7 +595,7 @@ export function ConfluenceWorkspacePage() {
   }
 
   // Xử lý gõ phím trong khối văn bản: Hỗ trợ Markdown (#, ##, ###), Slash Menu (/) và Enter tách dòng
-  const handleBlockTextKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, block: ConfluenceBlock) => {
+  const handleBlockTextKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, block: DocumentBlock) => {
     if (isSafeMode) return
     const val = block.text || ''
 
@@ -633,7 +633,7 @@ export function ConfluenceWorkspacePage() {
     }
   }
 
-  const handleBlockTextChange = (block: ConfluenceBlock, newText: string) => {
+  const handleBlockTextChange = (block: DocumentBlock, newText: string) => {
     updateBlock(block.id, { text: newText })
     if (newText.trim().startsWith('/')) {
       setSlashMenuBlockId(block.id)
@@ -643,7 +643,7 @@ export function ConfluenceWorkspacePage() {
   }
 
   // Thực thi lệnh từ Slash Menu (/)
-  const executeSlashCommand = (block: ConfluenceBlock, item: (typeof SLASH_COMMANDS)[number]) => {
+  const executeSlashCommand = (block: DocumentBlock, item: (typeof SLASH_COMMANDS)[number]) => {
     const cleanText = (block.text || '').replace(/^\/\w*\s*/, '')
     if (item.type === 'h1' || item.type === 'h2' || item.type === 'h3') {
       const nextNum = blocks.filter((b) => b.isReq).length + 1
@@ -681,7 +681,7 @@ export function ConfluenceWorkspacePage() {
     e.preventDefault()
     if (!newPageTitle.trim()) return
     try {
-      const created = await documentApi.createConfluencePage({
+      const created = await documentApi.createDocumentPage({
         projectId: activeProjectId,
         parentPageId: createParentId,
         title: newPageTitle.trim(),
@@ -694,7 +694,7 @@ export function ConfluenceWorkspacePage() {
         setExpandedPageIds((prev) => ({ ...prev, [createParentId]: true }))
       }
       setShowCreatePageModal(false)
-      showToast(`Đã tạo trang "${created.title}" trên cây Confluence!`)
+      showToast(`Đã tạo trang "${created.title}" trên cây tài liệu!`)
       navigate(`/projects/${activeProjectId}/documents/${created.id}`)
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Lỗi khi tạo trang mới')
@@ -755,14 +755,14 @@ export function ConfluenceWorkspacePage() {
     )
     if (!ok) return
     await documentApi.approve(currentPage.id, user?.fullName || 'Sarah Lin')
-    // Cập nhật các Jira Task/Bug liên quan sang CONFIRMED_STALE
+    // Cập nhật các Task/Bug liên quan sang CONFIRMED_STALE
     for (const item of savedItems) {
       if (item.syncStatus !== 'FRESH') {
         await issueApi.markRequirementStale(currentPage.id, item.keyCode, 'CONFIRMED_STALE')
       }
     }
     issuesAsync.reload()
-    showToast('Đã phê duyệt Baseline thành công! Trang đã kích hoạt khóa Safe Mode và đồng bộ cờ Confirmed Stale sang Jira.')
+    showToast('Đã phê duyệt Baseline thành công! Trang đã kích hoạt khóa Safe Mode và đồng bộ cờ Confirmed Stale sang danh mục Issue.')
     await loadWorkspace(currentPage.id)
   }
 
@@ -786,7 +786,7 @@ export function ConfluenceWorkspacePage() {
     navigate(`/projects/${activeProjectId}/documents/${newRev.id}`)
   }
 
-  // Nhập các mục yêu cầu từ Modal AI vào thẳng mặt giấy Confluence
+  // Nhập các mục yêu cầu từ Modal AI vào thẳng mặt giấy Document
   const handleImportAiItems = async (aiItems: Partial<RequirementItem>[]) => {
     if (!currentPage) return
     const generatedBlocks = convertItemsToBlocks(aiItems)
@@ -856,7 +856,7 @@ export function ConfluenceWorkspacePage() {
     setComments(detail.comments)
   }
 
-  // Render đệ quy cây thư mục trang Confluence bên cột trái
+  // Render đệ quy cây thư mục trang tài liệu bên cột trái
   const renderPageTreeNodes = (parentId: number | null, depth = 0) => {
     const children = allPages.filter((p) => {
       if (treeSearch.trim()) {
@@ -904,7 +904,7 @@ export function ConfluenceWorkspacePage() {
               </span>
             </div>
 
-            {/* Trạng thái & Nút hover (+) và (•••) giống hệt Confluence */}
+            {/* Trạng thái & Nút hover (+) và (•••) giống hệt Document */}
             <div className="flex items-center gap-1 shrink-0">
               {node.status === 'APPROVED' && !node.isFolder && (
                 <span title="Đã phê duyệt Baseline (Safe Mode)" className="text-[10px] group-hover:hidden">
@@ -1024,7 +1024,7 @@ export function ConfluenceWorkspacePage() {
       )}
 
       {/* ========================================================================= */}
-      {/* ROW 2: CONFLUENCE CONTEXTUAL SUB-TOOLBAR (44PX)                           */}
+      {/* ROW 2: DOCUMENT CONTEXTUAL SUB-TOOLBAR (44PX)                           */}
       {/* ========================================================================= */}
       <div className="flex h-11 shrink-0 items-center justify-between border-b border-slate-200/90 bg-slate-50/90 px-3 sm:px-4 z-20">
         {/* Left: Toggle Tree Sidebar + Active Document Breadcrumb */}
@@ -1044,7 +1044,7 @@ export function ConfluenceWorkspacePage() {
           </button>
 
           <span className="rounded bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800 border border-emerald-200 shrink-0">
-            📘 Specs
+            📘 Documents
           </span>
 
           {/* Active Page Breadcrumb */}
@@ -1204,7 +1204,7 @@ export function ConfluenceWorkspacePage() {
       {/* ========================================================================= */}
       <div className="relative flex flex-1 overflow-hidden">
         {/* ======================================================================= */}
-        {/* B. CỘT TRÁI: CONFLUENCE PAGE TREE & LIVE HEADING OUTLINE (Rộng 280px)   */}
+        {/* B. CỘT TRÁI: DOCUMENT PAGE TREE & LIVE HEADING OUTLINE (Rộng 280px)   */}
         {/* ======================================================================= */}
         {leftSidebarOpen && (
           <aside className="flex w-[280px] shrink-0 flex-col border-r border-slate-200 bg-slate-50/90 select-none z-20">
@@ -1332,10 +1332,10 @@ export function ConfluenceWorkspacePage() {
         )}
 
         {/* ======================================================================= */}
-        {/* C. VÙNG GIỮA: CONFLUENCE FREE-FORM RICH DOCUMENT CANVAS                 */}
+        {/* C. VÙNG GIỮA: DOCUMENT FREE-FORM RICH DOCUMENT CANVAS                 */}
         {/* ======================================================================= */}
         <div className="flex flex-1 flex-col min-w-0 overflow-hidden bg-slate-100">
-          {/* 1. THANH CÔNG CỤ ĐỊNH DẠNG CỐ ĐỊNH TRÊN ĐỈNH (CONFLUENCE EDITOR TOOLBAR) */}
+          {/* 1. THANH CÔNG CỤ ĐỊNH DẠNG CỐ ĐỊNH TRÊN ĐỈNH (DOCUMENT EDITOR TOOLBAR) */}
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-1.5 shadow-2xs z-10">
             <div className="flex flex-wrap items-center gap-1">
               {/* Chọn kiểu chữ cho khối đang chọn */}
@@ -1343,7 +1343,7 @@ export function ConfluenceWorkspacePage() {
                 disabled={isSafeMode}
                 value={blocks.find((b) => b.id === selectedBlockId)?.type || 'paragraph'}
                 onChange={(e) => {
-                  const val = e.target.value as ConfluenceBlockType
+                  const val = e.target.value as DocumentBlockType
                   if (selectedBlockId) {
                     updateBlock(selectedBlockId, { type: val })
                   } else {
@@ -1493,12 +1493,12 @@ export function ConfluenceWorkspacePage() {
             </div>
           </div>
 
-          {/* 2. MẶT GIẤY TRẮNG CONFLUENCE (FREE-FORM DOCUMENT CANVAS) */}
+          {/* 2. MẶT GIẤY TRẮNG DOCUMENT (FREE-FORM DOCUMENT CANVAS) */}
           <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-8">
             {isLoading ? (
               <div className="mx-auto max-w-4xl rounded-xl border border-slate-200 bg-white p-12 text-center shadow-xs">
                 <span className="inline-block h-7 w-7 animate-spin rounded-full border-2 border-emerald-600 border-t-transparent" />
-                <p className="mt-2 text-xs text-slate-500">Đang tải trang tài liệu Confluence…</p>
+                <p className="mt-2 text-xs text-slate-500">Đang tải trang tài liệu đặc tả…</p>
               </div>
             ) : currentPage ? (
               <article className="mx-auto max-w-4xl rounded-xl border border-slate-200/90 bg-white px-8 py-10 sm:px-14 sm:py-12 shadow-xs min-h-[calc(100vh-140px)]">
@@ -1527,7 +1527,7 @@ export function ConfluenceWorkspacePage() {
                   </div>
                 )}
 
-                {/* TIÊU ĐỀ LỚN CỦA TRANG TÀI LIỆU (CONFLUENCE PAGE TITLE) */}
+                {/* TIÊU ĐỀ LỚN CỦA TRANG TÀI LIỆU (DOCUMENT PAGE TITLE) */}
                 <div className="border-b border-slate-100 pb-5 mb-6">
                   <div className="flex flex-wrap items-center gap-2 mb-2 text-xs text-slate-500">
                     <span className="rounded bg-emerald-50 border border-emerald-200 px-2 py-0.5 font-mono font-bold text-emerald-800">
@@ -1590,7 +1590,7 @@ export function ConfluenceWorkspacePage() {
                   />
                 </div>
 
-                {/* DANH SÁCH CÁC KHỐI NỘI DUNG TỰ DO (CONFLUENCE BLOCKS) */}
+                {/* DANH SÁCH CÁC KHỐI NỘI DUNG TỰ DO (DOCUMENT BLOCKS) */}
                 <div className="space-y-4">
                   {blocks.map((block) => {
                     const isHeading = block.type === 'h1' || block.type === 'h2' || block.type === 'h3'
@@ -1760,7 +1760,7 @@ export function ConfluenceWorkspacePage() {
                                       )}
                                     </div>
 
-                                    {/* Hiển thị các Jira Issues đã liên kết & Nút tạo Jira Issue */}
+                                    {/* Hiển thị các Issues đã liên kết & Nút tạo Issue */}
                                     <div className="flex items-center gap-1.5 shrink-0">
                                       {projectIssues
                                         .filter(
@@ -1779,7 +1779,7 @@ export function ConfluenceWorkspacePage() {
                                                 ? 'bg-rose-100 text-rose-800 border border-rose-200'
                                                 : 'bg-blue-100 text-blue-800 border border-blue-200',
                                             )}
-                                            title={`Xem ${iss.key}: ${iss.summary} trên Jira Kanban`}
+                                            title={`Xem ${iss.key}: ${iss.summary} trên Bảng công việc`}
                                           >
                                             <span>{iss.type === 'BUG' ? '🐞' : '☑️'}</span>
                                             <span>{iss.key}</span>
@@ -1792,23 +1792,23 @@ export function ConfluenceWorkspacePage() {
                                           e.stopPropagation()
                                           const reqKey = block.reqKeyCode || matchedReq?.keyCode || 'REQ-01'
                                           const reqTitle = block.text || 'Mục yêu cầu'
-                                          setCreatingJiraForReq({
+                                          setCreatingIssueForReq({
                                             docId: currentPage?.id || 101,
                                             reqId: matchedReq?.id || block.reqId || `req-${block.id}`,
                                             reqKey,
                                             reqTitle,
                                           })
-                                          setJiraIssueSummary(
+                                          setIssueIssueSummary(
                                             `Triển khai & Test cho ${reqKey}: ${reqTitle.replace(/^\d+(\.\d+)*\.?\s*/, '')}`,
                                           )
-                                          setJiraIssueDesc(
-                                            `Đặc tả chi tiết theo tài liệu Confluence [${currentPage?.code || 'SRS'}] mục [${reqKey}].`,
+                                          setIssueIssueDesc(
+                                            `Đặc tả chi tiết theo tài liệu đặc tả [${currentPage?.code || 'SRS'}] mục [${reqKey}].`,
                                           )
                                         }}
                                         className="opacity-0 group-hover/blk:opacity-100 inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-100 transition-all shadow-2xs"
-                                        title="Tạo Jira Task hoặc Bug liên kết trực tiếp với mục yêu cầu này"
+                                        title="Tạo Task hoặc Bug liên kết trực tiếp với mục yêu cầu này"
                                       >
-                                        <span>+ Jira Issue</span>
+                                        <span>+ Issue</span>
                                       </button>
                                     </div>
                                   </>
@@ -1999,7 +1999,7 @@ export function ConfluenceWorkspacePage() {
                         )}
 
                         {/* ========================================================= */}
-                        {/* 5. KHỐI BẢNG BIỂU TỰ DO (CONFLUENCE DYNAMIC TABLE)        */}
+                        {/* 5. KHỐI BẢNG BIỂU TỰ DO (DOCUMENT DYNAMIC TABLE)        */}
                         {/* ========================================================= */}
                         {block.type === 'table' && (
                           <div className="my-2 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-2xs">
@@ -2116,7 +2116,7 @@ export function ConfluenceWorkspacePage() {
                         )}
 
                         {/* ========================================================= */}
-                        {/* 6. KHỐI HỘP GHI CHÚ (CONFLUENCE CALLOUT PANEL)            */}
+                        {/* 6. KHỐI HỘP GHI CHÚ (DOCUMENT CALLOUT PANEL)            */}
                         {/* ========================================================= */}
                         {block.type === 'callout' && (
                           <div
@@ -2269,7 +2269,7 @@ export function ConfluenceWorkspacePage() {
                                     {block.figmaFrameName || 'Màn hình Thiết kế Giao diện'}
                                   </p>
                                   <p className="text-[11px] text-slate-500">
-                                    Đã đồng bộ với phân đoạn yêu cầu trên trang Confluence · Sẵn sàng cho Frontend & QA đối chiếu
+                                    Đã đồng bộ với phân đoạn yêu cầu trên trang tài liệu · Sẵn sàng cho Frontend & QA đối chiếu
                                   </p>
                                 </div>
                               </div>
@@ -2286,7 +2286,7 @@ export function ConfluenceWorkspacePage() {
                         {slashMenuBlockId === block.id && !isSafeMode && (
                           <div className="absolute left-0 top-full z-40 mt-1 w-80 rounded-xl border border-slate-200 bg-white p-1.5 shadow-2xl">
                             <div className="px-2.5 py-1 flex items-center justify-between border-b border-slate-100 text-[10px] font-mono uppercase text-slate-400">
-                              <span>Chèn nhanh khối Confluence (Slash Menu)</span>
+                              <span>Chèn nhanh khối tài liệu (Slash Menu)</span>
                               <button
                                 type="button"
                                 onClick={() => setSlashMenuBlockId(null)}
@@ -2579,7 +2579,7 @@ export function ConfluenceWorkspacePage() {
                                 <span>🧪 {tc}</span>
                               </span>
                             ))}
-                            {/* Jira Issues thực tế từ kho lưu trữ issueApi */}
+                            {/* Issues thực tế từ kho lưu trữ issueApi */}
                             {projectIssues
                               .filter((iss) => iss.linkedRequirementKeyCode === req.keyCode)
                               .map((iss) => (
@@ -2593,7 +2593,7 @@ export function ConfluenceWorkspacePage() {
                                       ? 'border-rose-300 bg-rose-50 text-rose-800'
                                       : 'border-blue-300 bg-blue-50 text-blue-800',
                                   )}
-                                  title={`Xem chi tiết ${iss.key}: ${iss.summary} trên Jira`}
+                                  title={`Xem chi tiết ${iss.key}: ${iss.summary} trên danh sách Issue`}
                                 >
                                   <span>{iss.type === 'BUG' ? '🐞' : '☑️'}</span>
                                   <span>{iss.key}</span>
@@ -2601,27 +2601,27 @@ export function ConfluenceWorkspacePage() {
                               ))}
                           </div>
 
-                          {/* Nút Tạo Jira Task/Bug trực tiếp từ REQ này */}
+                          {/* Nút Tạo Task/Bug trực tiếp từ REQ này */}
                           <div className="mt-2 flex items-center justify-between">
                             <button
                               type="button"
                               onClick={() => {
-                                setCreatingJiraForReq({
+                                setCreatingIssueForReq({
                                   docId: currentPage?.id || 101,
                                   reqId: req.id,
                                   reqKey: req.keyCode,
                                   reqTitle: req.headingTitle,
                                 })
-                                setJiraIssueSummary(
+                                setIssueIssueSummary(
                                   `Triển khai cho ${req.keyCode}: ${req.headingTitle.replace(/^\d+(\.\d+)*\.?\s*/, '')}`,
                                 )
-                                setJiraIssueDesc(
+                                setIssueIssueDesc(
                                   `Đặc tả chi tiết theo mục [${req.keyCode}] trong tài liệu ${currentPage?.title}.`,
                                 )
                               }}
                               className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 hover:underline"
                             >
-                              <span>+ Tạo Jira Task/Bug từ REQ này</span>
+                              <span>+ Tạo Task/Bug từ REQ này</span>
                             </button>
                           </div>
 
@@ -2828,11 +2828,11 @@ export function ConfluenceWorkspacePage() {
       {/* CÁC MODAL PHỤ TRỢ (TẠO TRANG, SỬA SƠ ĐỒ, DIFF, AI RAW NOTES, PRINT)       */}
       {/* ========================================================================= */}
 
-      {/* 1. Modal Tạo Trang Tài liệu / Nhánh mới trên Cây Confluence */}
+      {/* 1. Modal Tạo Trang Tài liệu / Nhánh mới trên Cây Document */}
       <Modal
         open={showCreatePageModal}
         onClose={() => setShowCreatePageModal(false)}
-        title={newPageIsFolder ? 'Tạo Nhánh Thư mục Tài liệu Mới' : 'Tạo Trang Tài liệu Confluence Mới'}
+        title={newPageIsFolder ? 'Tạo Nhánh Thư mục Tài liệu Mới' : 'Tạo Trang Tài liệu Đặc tả Mới'}
         size="md"
       >
         <form onSubmit={handleCreateNewPage} className="space-y-4">
@@ -2876,7 +2876,7 @@ export function ConfluenceWorkspacePage() {
 
               <div>
                 <p className="mb-1.5 font-mono text-[11px] font-medium uppercase tracking-wider text-slate-500">
-                  Chọn Mẫu Khởi tạo Trang (Confluence Template)
+                  Chọn Mẫu Khởi tạo Trang (Document Template)
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   {[
@@ -3024,7 +3024,7 @@ export function ConfluenceWorkspacePage() {
         <div className="max-h-[70vh] overflow-y-auto rounded border border-slate-200 bg-white p-6 space-y-4 text-xs text-slate-800">
           <div className="border-b pb-4 text-center">
             <p className="font-mono text-[10px] font-bold uppercase tracking-widest text-emerald-700">
-              // CONFLUENCE SPECIFICATION WORKSPACE · {currentProject?.name}
+              // SPECIFICATION DOCUMENT WORKSPACE · {currentProject?.name}
             </p>
             <h1 className="mt-1 text-xl font-bold text-slate-900">{pageTitle}</h1>
             <p className="mt-1 text-slate-500">
@@ -3084,19 +3084,19 @@ export function ConfluenceWorkspacePage() {
         </div>
       </Modal>
 
-      {/* 8. Modal Tạo Jira Task / Bug từ Requirement Item */}
-      {creatingJiraForReq && (
+      {/* 8. Modal Tạo Issue Task / Bug từ Requirement Item */}
+      {creatingIssueForReq && (
         <Modal
           open={true}
-          onClose={() => setCreatingJiraForReq(null)}
-          title={`+ Tạo Jira Issue cho [${creatingJiraForReq.reqKey}]`}
+          onClose={() => setCreatingIssueForReq(null)}
+          title={`+ Tạo Issue cho [${creatingIssueForReq.reqKey}]`}
           size="md"
         >
           <div className="space-y-4">
             <div className="rounded-lg bg-blue-50/70 border border-blue-200 p-3 text-xs text-blue-900">
-              <p className="font-bold">Đang liên kết với Yêu cầu Confluence:</p>
+              <p className="font-bold">Đang liên kết với Yêu cầu Đặc tả:</p>
               <p className="mt-0.5 font-mono text-[11px] text-blue-800">
-                [{creatingJiraForReq.reqKey}] - {creatingJiraForReq.reqTitle}
+                [{creatingIssueForReq.reqKey}] - {creatingIssueForReq.reqTitle}
               </p>
             </div>
 
@@ -3104,10 +3104,10 @@ export function ConfluenceWorkspacePage() {
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setJiraIssueType('TASK')}
+                onClick={() => setIssueIssueType('TASK')}
                 className={clsx(
                   'flex-1 flex items-center justify-center gap-1.5 rounded-lg border py-2 text-xs font-bold transition-colors',
-                  jiraIssueType === 'TASK'
+                  linkedIssueType === 'TASK'
                     ? 'border-blue-600 bg-blue-50 text-blue-800'
                     : 'border-slate-200 text-slate-600',
                 )}
@@ -3117,10 +3117,10 @@ export function ConfluenceWorkspacePage() {
               </button>
               <button
                 type="button"
-                onClick={() => setJiraIssueType('BUG')}
+                onClick={() => setIssueIssueType('BUG')}
                 className={clsx(
                   'flex-1 flex items-center justify-center gap-1.5 rounded-lg border py-2 text-xs font-bold transition-colors',
-                  jiraIssueType === 'BUG'
+                  linkedIssueType === 'BUG'
                     ? 'border-rose-600 bg-rose-50 text-rose-800'
                     : 'border-slate-200 text-slate-600',
                 )}
@@ -3132,16 +3132,16 @@ export function ConfluenceWorkspacePage() {
 
             <TextField
               label="Tiêu đề Issue (Summary)"
-              value={jiraIssueSummary}
-              onChange={(e) => setJiraIssueSummary(e.target.value)}
+              value={linkedIssueSummary}
+              onChange={(e) => setIssueIssueSummary(e.target.value)}
               placeholder="VD: Triển khai kiểm soát đăng nhập..."
               required
             />
 
             <TextAreaField
               label="Mô tả chi tiết"
-              value={jiraIssueDesc}
-              onChange={(e) => setJiraIssueDesc(e.target.value)}
+              value={linkedIssueDesc}
+              onChange={(e) => setIssueIssueDesc(e.target.value)}
               rows={3}
             />
 
@@ -3149,8 +3149,8 @@ export function ConfluenceWorkspacePage() {
               <div>
                 <label className="text-xs font-medium text-slate-700 block mb-1">Độ ưu tiên</label>
                 <select
-                  value={jiraIssuePriority}
-                  onChange={(e) => setJiraIssuePriority(e.target.value as IssuePriority)}
+                  value={linkedIssuePriority}
+                  onChange={(e) => setIssueIssuePriority(e.target.value as IssuePriority)}
                   className="w-full rounded-lg border border-slate-300 p-2 text-xs text-slate-800 outline-none"
                 >
                   <option value="HIGHEST">Highest (Cao nhất)</option>
@@ -3165,48 +3165,48 @@ export function ConfluenceWorkspacePage() {
                 type="number"
                 min={1}
                 max={21}
-                value={String(jiraStoryPoints)}
-                onChange={(e) => setJiraStoryPoints(Number(e.target.value))}
+                value={String(linkedStoryPoints)}
+                onChange={(e) => setIssueStoryPoints(Number(e.target.value))}
               />
             </div>
 
             <div className="flex justify-end gap-2 border-t pt-3">
-              <Button variant="secondary" inline onClick={() => setCreatingJiraForReq(null)}>
+              <Button variant="secondary" inline onClick={() => setCreatingIssueForReq(null)}>
                 Hủy
               </Button>
               <Button
                 variant="primary"
                 inline
                 onClick={async () => {
-                  if (!jiraIssueSummary.trim()) return
+                  if (!linkedIssueSummary.trim()) return
                   const newIss = await issueApi.createIssue({
                     projectId: activeProjectId,
-                    type: jiraIssueType,
-                    summary: jiraIssueSummary.trim(),
-                    description: jiraIssueDesc.trim(),
+                    type: linkedIssueType,
+                    summary: linkedIssueSummary.trim(),
+                    description: linkedIssueDesc.trim(),
                     phaseId: 3,
                     phaseName: 'Phase 3: Sprint Execution & Coding',
                     statusId: 301,
                     statusName: 'To Do',
                     statusCategory: 'TODO',
-                    priority: jiraIssuePriority,
-                    storyPoints: jiraStoryPoints,
+                    priority: linkedIssuePriority,
+                    storyPoints: linkedStoryPoints,
                     assigneeName: user?.fullName || 'Sarah Lin',
                     assigneeRole: 'Thành viên dự án',
                     reporterName: user?.fullName || 'Sarah Lin',
-                    linkedDocumentId: creatingJiraForReq.docId,
-                    linkedRequirementItemId: creatingJiraForReq.reqId,
-                    linkedRequirementKeyCode: creatingJiraForReq.reqKey,
-                    linkedRequirementTitle: creatingJiraForReq.reqTitle,
+                    linkedDocumentId: creatingIssueForReq.docId,
+                    linkedRequirementItemId: creatingIssueForReq.reqId,
+                    linkedRequirementKeyCode: creatingIssueForReq.reqKey,
+                    linkedRequirementTitle: creatingIssueForReq.reqTitle,
                   })
-                  setCreatingJiraForReq(null)
+                  setCreatingIssueForReq(null)
                   issuesAsync.reload()
                   showToast(
-                    `Đã tạo thành công Issue ${newIss.key} trên Jira Kanban và kết nối với [${creatingJiraForReq.reqKey}]!`,
+                    `Đã tạo thành công Issue ${newIss.key} trên Bảng công việc và kết nối với [${creatingIssueForReq.reqKey}]!`,
                   )
                 }}
               >
-                + Khởi tạo trên Jira
+                + Khởi tạo Issue
               </Button>
             </div>
           </div>
@@ -3215,3 +3215,5 @@ export function ConfluenceWorkspacePage() {
     </div>
   )
 }
+
+export const ConfluenceWorkspacePage = DocumentWorkspacePage

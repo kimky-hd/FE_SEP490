@@ -1,4 +1,4 @@
-// Định nghĩa dữ liệu cho phân hệ Quản lý Đặc tả Tài liệu Yêu cầu (Confluence Workspace & Auto-Extracted Requirement Items)
+// Định nghĩa dữ liệu cho phân hệ Quản lý Đặc tả Tài liệu Yêu cầu (Document Workspace & Auto-Extracted Requirement Items)
 
 export type DocumentType = 'SRS' | 'URD' | 'BRD'
 export type DocumentStatus = 'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'ARCHIVED'
@@ -11,8 +11,8 @@ export type TraceSyncStatus = 'FRESH' | 'UNCONFIRMED_STALE' | 'CONFIRMED_STALE'
 export type HistoryChangeType = 'CONTENT' | 'DIAGRAM' | 'FIGMA_UI' | 'CREATED'
 export type ConfirmationState = 'UNCONFIRMED_DRAFT' | 'CONFIRMED_APPROVED' | 'REVERTED'
 
-/** Các loại khối nội dung tự do trong trình soạn thảo Confluence */
-export type ConfluenceBlockType =
+/** Các loại khối nội dung tự do trong trình soạn thảo Tài liệu */
+export type DocumentBlockType =
   | 'h1'
   | 'h2'
   | 'h3'
@@ -26,6 +26,8 @@ export type ConfluenceBlockType =
   | 'figma'
   | 'divider'
 
+export type ConfluenceBlockType = DocumentBlockType
+
 export type CalloutTone = 'info' | 'warning' | 'rule' | 'success'
 
 export interface ChecklistItem {
@@ -34,10 +36,10 @@ export interface ChecklistItem {
   checked: boolean
 }
 
-/** Khối nội dung trong trang Confluence (Rich Free-Form Block) */
-export interface ConfluenceBlock {
+/** Khối nội dung trong trang Tài liệu (Rich Free-Form Block) */
+export interface DocumentBlock {
   id: string
-  type: ConfluenceBlockType
+  type: DocumentBlockType
   text?: string // Dùng cho h1, h2, h3, paragraph, callout
 
   // Định dạng văn bản cơ bản
@@ -78,6 +80,8 @@ export interface ConfluenceBlock {
   figmaUrl?: string
 }
 
+export type ConfluenceBlock = DocumentBlock
+
 /** 4 trường cấu trúc chuẩn hóa từ ghi chú thô (Raw Notes) */
 export interface NormalizedRawNotes {
   scope: string
@@ -86,11 +90,11 @@ export interface NormalizedRawNotes {
   businessRules: string
 }
 
-/** Trang tài liệu đặc tả trong cây Confluence (Confluence Page / Document Set) */
+/** Trang tài liệu đặc tả trong cây Tài liệu (Document Set) */
 export interface SpecificationDocument {
   id: number
   projectId: number
-  parentPageId?: number | null // ID trang/thư mục cha trên cây Confluence đa cấp
+  parentPageId?: number | null // ID trang/thư mục cha trên cây tài liệu đa cấp
   isFolder?: boolean // Nhánh thư mục nhóm hoặc trang chứa trang con
   icon?: string // Icon hiển thị trên cây (📂, 📄, 🔐, 💳...)
   orderIndex?: number
@@ -101,7 +105,7 @@ export interface SpecificationDocument {
   status: DocumentStatus
   description: string | null
   normalizedRawNotes?: NormalizedRawNotes
-  blocks?: ConfluenceBlock[] // Danh sách các khối nội dung tự do của trang Confluence
+  blocks?: DocumentBlock[] // Danh sách các khối nội dung tự do của trang tài liệu
   createdBy: string
   createdAt: string
   updatedAt: string

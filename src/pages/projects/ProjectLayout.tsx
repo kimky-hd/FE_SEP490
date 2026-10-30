@@ -122,7 +122,7 @@ export function ProjectLayout() {
     {
       key: 'documents',
       icon: '📄',
-      label: 'Specs',
+      label: 'Documents',
       to: `${base}/documents`,
       count: docStats.data?.totalDocs,
       hidden: false,
@@ -130,7 +130,7 @@ export function ProjectLayout() {
     {
       key: 'issues',
       icon: '📋',
-      label: 'Kanban',
+      label: 'Issues',
       to: `${base}/issues`,
       count: issueStats.data?.open,
       hidden: false,
@@ -355,7 +355,7 @@ export function ProjectLayout() {
               )}
             </div>
             <div className="hidden sm:flex items-center gap-3 shrink-0 font-mono text-[11px] text-slate-500">
-              <span>📄 {docStats.data?.totalDocs ?? 0} Specs</span>
+              <span>📄 {docStats.data?.totalDocs ?? 0} Documents</span>
               <span>·</span>
               <span>📋 {issueStats.data?.open ?? 0} Open Issues</span>
               <span>·</span>

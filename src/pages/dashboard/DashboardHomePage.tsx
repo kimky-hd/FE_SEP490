@@ -115,7 +115,7 @@ export function DashboardHomePage() {
         )}
         <DashboardEmptyState
           icon={<DocumentIcon className="h-5 w-5" />}
-          title="Requirements & Confluence Workspace"
+          title="Requirements & Documents Workspace"
           description="Full-screen distraction-free authoring for URD, BRD, SRS with auto REQ tracking."
         />
       </div>

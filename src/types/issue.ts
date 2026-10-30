@@ -1,4 +1,4 @@
-// Định nghĩa dữ liệu cho phân hệ Quản lý Công việc & Lỗi (Task & Bug Tracking theo phong cách Atlassian Jira)
+// Định nghĩa dữ liệu cho phân hệ Quản lý Công việc & Lỗi (Task & Bug Tracking / Issues)
 import type { StatusCategory } from './project'
 import type { TraceSyncStatus } from './document'
 
@@ -62,7 +62,7 @@ export interface ProjectIssue {
   statusName: string
   statusCategory: StatusCategory // 'TODO' | 'IN_PROGRESS' | 'DONE'
 
-  // Thuộc tính quản trị Jira & Nhân sự 4 vai trò
+  // Thuộc tính quản trị & Nhân sự 4 vai trò
   priority: IssuePriority
   storyPoints?: number // 1, 2, 3, 5, 8...
   originalEstimate?: string // '2h', '1d 4h', '3d'
@@ -88,7 +88,7 @@ export interface ProjectIssue {
   createdAt: string
   updatedAt: string
 
-  // Cầu nối Truy xuất với Confluence (Confluence REQ Link)
+  // Cầu nối Truy xuất với Tài liệu Đặc tả (Requirement REQ Link)
   linkedDocumentId?: number
   linkedRequirementItemId?: string
   linkedRequirementKeyCode?: string // VD: 'REQ-01'

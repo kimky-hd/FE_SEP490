@@ -77,7 +77,7 @@ const INITIAL_TEST_CASES: TestCaseItem[] = [
     code: 'TC-03-01',
     title: 'Live parser extraction of REQ blocks from markdown headings',
     reqCode: 'REQ-03',
-    reqTitle: 'Confluence Live Parser & Gutter Badges',
+    reqTitle: 'Live Document Parser & Gutter Badges',
     linkedIssueKey: 'CORE-102',
     type: 'E2E',
     priority: 'HIGH',
@@ -90,7 +90,7 @@ const INITIAL_TEST_CASES: TestCaseItem[] = [
     code: 'TC-03-02',
     title: 'Safe Mode baseline lock prevents unapproved edits',
     reqCode: 'REQ-03',
-    reqTitle: 'Confluence Safe Mode & Baseline Control',
+    reqTitle: 'Document Safe Mode & Baseline Control',
     linkedIssueKey: 'CORE-102',
     type: 'E2E',
     priority: 'HIGH',
@@ -101,7 +101,7 @@ const INITIAL_TEST_CASES: TestCaseItem[] = [
   {
     id: 'tc-7',
     code: 'TC-04-01',
-    title: 'RTM bidirectional link sync between Jira Issues and REQ items',
+    title: 'RTM bidirectional link sync between Project Issues and REQ items',
     reqCode: 'REQ-04',
     reqTitle: 'Bidirectional RTM Traceability Sync',
     linkedIssueKey: 'CORE-105',
@@ -114,7 +114,7 @@ const INITIAL_TEST_CASES: TestCaseItem[] = [
   {
     id: 'tc-8',
     code: 'TC-04-02',
-    title: 'Unconfirmed stale badge trigger when Confluence spec is edited',
+    title: 'Unconfirmed stale badge trigger when document spec is edited',
     reqCode: 'REQ-04',
     reqTitle: 'Stale Audit Flag Notification',
     linkedIssueKey: 'CORE-104',
@@ -249,7 +249,7 @@ export function ProjectTestCasesPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search code, title, REQ, Jira..."
+            placeholder="Search code, title, REQ, Issue..."
             className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1 pl-8 pr-3 text-xs text-slate-800 placeholder-slate-400 outline-none focus:bg-white focus:border-blue-500"
           />
           <span className="absolute left-2.5 top-1.5 text-slate-400 text-xs">🔍</span>
@@ -291,7 +291,7 @@ export function ProjectTestCasesPage() {
                 <th className="py-3 px-4">Test Code</th>
                 <th className="py-3 px-4">Test Scenario & Verification</th>
                 <th className="py-3 px-4">Traceability [REQ-xx]</th>
-                <th className="py-3 px-4">Linked Jira</th>
+                <th className="py-3 px-4">Linked Issue</th>
                 <th className="py-3 px-4">Type</th>
                 <th className="py-3 px-4">Status (Click to toggle)</th>
                 <th className="py-3 px-4">Tester</th>
@@ -312,7 +312,7 @@ export function ProjectTestCasesPage() {
                     <Link
                       to={`/projects/${projectId}/documents`}
                       className="inline-flex items-center gap-1 rounded bg-emerald-50 border border-emerald-200 px-2 py-0.5 font-mono text-[11px] font-bold text-emerald-800 hover:bg-emerald-100 transition-colors"
-                      title="View in Confluence Workspace"
+                      title="View in Document Workspace"
                     >
                       <span>📄</span>
                       <span>[{tc.reqCode}]</span>
@@ -323,7 +323,7 @@ export function ProjectTestCasesPage() {
                       <Link
                         to={`/projects/${projectId}/issues?issueId=${tc.linkedIssueKey}`}
                         className="inline-flex items-center gap-1 rounded bg-blue-50 border border-blue-200 px-2 py-0.5 font-mono text-[11px] font-bold text-blue-800 hover:bg-blue-100 transition-colors"
-                        title="View in Jira Workspace"
+                        title="View in Issues Workspace"
                       >
                         <span>📋</span>
                         <span>{tc.linkedIssueKey}</span>

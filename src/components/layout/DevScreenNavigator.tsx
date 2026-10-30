@@ -79,10 +79,10 @@ export const SCREEN_GROUPS: ScreenGroup[] = [
     ],
   },
   {
-    group: '7. Không gian Tài liệu Confluence & Tự động Bóc tách REQ (Full-Screen Workspace)',
+    group: '7. Không gian Tài liệu Đặc tả & Tự động Bóc tách REQ (Full-Screen Workspace)',
     items: [
-      { id: '33', title: 'Confluence Workspace (Mở nhanh từ Sidebar)', path: '/documents', file: 'src/pages/projects/ConfluenceWorkspacePage.tsx', note: 'Không gian toàn màn hình 100vw x 100vh, cây thư mục đa cấp & tự động bóc tách REQ từ Heading' },
-      { id: '34', title: 'Confluence Space Dự án CORE (Mặc định)', path: '/projects/20/documents', file: 'src/pages/projects/ConfluenceWorkspacePage.tsx', note: 'Cây thư mục 2 nhánh lớn (BRD/URD & SRS), Live Outline, Bảng biểu tự do & Slash Menu (/)' },
+      { id: '33', title: 'Document Workspace (Mở nhanh từ Sidebar)', path: '/documents', file: 'src/pages/projects/ConfluenceWorkspacePage.tsx', note: 'Không gian toàn màn hình 100vw x 100vh, cây thư mục đa cấp & tự động bóc tách REQ từ Heading' },
+      { id: '34', title: 'Document Space Dự án CORE (Mặc định)', path: '/projects/20/documents', file: 'src/pages/projects/ConfluenceWorkspacePage.tsx', note: 'Cây thư mục 2 nhánh lớn (BRD/URD & SRS), Live Outline, Bảng biểu tự do & Slash Menu (/)' },
       { id: '35', title: 'Trang SRS-01: Phân hệ Xác thực & RBAC (Safe Mode 🔒)', path: '/projects/20/documents/101', file: 'src/pages/projects/ConfluenceWorkspacePage.tsx', note: 'Trang Baseline đã duyệt (Khóa Safe Mode GB-01) — Bấm [+ Tạo phiên bản sửa đổi mới]' },
       { id: '36', title: 'Trang SRS-02: Thanh toán VietQR & Cảnh báo Stale RTM', path: '/projects/20/documents/102', file: 'src/pages/projects/ConfluenceWorkspacePage.tsx', note: 'Đang rà soát — Có Bảng đặc tả, Sơ đồ Mermaid, Figma & Ngăn trượt Diff / Stale RTM' },
     ],

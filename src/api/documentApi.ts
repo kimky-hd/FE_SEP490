@@ -1,5 +1,5 @@
 import type {
-  ConfluenceBlock,
+  DocumentBlock,
   DocumentComment,
   HistoryChangeType,
   ItemPriority,
@@ -19,13 +19,13 @@ interface StoredData {
 
 /**
  * Hàm Parser Trái tim Kỹ thuật:
- * Quét danh sách các khối (ConfluenceBlock[]) từ trên xuống dưới, chia tách theo từng Heading (H1, H2, H3).
+ * Quét danh sách các khối (DocumentBlock[]) từ trên xuống dưới, chia tách theo từng Heading (H1, H2, H3).
  * Toàn bộ nội dung (đoạn văn, bảng biểu, checklist, callout, sơ đồ Mermaid, khung Figma) nằm dưới một Heading
  * có gắn nhãn `isReq: true` cho đến trước Heading tiếp theo được gom thành 1 Section Slice và ánh xạ thành `RequirementItem`.
  */
 export function extractRequirementsFromBlocks(
   docId: number,
-  blocks: ConfluenceBlock[],
+  blocks: DocumentBlock[],
   existingItems: RequirementItem[] = [],
 ): RequirementItem[] {
   const existingMap = new Map<string, RequirementItem>()
@@ -35,11 +35,11 @@ export function extractRequirementsFromBlocks(
   })
 
   const extracted: RequirementItem[] = []
-  let currentHeading: ConfluenceBlock | null = null
-  let currentSlice: ConfluenceBlock[] = []
+  let currentHeading: DocumentBlock | null = null
+  let currentSlice: DocumentBlock[] = []
   let reqCounter = 0
 
-  const flushSlice = (heading: ConfluenceBlock | null, slice: ConfluenceBlock[]) => {
+  const flushSlice = (heading: DocumentBlock | null, slice: DocumentBlock[]) => {
     if (!heading || !heading.isReq) return
     reqCounter++
 
@@ -150,9 +150,9 @@ export function extractRequirementsFromBlocks(
   return extracted
 }
 
-/** Chuyển đổi danh sách RequirementItem sang các khối ConfluenceBlock tự nhiên (dùng cho AI import hoặc mẫu) */
-export function convertItemsToBlocks(items: Partial<RequirementItem>[]): ConfluenceBlock[] {
-  const blocks: ConfluenceBlock[] = []
+/** Chuyển đổi danh sách RequirementItem sang các khối DocumentBlock tự nhiên (dùng cho AI import hoặc mẫu) */
+export function convertItemsToBlocks(items: Partial<RequirementItem>[]): DocumentBlock[] {
+  const blocks: DocumentBlock[] = []
   items.forEach((it, idx) => {
     const reqId = it.id || `req-gen-${Date.now()}-${idx + 1}`
     const keyCode = it.keyCode || `REQ-${String(idx + 1).padStart(2, '0')}`
@@ -221,7 +221,7 @@ export function convertItemsToBlocks(items: Partial<RequirementItem>[]): Conflue
 
 function createInitialSeed(): StoredData {
   // 1. Trang 101: SRS - Phân hệ Xác thực & Phân quyền RBAC (APPROVED 🔒)
-  const doc101Blocks: ConfluenceBlock[] = [
+  const doc101Blocks: DocumentBlock[] = [
     {
       id: 'b101-intro-h',
       type: 'h1',
@@ -314,7 +314,7 @@ function createInitialSeed(): StoredData {
   ]
 
   // 2. Trang 102: SRS - Phân hệ Thanh toán VietQR & Quản lý RTM (IN_REVIEW - Có mục UNCONFIRMED_STALE)
-  const doc102Blocks: ConfluenceBlock[] = [
+  const doc102Blocks: DocumentBlock[] = [
     {
       id: 'b102-intro-h',
       type: 'h1',
@@ -417,7 +417,7 @@ function createInitialSeed(): StoredData {
   ]
 
   // 3. Trang 107 (Trang con của 102): 2.2.1. Chi tiết Luồng Hoàn tiền & Đối soát Tự động
-  const doc107Blocks: ConfluenceBlock[] = [
+  const doc107Blocks: DocumentBlock[] = [
     {
       id: 'b107-h1',
       type: 'h1',
@@ -444,7 +444,7 @@ function createInitialSeed(): StoredData {
   ]
 
   // 4. Trang 103: URD - Hành trình Khách hàng & Mở tài khoản eKYC
-  const doc103Blocks: ConfluenceBlock[] = [
+  const doc103Blocks: DocumentBlock[] = [
     {
       id: 'b103-h1',
       type: 'h1',
@@ -470,7 +470,7 @@ function createInitialSeed(): StoredData {
   ]
 
   // 5. Trang 106: BRD - Quy tắc Nghiệp vụ & Hạn mức Giao dịch
-  const doc106Blocks: ConfluenceBlock[] = [
+  const doc106Blocks: DocumentBlock[] = [
     {
       id: 'b106-h1',
       type: 'h1',
@@ -836,11 +836,11 @@ function saveStorage(data: StoredData): void {
   }
 }
 
-/** Tạo mẫu khối nội dung theo Template khi người dùng tạo trang Confluence mới */
+/** Tạo mẫu khối nội dung theo Template khi người dùng tạo trang tài liệu mới */
 export function buildTemplateBlocks(
   template: 'BLANK' | 'SRS' | 'URD' | 'MEETING_NOTES',
   title: string,
-): ConfluenceBlock[] {
+): DocumentBlock[] {
   const ts = Date.now()
   if (template === 'BLANK') {
     return [
@@ -1001,7 +1001,7 @@ export const documentApi = {
       .sort((a, b) => (a.orderIndex ?? 99) - (b.orderIndex ?? 99))
 
     if (projectDocs.length === 0) {
-      // Tự động tạo cây Confluence mẫu nếu dự án mới chưa có trang nào
+      // Tự động tạo cây tài liệu mẫu nếu dự án mới chưa có trang nào
       const now = new Date().toISOString()
       const folderId = Date.now()
       const pageId = folderId + 1
@@ -1067,7 +1067,7 @@ export const documentApi = {
     return projectDocs
   },
 
-  /** Lấy thông tin chi tiết 1 trang Confluence: Document + Blocks + Auto-Extracted Items + History + Comments */
+  /** Lấy thông tin chi tiết 1 trang tài liệu: Document + Blocks + Auto-Extracted Items + History + Comments */
   get: async (
     docId: number,
   ): Promise<{
@@ -1106,14 +1106,14 @@ export const documentApi = {
   },
 
   /**
-   * Lưu nội dung trang Confluence (Title + Blocks):
+   * Lưu nội dung trang tài liệu (Title + Blocks):
    * Tự động chạy Parser bóc tách các Heading [REQ-xx], phát hiện thay đổi (Diff) so với bản lưu trước,
    * tự động ghi RequirementHistoryLog và kích hoạt cảnh báo UNCONFIRMED_STALE cho các Test Case liên quan.
    */
-  saveConfluencePage: async (
+  saveDocumentPage: async (
     docId: number,
     patch: Partial<SpecificationDocument>,
-    newBlocks: ConfluenceBlock[],
+    newBlocks: DocumentBlock[],
     authorName: string,
   ): Promise<{
     document: SpecificationDocument
@@ -1219,8 +1219,18 @@ export const documentApi = {
     return { document: doc, items: nextItems, changedKeys }
   },
 
-  /** Tạo trang tài liệu mới hoặc trang con (nhánh con) trên cây Confluence */
-  createConfluencePage: async (params: {
+  /** Alias for backward compatibility */
+  saveConfluencePage: async (
+    docId: number,
+    patch: Partial<SpecificationDocument>,
+    newBlocks: DocumentBlock[],
+    authorName: string,
+  ) => {
+    return documentApi.saveDocumentPage(docId, patch, newBlocks, authorName)
+  },
+
+  /** Tạo trang tài liệu mới hoặc trang con (nhánh con) trên cây tài liệu */
+  createDocumentPage: async (params: {
     projectId: number
     parentPageId?: number | null
     title: string
@@ -1229,7 +1239,7 @@ export const documentApi = {
     isFolder?: boolean
     icon?: string
     createdBy: string
-    initialBlocks?: ConfluenceBlock[]
+    initialBlocks?: DocumentBlock[]
   }): Promise<SpecificationDocument> => {
     const data = loadStorage()
     const id = Date.now()
@@ -1270,7 +1280,12 @@ export const documentApi = {
     return newDoc
   },
 
-  /** Nhân bản một trang tài liệu trên cây Confluence */
+  /** Alias for backward compatibility */
+  createConfluencePage: async (params: any) => {
+    return documentApi.createDocumentPage(params)
+  },
+
+  /** Nhân bản một trang tài liệu trên cây tài liệu */
   duplicatePage: async (docId: number, authorName: string): Promise<SpecificationDocument> => {
     const data = loadStorage()
     const source = data.documents.find((d) => d.id === docId)
@@ -1278,7 +1293,7 @@ export const documentApi = {
 
     const newId = Date.now()
     const now = new Date().toISOString()
-    const clonedBlocks: ConfluenceBlock[] = JSON.parse(JSON.stringify(source.blocks || []))
+    const clonedBlocks: DocumentBlock[] = JSON.parse(JSON.stringify(source.blocks || []))
     clonedBlocks.forEach((b, idx) => {
       b.id = `blk-${newId}-${idx}`
       if (b.isReq) {
@@ -1308,7 +1323,7 @@ export const documentApi = {
     return copyDoc
   },
 
-  /** Xóa một trang tài liệu trên cây Confluence */
+  /** Xóa một trang tài liệu trên cây tài liệu */
   deletePage: async (docId: number): Promise<void> => {
     const data = loadStorage()
     const target = data.documents.find((d) => d.id === docId)
@@ -1387,7 +1402,7 @@ export const documentApi = {
 
     const newId = Date.now()
     const now = new Date().toISOString()
-    const clonedBlocks: ConfluenceBlock[] = JSON.parse(JSON.stringify(parentDoc.blocks || []))
+    const clonedBlocks: DocumentBlock[] = JSON.parse(JSON.stringify(parentDoc.blocks || []))
     clonedBlocks.forEach((b, idx) => {
       if (b.isReq) {
         b.reqId = `item-${newId}-${idx + 1}`

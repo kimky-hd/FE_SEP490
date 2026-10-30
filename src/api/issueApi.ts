@@ -101,7 +101,7 @@ function createInitialSeed(): StoredIssueData {
         {
           id: 'act-3',
           authorName: 'Sarah Lin',
-          action: 'Linked Confluence Requirement',
+          action: 'Linked Requirement Item',
           details: 'Linked with REQ-01 in SRS-01',
           timestamp: '2026-10-22T08:35:00.000Z',
         },
@@ -287,7 +287,7 @@ function createInitialSeed(): StoredIssueData {
           id: 'cmt-iss-4',
           authorName: 'Vu Kim Ky (BA)',
           authorRole: 'Business Analyst',
-          body: 'Note: Partial payment rules were just updated in Confluence spec v1.1. Please inspect the diff before patching!',
+          body: 'Note: Partial payment rules were just updated in specification v1.1. Please inspect the diff before patching!',
           mentions: ['Pham Minh Luong'],
           createdAt: '2026-10-27T09:30:00.000Z',
         },
@@ -332,7 +332,7 @@ function createInitialSeed(): StoredIssueData {
 
       // Organization & Security Classification
       departmentLabel: 'Frontend Team',
-      component: 'Confluence Spec Editor',
+      component: 'Specification Document Editor',
       dataClassification: 'INTERNAL',
       environment: 'DEV',
       labels: ['Frontend', 'UI/UX', 'Table'],
@@ -920,7 +920,7 @@ export const issueApi = {
     return issue
   },
 
-  /** Link Confluence Requirement */
+  /** Link Specification Requirement */
   linkRequirement: async (
     id: string,
     req: { docId: number; reqId: string; reqKey: string; reqTitle: string },
@@ -941,7 +941,7 @@ export const issueApi = {
     issue.activityLog.unshift({
       id: `act-${Date.now()}`,
       authorName: actor,
-      action: 'Linked Confluence Requirement',
+      action: 'Linked Requirement Item',
       details: `Linked with [${req.reqKey}] - ${req.reqTitle}`,
       timestamp: now,
     })
@@ -1000,7 +1000,7 @@ export const issueApi = {
     return issue
   },
 
-  /** Bidirectional sync: mark issues Stale when Confluence requirement is edited */
+  /** Bidirectional sync: mark issues Stale when specification requirement is edited */
   markRequirementStale: async (
     docId: number,
     reqKeyCode: string,
@@ -1019,7 +1019,7 @@ export const issueApi = {
         iss.updatedAt = now
         iss.activityLog.unshift({
           id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-          authorName: 'SSAM Confluence Sync',
+          authorName: 'SSAM Document Sync',
           action:
             status === 'UNCONFIRMED_STALE'
               ? 'Draft Revision Alert (Unconfirmed Stale)'

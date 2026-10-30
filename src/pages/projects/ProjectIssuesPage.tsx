@@ -40,7 +40,7 @@ export const DEFAULT_COMPONENTS = [
   'Authentication & SSO',
   'RBAC & Permission',
   'Core Banking & VietQR',
-  'Confluence Spec Editor',
+  'Specification Document Editor',
   'Traceability & RTM',
   'AI Generation Engine',
   'Notification Service',
@@ -125,25 +125,24 @@ export function DepartmentBadge({ label, className }: { label?: DepartmentLabel;
   )
 }
 
-// --- ATLASSIAN JIRA ICONS ---
+// --- ENTERPRISE ISSUE TRACKER ICONS ---
 
-function JiraLogoIcon({ className = 'h-5 w-5' }: { className?: string }) {
+function IssueTrackerIcon({ className = 'h-5 w-5' }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none">
-      <rect width="24" height="24" rx="5" fill="#2563EB" />
+      <rect width="24" height="24" rx="6" fill="#2563EB" />
       <path
-        d="M11.5 5.5a1 1 0 011 1v5.172a1 1 0 01-.293.707l-3.5 3.5a1 1 0 01-1.414-1.414l3.207-3.207V6.5a1 1 0 011-1z"
-        fill="#FFFFFF"
+        d="M7 8h10M7 12h7M7 16h5"
+        stroke="#FFFFFF"
+        strokeWidth="2"
+        strokeLinecap="round"
       />
-      <path
-        d="M17.5 11.5a1 1 0 011 1v2.172a1 1 0 01-.293.707l-2 2a1 1 0 01-1.414-1.414l1.707-1.707V12.5a1 1 0 011-1z"
-        fill="#93C5FD"
-      />
+      <circle cx="17" cy="15" r="2.5" fill="#93C5FD" />
     </svg>
   )
 }
 
-function JiraTaskIcon({ className = 'h-4 w-4' }: { className?: string }) {
+function TaskIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (
     <span
       className={clsx('inline-flex items-center justify-center rounded bg-blue-600 text-white shadow-2xs shrink-0', className)}
@@ -156,7 +155,7 @@ function JiraTaskIcon({ className = 'h-4 w-4' }: { className?: string }) {
   )
 }
 
-function JiraBugIcon({ className = 'h-4 w-4' }: { className?: string }) {
+function BugIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (
     <span
       className={clsx('inline-flex items-center justify-center rounded-full bg-rose-600 text-white shadow-2xs shrink-0', className)}
@@ -169,7 +168,7 @@ function JiraBugIcon({ className = 'h-4 w-4' }: { className?: string }) {
   )
 }
 
-function JiraPriorityIcon({ priority }: { priority: IssuePriority }) {
+function PriorityIcon({ priority }: { priority: IssuePriority }) {
   if (priority === 'HIGHEST') {
     return (
       <span className="inline-flex items-center text-rose-600" title="Priority: Highest">
@@ -207,7 +206,7 @@ function JiraPriorityIcon({ priority }: { priority: IssuePriority }) {
 }
 
 // ========================================================
-// MAIN: FULL-SCREEN JIRA WORKSPACE (100vw x 100vh)
+// MAIN: FULL-SCREEN ISSUE TRACKING WORKSPACE (100vw x 100vh)
 // ========================================================
 
 export function ProjectIssuesPage() {
@@ -526,7 +525,7 @@ export function ProjectIssuesPage() {
       )}
 
       {/* ======================================================== */}
-      {/* ROW 2: JIRA CONTEXTUAL SUB-TOOLBAR (44PX)                */}
+      {/* ROW 2: ISSUE CONTEXTUAL SUB-TOOLBAR (44PX)                 */}
       {/* ======================================================== */}
       <div className="h-11 bg-white border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0 z-20">
         {/* LEFT: 3 WORKSPACE VIEWS + SDLC PHASE SELECTOR */}
@@ -722,7 +721,7 @@ export function ProjectIssuesPage() {
                 typeFilter === 'TASK' ? 'bg-blue-50 font-bold text-blue-700' : 'text-slate-600',
               )}
             >
-              <JiraTaskIcon className="h-3 w-3" />
+              <TaskIcon className="h-3 w-3" />
               <span>Task</span>
             </button>
             <button
@@ -733,7 +732,7 @@ export function ProjectIssuesPage() {
                 typeFilter === 'BUG' ? 'bg-rose-50 font-bold text-rose-700' : 'text-slate-600',
               )}
             >
-              <JiraBugIcon className="h-3 w-3" />
+              <BugIcon className="h-3 w-3" />
               <span>Bug</span>
             </button>
           </div>
@@ -897,9 +896,9 @@ export function ProjectIssuesPage() {
                           <div className="flex items-center justify-between gap-1 mb-1.5">
                             <div className="flex items-center gap-1.5">
                               {issue.type === 'TASK' ? (
-                                <JiraTaskIcon className="h-4 w-4" />
+                                <TaskIcon className="h-4 w-4" />
                               ) : (
-                                <JiraBugIcon className="h-4 w-4" />
+                                <BugIcon className="h-4 w-4" />
                               )}
                               <span className="font-mono text-xs font-bold text-slate-700 hover:text-blue-600 hover:underline">
                                 {issue.key}
@@ -1000,7 +999,7 @@ export function ProjectIssuesPage() {
                             )}
                           </div>
 
-                          {/* Row 3: Confluence REQ Chip */}
+                          {/* Row 3: Requirement REQ Chip */}
                           {issue.linkedRequirementKeyCode && (
                             <div
                               className="mb-2 flex items-center flex-wrap gap-1"
@@ -1019,7 +1018,7 @@ export function ProjectIssuesPage() {
                                       ? 'border-rose-300 bg-rose-50 text-rose-900 font-bold'
                                       : 'border-emerald-200 bg-emerald-50 text-emerald-800',
                                 )}
-                                title="Click to view Confluence Spec Split-View"
+                                title="Click to view Document Spec Split-View"
                               >
                                 <span className="shrink-0">📄</span>
                                 <span className="font-mono font-bold shrink-0">{issue.linkedRequirementKeyCode}</span>
@@ -1040,7 +1039,7 @@ export function ProjectIssuesPage() {
                           {/* Row 4: Priority + Points + Comments + Assignee */}
                           <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-xs">
                             <div className="flex items-center gap-2">
-                              <JiraPriorityIcon priority={issue.priority} />
+                              <PriorityIcon priority={issue.priority} />
                               {issue.storyPoints !== undefined && (
                                 <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-600">
                                   {issue.storyPoints} pts
@@ -1111,7 +1110,7 @@ export function ProjectIssuesPage() {
                       )}
                     >
                       <td className="py-3 px-4 text-center">
-                        {issue.type === 'TASK' ? <JiraTaskIcon /> : <JiraBugIcon />}
+                        {issue.type === 'TASK' ? <TaskIcon /> : <BugIcon />}
                       </td>
                       <td className="py-3 px-3 font-mono font-bold text-blue-600 hover:underline">
                         {issue.key}
@@ -1156,7 +1155,7 @@ export function ProjectIssuesPage() {
                       </td>
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-1.5">
-                          <JiraPriorityIcon priority={issue.priority} />
+                          <PriorityIcon priority={issue.priority} />
                           <span className="font-medium text-slate-600">{issue.priority}</span>
                         </div>
                       </td>
@@ -1204,7 +1203,7 @@ export function ProjectIssuesPage() {
           </div>
         )}
 
-        {/* VIEW MODE 3: SPLIT-VIEW CONFLUENCE */}
+        {/* VIEW MODE 3: SPLIT-VIEW SPECIFICATION */}
         {viewMode === 'split' && (
           <SplitViewWorkspace
             projectId={project.projectId}
@@ -1218,8 +1217,7 @@ export function ProjectIssuesPage() {
       </main>
 
       {/* ======================================================== */}
-      {/* 4. FULL-SCREEN JIRA DEDICATED ISSUE VIEW     */}
-      {/*    (REPLACED NARROW RIGHT DRAWER)                  */}
+      {/* 4. FULL-SCREEN DEDICATED ISSUE VIEW                      */}
       {/* ======================================================== */}
       {currentSelectedIssue && viewMode !== 'split' && (
         <FullScreenIssueView
@@ -1411,7 +1409,7 @@ export function ProjectIssuesPage() {
 }
 
 // ========================================================
-// FULL-SCREEN JIRA DEDICATED ISSUE VIEW
+// FULL-SCREEN DEDICATED ISSUE VIEW
 // (3-COLUMN DEDICATED LAYOUT)
 // ========================================================
 
@@ -1699,7 +1697,7 @@ function FullScreenIssueView({
                 issue.type === 'TASK' ? 'bg-blue-100 text-blue-800' : 'bg-rose-100 text-rose-800',
               )}
             >
-              {issue.type === 'TASK' ? <JiraTaskIcon className="h-3 w-3" /> : <JiraBugIcon className="h-3 w-3" />}
+              {issue.type === 'TASK' ? <TaskIcon className="h-3 w-3" /> : <BugIcon className="h-3 w-3" />}
               <span>{issue.type === 'TASK' ? 'Task' : 'Bug'}</span>
             </span>
 
@@ -1748,7 +1746,7 @@ function FullScreenIssueView({
               </span>
             )}
 
-            <QuickModuleSwitcher projectId={issue.projectId} active="jira" className="hidden xl:inline-flex" />
+            <QuickModuleSwitcher projectId={issue.projectId} active="issues" className="hidden xl:inline-flex" />
           </div>
 
           {/* PREV / NEXT NAVIGATION + SIZE TOGGLE + CLOSE */}
@@ -1844,7 +1842,7 @@ function FullScreenIssueView({
                   >
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-1.5 font-mono font-bold">
-                        {iss.type === 'TASK' ? <JiraTaskIcon className="h-3.5 w-3.5" /> : <JiraBugIcon className="h-3.5 w-3.5" />}
+                        {iss.type === 'TASK' ? <TaskIcon className="h-3.5 w-3.5" /> : <BugIcon className="h-3.5 w-3.5" />}
                         <span>{iss.key}</span>
                       </div>
                       <span
@@ -1900,7 +1898,7 @@ function FullScreenIssueView({
                   )}
                   title="Click to switch between Task and Bug"
                 >
-                  {issue.type === 'TASK' ? <JiraTaskIcon /> : <JiraBugIcon />}
+                  {issue.type === 'TASK' ? <TaskIcon /> : <BugIcon />}
                   <span>{issue.type === 'TASK' ? 'Task' : 'Bug'}</span>
                   <span className="text-[10px] text-slate-400">⇄ Switch type</span>
                 </button>
@@ -1978,7 +1976,7 @@ function FullScreenIssueView({
               </div>
             )}
 
-            {/* CONFLUENCE REQUIREMENT TRACEABILITY PANEL */}
+            {/* REQUIREMENT TRACEABILITY PANEL */}
             <div
               className={clsx(
                 'rounded-2xl border p-5 space-y-4 shadow-2xs transition-all',
@@ -1993,7 +1991,7 @@ function FullScreenIssueView({
                 <div className="flex items-center gap-2">
                   <span className="text-base">📄</span>
                   <span className="font-extrabold text-xs uppercase tracking-wider text-slate-800">
-                    Confluence Requirement Traceability
+                    Requirement Traceability (RTM)
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -2048,14 +2046,14 @@ function FullScreenIssueView({
                   </div>
 
                   <p className="text-sm font-bold text-slate-900">
-                    {issue.linkedRequirementTitle || 'Confluence Requirement'}
+                    {issue.linkedRequirementTitle || 'Specification Requirement'}
                   </p>
 
                   {/* Stale acknowledgement button */}
                   {issue.traceabilityStatus !== 'FRESH' && (
                     <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3 bg-amber-50/50 p-2.5 rounded-lg border border-amber-200">
                       <span className="text-xs text-amber-950 font-medium">
-                        ⚠️ Requirement [<b>{issue.linkedRequirementKeyCode}</b>] was modified in Confluence. Review the diff and verify code updates.
+                        ⚠️ Requirement [<b>{issue.linkedRequirementKeyCode}</b>] was modified in Document. Review the diff and verify code updates.
                       </span>
                       <Button
                         variant="primary"
@@ -2134,7 +2132,7 @@ function FullScreenIssueView({
                 </div>
               ) : (
                 <div className="rounded-xl bg-white p-4 border border-dashed border-slate-300 text-center text-xs text-slate-500">
-                  This issue is not currently linked to any Confluence requirement item.
+                  This issue is not currently linked to any requirement item.
                 </div>
               )}
             </div>
@@ -2831,7 +2829,7 @@ function FullScreenIssueView({
 }
 
 // ========================================================
-// SPLIT-VIEW WORKSPACE (JIRA ↔ CONFLUENCE)
+// SPLIT-VIEW WORKSPACE (ISSUES ↔ DOCUMENTS)
 // ========================================================
 
 function SplitViewWorkspace({
@@ -2889,14 +2887,14 @@ function SplitViewWorkspace({
           <span className="font-bold text-xs text-slate-800">
             Issues & Tasks ({issues.length})
           </span>
-          <span className="text-[11px] font-mono text-slate-400">Jira Split-View</span>
+          <span className="text-[11px] font-mono text-slate-400">Split-View Tracking</span>
         </div>
 
         {selectedIssue ? (
           <div className="flex-1 overflow-y-auto p-5 space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-2">
-                {selectedIssue.type === 'TASK' ? <JiraTaskIcon /> : <JiraBugIcon />}
+                {selectedIssue.type === 'TASK' ? <TaskIcon /> : <BugIcon />}
                 <span className="font-mono text-base font-extrabold text-blue-600">
                   {selectedIssue.key}
                 </span>
@@ -2913,7 +2911,7 @@ function SplitViewWorkspace({
                   {selectedIssue.statusName}
                 </span>
               </div>
-              <JiraPriorityIcon priority={selectedIssue.priority} />
+              <PriorityIcon priority={selectedIssue.priority} />
             </div>
 
             <h3 className="text-sm font-bold text-slate-900 leading-snug">{selectedIssue.summary}</h3>
@@ -2934,7 +2932,7 @@ function SplitViewWorkspace({
               <div className="flex items-center justify-between">
                 <span className="font-bold text-xs uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
                   <span>🔗</span>
-                  <span>Confluence Requirement Traceability</span>
+                  <span>Requirement Traceability (RTM)</span>
                 </span>
                 <span
                   className={clsx(
@@ -3018,7 +3016,7 @@ function SplitViewWorkspace({
                     )}
                   >
                     <div className="flex items-center gap-1.5 truncate">
-                      {iss.type === 'TASK' ? <JiraTaskIcon /> : <JiraBugIcon />}
+                      {iss.type === 'TASK' ? <TaskIcon /> : <BugIcon />}
                       <span className="font-mono font-bold text-xs">{iss.key}</span>
                       <span className="truncate">{iss.summary}</span>
                     </div>
@@ -3039,13 +3037,13 @@ function SplitViewWorkspace({
         )}
       </div>
 
-      {/* RIGHT HALF (50%): CONFLUENCE SPEC VIEWER */}
+      {/* RIGHT HALF (50%): SPEC VIEWER */}
       <div className="flex flex-col rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-800">📄 Confluence Document:</span>
+            <span className="text-xs font-bold text-slate-800">📄 Specification Document:</span>
             <select
-              aria-label="Select Confluence document"
+              aria-label="Select specification document"
               value={activeDocId || ''}
               onChange={(e) => setActiveDocId(Number(e.target.value))}
               className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-800 outline-none"
@@ -3179,7 +3177,7 @@ function SplitViewWorkspace({
 }
 
 // ========================================================
-// CREATE ISSUE MODAL (ATLASSIAN JIRA CLOUD STYLE)
+// CREATE ISSUE MODAL (ENTERPRISE STYLE)
 // 2-COLUMN BALANCED LAYOUT: 60% CONTENT / 40% METADATA
 // ========================================================
 
@@ -3237,7 +3235,7 @@ function CreateIssueModal({
   const [labels, setLabels] = useState<string[]>(['Sprint-3'])
   const [tagInput, setTagInput] = useState('')
 
-  // Traceability Confluence
+  // Traceability Requirement Mapping
   const [linkedDocId, setLinkedDocId] = useState<number | undefined>(prefillReq?.docId)
   const [linkedReqKey, setLinkedReqKey] = useState(prefillReq?.reqKey || '')
 
@@ -3393,7 +3391,7 @@ function CreateIssueModal({
         {/* ======================================================== */}
         <header className="h-16 border-b border-slate-200 px-6 flex items-center justify-between shrink-0 bg-slate-50/70">
           <div className="flex items-center gap-3">
-            <JiraLogoIcon className="h-6 w-6" />
+            <IssueTrackerIcon className="h-6 w-6" />
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-extrabold text-slate-900">
@@ -3422,7 +3420,7 @@ function CreateIssueModal({
                     : 'text-slate-600 hover:bg-slate-100',
                 )}
               >
-                <JiraTaskIcon className="h-3.5 w-3.5" />
+                <TaskIcon className="h-3.5 w-3.5" />
                 <span>Task</span>
               </button>
               <button
@@ -3435,7 +3433,7 @@ function CreateIssueModal({
                     : 'text-slate-600 hover:bg-slate-100',
                 )}
               >
-                <JiraBugIcon className="h-3.5 w-3.5" />
+                <BugIcon className="h-3.5 w-3.5" />
                 <span>Bug</span>
               </button>
             </div>
@@ -3697,7 +3695,7 @@ function CreateIssueModal({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <SelectField
-                    label="Confluence Document"
+                    label="Specification Document"
                     value={linkedDocId || ''}
                     onChange={(e) => setLinkedDocId(Number(e.target.value) || undefined)}
                   >

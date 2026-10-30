@@ -18,6 +18,9 @@ export default defineConfig({
     strictPort: true,
     host: true,
     allowedHosts: true,
+    watch: {
+      ignored: ['**/*.docx', '**/target/**', '**/dist/**', '**/.git/**'],
+    },
   },
   test: {
     environment: "jsdom",
