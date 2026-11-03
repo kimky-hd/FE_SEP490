@@ -1,5 +1,6 @@
 import type { DraftPhase } from '@/lib/workflowDraft'
 import type { SdlcMethod } from '@/types/project'
+import { tr } from '@/i18n'
 
 // Trạng thái wizard tạo dự án (Figma hàng 2 frame 02–04). Lưu nháp ở localStorage — đúng ghi chú Figma
 // "Dữ liệu bản nháp được lưu tại local state (Uncommitted)", chưa gửi BE cho tới khi Submit.
@@ -20,7 +21,6 @@ export interface WizardState {
   description: string
   aiEnabled: boolean
   sdlcMethod: SdlcMethod
-  baseTemplateName?: string
   phases: DraftPhase[]
   /** Đã sửa phase/trạng thái → đổi phương pháp SDLC phải xác nhận vì sẽ mất chỉnh sửa. */
   phasesTouched: boolean
@@ -64,16 +64,21 @@ export function clearDraft(userId: number, workspaceId: number) {
 export function validateStepOne(state: WizardState): Record<string, string> {
   const errors: Record<string, string> = {}
   const name = state.name.trim()
-  if (name.length < 2) errors.name = 'Tên dự án tối thiểu 2 ký tự'
-  else if (name.length > NAME_MAX) errors.name = `Tối đa ${NAME_MAX} ký tự`
-  if (!/^[A-Z][A-Z0-9]{1,9}$/.test(state.key)) errors.key = 'Key 2–10 ký tự, chữ HOA và số, bắt đầu bằng chữ'
-  if (state.description.length > DESCRIPTION_MAX) errors.description = `Tối đa ${DESCRIPTION_MAX} ký tự`
-  if (state.phases.length === 0) errors.phases = 'Dự án cần ít nhất 1 phase'
-  else if (state.phases.some((p) => !p.name.trim())) errors.phases = 'Phase phải có tên'
+  if (name.length < 2) errors.name = tr('Tên dự án tối thiểu 2 ký tự', 'Project name must be at least 2 characters')
+  else if (name.length > NAME_MAX) errors.name = tr(`Tối đa ${NAME_MAX} ký tự`, `Maximum ${NAME_MAX} characters`)
+  if (!/^[A-Z][A-Z0-9]{1,9}$/.test(state.key))
+    errors.key = tr(
+      'Key 2–10 ký tự, chữ HOA và số, bắt đầu bằng chữ',
+      'Key must be 2–10 uppercase letters or digits, starting with a letter',
+    )
+  if (state.description.length > DESCRIPTION_MAX)
+    errors.description = tr(`Tối đa ${DESCRIPTION_MAX} ký tự`, `Maximum ${DESCRIPTION_MAX} characters`)
+  if (state.phases.length === 0) errors.phases = tr('Dự án cần ít nhất 1 phase', 'The project needs at least 1 phase')
+  else if (state.phases.some((p) => !p.name.trim())) errors.phases = tr('Phase phải có tên', 'Every phase needs a name')
   else if (new Set(state.phases.map((p) => p.name.trim().toLowerCase())).size !== state.phases.length) {
-    errors.phases = 'Tên phase bị trùng'
+    errors.phases = tr('Tên phase bị trùng', 'Phase names must be unique')
   } else if (state.phases.some((p) => p.statuses.filter((s) => s.isActive).length === 0)) {
-    errors.phases = 'Mỗi phase cần ít nhất 1 trạng thái'
+    errors.phases = tr('Mỗi phase cần ít nhất 1 trạng thái', 'Each phase needs at least 1 status')
   }
   return errors
 }

@@ -1,20 +1,23 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
-import { Card, ErrorState, ForbiddenState, LoadingBlock, PageHeader } from '@/components/layout/PageParts'
-import { buttonClasses } from '@/components/ui/Button'
+import { ErrorState, ForbiddenState, LoadingBlock, PageHeader } from '@/components/layout/PageParts'
+import { Button, buttonClasses } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Avatar } from '@/components/ui/Avatar'
 import { Alert } from '@/components/ui/Alert'
 import { SelectField } from '@/components/ui/SelectField'
-import { MailIcon, SearchIcon } from '@/components/ui/icons'
+import { MailIcon } from '@/components/ui/icons'
 import { useAuth } from '@/context/AuthContext'
 import { companyApi } from '@/api/companyApi'
 import { roleApi } from '@/api/roleApi'
 import { useAsync } from '@/lib/useAsync'
 import { apiErrorMessage } from '@/lib/apiErrors'
 import { formatDate } from '@/lib/format'
+import { useI18n } from '@/i18n'
+import { useRoleChangeGuard } from '@/lib/useRoleChangeGuard'
 import { PERMISSIONS, type CompanyUserDto, type MemberStatus } from '@/types/rbac'
+import { SearchInput, tableWrap, th, theadRow } from '@/components/ui/listControls'
 
 const PAGE_SIZE = 20
 const SEARCH_DEBOUNCE_MS = 300
@@ -22,6 +25,7 @@ const SEARCH_DEBOUNCE_MS = 300
 // Figma B "Quản lý người dùng" (bản gọn) · FR §III.3.2.2 · UC-15: đổi role cấp công ty của từng người.
 export function CompanyUsersPage() {
   const { currentCompany, can, user, refreshMe } = useAuth()
+  const { t } = useI18n()
   const companyId = currentCompany?.companyId
   const canView = companyId !== undefined && can(PERMISSIONS.userView)
   const canAssign = canView && can(PERMISSIONS.userAssignRole)
@@ -60,24 +64,46 @@ export function CompanyUsersPage() {
     [canView, companyId],
   )
 
+  // Gọi trước return sớm (luật hooks); apply bọc lại vì changeRole khai báo phía dưới.
+  const roleGuard = useRoleChangeGuard<CompanyUserDto>({
+    selfId: user?.id,
+    scopeLabel: t('công ty', 'the company'),
+    apply: (u, nextRoleId) => changeRole(u, nextRoleId),
+  })
+
   if (!canView) {
     return (
       <DashboardLayout>
-        <ForbiddenState message="Requires “View users” permission (user.view)." />
+        <ForbiddenState
+          message={t(
+            'Bạn cần quyền xem danh sách người dùng. Liên hệ Tenant Admin của công ty.',
+            'You need permission to view users. Contact your company’s Tenant Admin.',
+          )}
+        />
       </DashboardLayout>
     )
   }
 
-  const changeRole = async (target: CompanyUserDto, nextRoleId: number) => {
+  async function changeRole(target: CompanyUserDto, nextRoleId: number): Promise<boolean> {
     setNotice(null)
     setSavingUserId(target.userId)
     try {
       const updated = await companyApi.changeUserRole(companyId!, target.userId, nextRoleId)
-      users.setData((prev) => prev && { ...prev, items: prev.items.map((u) => (u.userId === updated.userId ? updated : u)) })
-      setNotice({ tone: 'success', text: `Changed role for ${target.fullName} to ${updated.role.name}.` })
+      users.setData(
+        (prev) => prev && { ...prev, items: prev.items.map((u) => (u.userId === updated.userId ? updated : u)) },
+      )
+      setNotice({
+        tone: 'success',
+        text: t(
+          `Đã đổi role của ${target.fullName} thành ${updated.role.name}.`,
+          `Changed ${target.fullName}’s role to ${updated.role.name}.`,
+        ),
+      })
       if (target.userId === user?.id) await refreshMe()
+      return true
     } catch (err) {
       setNotice({ tone: 'error', text: apiErrorMessage(err) })
+      return false
     } finally {
       setSavingUserId(null)
     }
@@ -85,46 +111,51 @@ export function CompanyUsersPage() {
 
   const data = users.data
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1
+  const statusLabel = (s: MemberStatus) =>
+    s === 'ACTIVE' ? t('Hoạt động', 'Active') : t('Đã vô hiệu hoá', 'Deactivated')
 
   return (
     <DashboardLayout>
       <PageHeader
-        eyebrow="// Organization Admin"
-        title="Users"
-        description={`Team members in ${currentCompany!.companyName} and their company-level roles.`}
+        title={t('Người dùng', 'Users')}
+        description={
+          data
+            ? t(
+                `${data.total} người trong ${currentCompany!.companyName}`,
+                `${data.total} people in ${currentCompany!.companyName}`,
+              )
+            : currentCompany!.companyName
+        }
         actions={
           can(PERMISSIONS.userInvite) && (
             <Link to="/members/invite" className={buttonClasses({ inline: true })}>
               <MailIcon className="h-4 w-4" />
-              Invite Member
+              {t('Mời thành viên', 'Invite members')}
             </Link>
           )
         }
       />
 
-      <div className="mt-6 flex flex-col gap-3 lg:flex-row lg:items-center">
-        <label className="relative block lg:w-72">
-          <span className="sr-only">Search users</span>
-          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search by name or email…"
-            className="h-9 w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
-          />
-        </label>
-        <div className="flex gap-3">
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <SearchInput
+          value={searchInput}
+          onChange={setSearchInput}
+          label={t('Tìm người dùng', 'Search users')}
+          placeholder={t('Tìm theo tên hoặc email…', 'Search by name or email…')}
+          className="sm:w-72"
+        />
+        <div className="grid grid-cols-2 gap-3 sm:flex">
           <SelectField
             compact
-            aria-label="Filter by role"
+            aria-label={t('Lọc theo role', 'Filter by role')}
             value={roleId}
             onChange={(e) => {
               setRoleId(e.target.value ? Number(e.target.value) : '')
               setPage(1)
             }}
-            className="!h-9 min-w-[10rem] text-sm"
+            className="lg:!h-9 lg:!text-sm sm:min-w-[10rem]"
           >
-            <option value="">All roles</option>
+            <option value="">{t('Tất cả vai trò', 'All roles')}</option>
             {(tenantRoles.data ?? []).map((r) => (
               <option key={r.roleId} value={r.roleId}>
                 {r.name}
@@ -133,17 +164,17 @@ export function CompanyUsersPage() {
           </SelectField>
           <SelectField
             compact
-            aria-label="Filter by status"
+            aria-label={t('Lọc theo trạng thái', 'Filter by status')}
             value={status}
             onChange={(e) => {
               setStatus(e.target.value as MemberStatus | '')
               setPage(1)
             }}
-            className="!h-9 min-w-[9rem] text-sm"
+            className="lg:!h-9 lg:!text-sm sm:min-w-[9rem]"
           >
-            <option value="">All statuses</option>
-            <option value="ACTIVE">Active</option>
-            <option value="DEACTIVATED">Deactivated</option>
+            <option value="">{t('Mọi trạng thái', 'All statuses')}</option>
+            <option value="ACTIVE">{t('Hoạt động', 'Active')}</option>
+            <option value="DEACTIVATED">{t('Đã vô hiệu hoá', 'Deactivated')}</option>
           </SelectField>
         </div>
       </div>
@@ -153,6 +184,7 @@ export function CompanyUsersPage() {
           <Alert tone={notice.tone}>{notice.text}</Alert>
         </div>
       )}
+      {roleGuard.undoBar}
 
       <div className="mt-4">
         {users.isLoading && !data ? (
@@ -160,41 +192,48 @@ export function CompanyUsersPage() {
         ) : users.error ? (
           <ErrorState message={apiErrorMessage(users.error)} onRetry={users.reload} />
         ) : (
-          <Card className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 text-left font-mono text-[10px] uppercase tracking-[0.12em] text-gray-500">
-                  <th className="px-4 py-3 font-medium">User</th>
-                  <th className="px-4 py-3 font-medium">Company Role</th>
-                  <th className="px-4 py-3 font-medium">Workspaces</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Joined</th>
+          <div className={tableWrap}>
+            {/* Dưới md: mỗi người là một thẻ (tên + email, rồi role và trạng thái), không cuộn ngang. */}
+            <table className="w-full text-sm">
+              <thead className="hidden md:table-header-group">
+                <tr className={theadRow}>
+                  <th className={th}>{t('Người dùng', 'User')}</th>
+                  <th className={th}>{t('Vai trò', 'Role')}</th>
+                  <th className={th}>{t('Trạng thái', 'Status')}</th>
+                  <th className={th}>{t('Tham gia', 'Joined')}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-200">
                 {data!.items.map((u) => (
-                  <tr key={u.userId}>
-                    <td className="px-4 py-3">
+                  <tr
+                    key={u.userId}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-2.5 px-4 py-3 transition-colors hover:bg-gray-50 md:table-row md:p-0"
+                  >
+                    <td className="block w-full md:table-cell md:w-auto md:px-4 md:py-3">
                       <div className="flex items-center gap-3">
                         <Avatar name={u.fullName} />
                         <div className="min-w-0">
                           <p className="truncate font-medium text-gray-900">
                             {u.fullName}
-                            {u.userId === user?.id && <span className="ml-1.5 text-xs font-normal text-gray-400">(you)</span>}
+                            {u.userId === user?.id && (
+                              <span className="ml-1.5 text-xs font-normal text-gray-500">{t('(bạn)', '(you)')}</span>
+                            )}
                           </p>
-                          <p className="truncate text-xs text-gray-500">{u.email}</p>
+                          <p className="truncate text-sm text-gray-500">{u.email}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="block md:table-cell md:px-4 md:py-3">
                       {canAssign && u.status === 'ACTIVE' && tenantRoles.data ? (
                         <SelectField
                           compact
-                          aria-label={`Role for ${u.fullName}`}
-                          value={u.role.roleId}
+                          aria-label={t(`Role của ${u.fullName}`, `Role of ${u.fullName}`)}
+                          value={roleGuard.valueFor(u)}
                           disabled={savingUserId === u.userId}
-                          onChange={(e) => void changeRole(u, Number(e.target.value))}
-                          className="min-w-[11rem]"
+                          onChange={(e) =>
+                            roleGuard.request(u, Number(e.target.value), e.target.selectedOptions[0]?.text ?? '')
+                          }
+                          className="min-w-[11rem] lg:!h-9 lg:!text-sm"
                         >
                           {!tenantRoles.data.some((r) => r.roleId === u.role.roleId) && (
                             <option value={u.role.roleId}>{u.role.name}</option>
@@ -206,50 +245,57 @@ export function CompanyUsersPage() {
                           ))}
                         </SelectField>
                       ) : (
-                        <Badge tone={u.role.code === 'TENANT_ADMIN' ? 'brand' : 'neutral'}>{u.role.name}</Badge>
+                        <span className="text-gray-700">{u.role.name}</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-500">{u.workspaceCount}</td>
-                    <td className="px-4 py-3">
-                      <Badge tone={u.status === 'ACTIVE' ? 'brand' : 'neutral'} dot>
-                        {u.status === 'ACTIVE' ? 'Active' : 'Deactivated'}
-                      </Badge>
+                    <td className="block md:table-cell md:px-4 md:py-3">
+                      <Badge tone={u.status === 'ACTIVE' ? 'success' : 'neutral'}>{statusLabel(u.status)}</Badge>
                     </td>
-                    <td className="px-4 py-3 text-gray-500">{formatDate(u.joinedAt)}</td>
+                    <td className="ml-auto block tabular-nums text-gray-500 md:ml-0 md:table-cell md:px-4 md:py-3">
+                      {formatDate(u.joinedAt)}
+                    </td>
                   </tr>
                 ))}
                 {data!.items.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-10 text-center text-sm text-gray-400">
-                      No matching users found.
+                    <td colSpan={4} className="block px-4 py-12 text-center text-sm text-gray-500 md:table-cell">
+                      {t('Không có người dùng phù hợp.', 'No matching users.')}
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
             {data!.total > PAGE_SIZE && (
-              <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3 text-xs text-gray-500">
-                <span>
-                  {data!.total} users · page {page}/{totalPages}
+              <div className="flex items-center justify-between gap-3 border-t border-gray-200 px-4 py-3 text-sm text-gray-500">
+                <span className="tabular-nums">
+                  {t('Trang', 'Page')} {page}/{totalPages}
                 </span>
                 <div className="flex gap-2">
-                  <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="rounded border border-gray-200 px-2.5 py-1 disabled:opacity-40">
-                    Previous
-                  </button>
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
+                    inline
+                    className="lg:!h-8"
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => p - 1)}
+                  >
+                    {t('Trang trước', 'Previous')}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    inline
+                    className="lg:!h-8"
                     disabled={page >= totalPages}
                     onClick={() => setPage((p) => p + 1)}
-                    className="rounded border border-gray-200 px-2.5 py-1 disabled:opacity-40"
                   >
-                    Next
-                  </button>
+                    {t('Trang sau', 'Next')}
+                  </Button>
                 </div>
               </div>
             )}
-          </Card>
+          </div>
         )}
       </div>
+      {roleGuard.confirm}
     </DashboardLayout>
   )
 }

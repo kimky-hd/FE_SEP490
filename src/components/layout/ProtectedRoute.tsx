@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
-import { Navigate, useLocation } from 'react-router-dom'
+import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { FullPageSpinner } from '@/components/ui/Spinner'
 
-export function ProtectedRoute({ children }: { children: ReactNode }) {
+export function ProtectedRoute({ children }: { children?: ReactNode }) {
   const { isAuthenticated, isBootstrapping } = useAuth()
   const location = useLocation()
 
@@ -13,5 +13,5 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
     return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
   }
 
-  return <>{children}</>
+  return children === undefined ? <Outlet /> : <>{children}</>
 }

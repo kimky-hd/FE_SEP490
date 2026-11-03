@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { AuthCard, AuthCardEyebrow } from '@/components/layout/AuthCard'
+import { AuthCard, authLinkClass } from '@/components/layout/AuthCard'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
-import { Tag } from '@/components/ui/Eyebrow'
 import { companyApi } from '@/api/companyApi'
 import { ApiError } from '@/lib/apiClient'
 import { useAuth } from '@/context/AuthContext'
+import { useI18n } from '@/i18n'
 
 interface MatchedCompany {
   id: number
@@ -20,13 +20,8 @@ export function DomainMatchPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { refreshMe } = useAuth()
-  const company = (location.state as { company?: MatchedCompany } | null)?.company ?? {
-    id: 1,
-    name: 'Acme Fintech Corp',
-    domain: 'fintechcorp.com',
-    logoUrl: null,
-    autoJoinEnabled: true,
-  }
+  const { t } = useI18n()
+  const company = (location.state as { company?: MatchedCompany } | null)?.company
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -61,35 +56,38 @@ export function DomainMatchPage() {
           // rơi xuống thông báo lỗi chung bên dưới
         }
       }
-      setError('Có lỗi xảy ra, vui lòng thử lại.')
+      setError(t('Có lỗi xảy ra, vui lòng thử lại.', 'Something went wrong. Please try again.'))
     } finally {
       setIsSubmitting(false)
     }
   }
 
   return (
-    <AuthCard>
-      <AuthCardEyebrow>// Phát hiện tên miền</AuthCardEyebrow>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-950">Có vẻ như đội ngũ của bạn đã ở đây</h1>
-        <Tag tone="brand">@{company.domain}</Tag>
-      </div>
-      <p className="mt-2 text-sm text-gray-500">
-        Email của bạn khớp với không gian làm việc doanh nghiệp đã đăng ký của{' '}
-        <span className="font-semibold text-gray-800">{company.name}</span>.
-      </p>
-
-      <div className="mt-4 flex items-center gap-3 rounded-md border border-gray-200 bg-paper p-3">
+    <AuthCard
+      title={t('Đội của bạn đã có trên SSAM', 'Your team is already on SSAM')}
+      description={
+        <>
+          {t('Email của bạn khớp tên miền', 'Your email matches')}{' '}
+          <span className="font-medium text-gray-900">@{company.domain}</span>.
+        </>
+      }
+      footer={
+        <button type="button" onClick={() => navigate('/onboarding/company-setup')} className={authLinkClass}>
+          {t('Không phải công ty của bạn? Tạo công ty mới', 'Not your company? Create a new one')}
+        </button>
+      }
+    >
+      <div className="flex items-center gap-3 rounded-card border border-gray-200 bg-gray-50 p-3">
         {company.logoUrl ? (
-          <img src={company.logoUrl} alt="" className="h-9 w-9 rounded-sm" />
+          <img src={company.logoUrl} alt="" className="h-10 w-10 rounded-control object-cover" />
         ) : (
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm bg-brand-600 text-xs font-bold text-white">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-brand-600 text-sm font-bold text-white">
             {company.name.slice(0, 2).toUpperCase()}
           </span>
         )}
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-gray-900">{company.name}</p>
-          <p className="font-mono text-xs text-gray-400">{company.domain}</p>
+          <p className="truncate text-xs text-gray-500">{company.domain}</p>
         </div>
       </div>
 
@@ -101,16 +99,11 @@ export function DomainMatchPage() {
 
       <div className="mt-6">
         <Button onClick={handleJoin} isLoading={isSubmitting}>
-          {company.autoJoinEnabled ? `Tham gia ${company.name} →` : 'Gửi yêu cầu tham gia →'}
+          {company.autoJoinEnabled
+            ? t(`Tham gia ${company.name}`, `Join ${company.name}`)
+            : t('Gửi yêu cầu tham gia', 'Request to join')}
         </Button>
       </div>
-      <button
-        type="button"
-        onClick={() => navigate('/onboarding/company-setup')}
-        className="mt-3 w-full text-sm text-gray-400 hover:text-gray-600"
-      >
-        Không phải công ty của bạn? Tạo công ty mới
-      </button>
     </AuthCard>
   )
 }

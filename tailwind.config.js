@@ -1,55 +1,63 @@
-import colors from 'tailwindcss/colors'
-
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
-        // Trung tính ẤM (stone) thay cho gray lạnh mặc định của Tailwind: toàn bộ class `gray-*` hiện có
-        // trong app tự đổi theo, không phải sửa từng file. Nền giấy + xanh thương hiệu là cặp màu duy nhất
-        // trên trang, xanh chỉ dùng cho "liên kết / đã kiểm chứng / hành động chính".
-        gray: colors.stone,
-        paper: '#faf9f6',
+        // Trung tính lạnh (slate-xanh nhẹ) cho toàn bộ `gray-*`. Chữ phụ dùng gray-500 trở lên (≥ 4.5:1 trên trắng).
+        gray: {
+          25: '#fcfcfd',
+          50: '#f9fafb',
+          100: '#f2f4f7',
+          200: '#e4e7ec',
+          300: '#d0d5dd',
+          400: '#98a2b3',
+          500: '#667085',
+          600: '#475467',
+          700: '#344054',
+          800: '#1d2939',
+          900: '#101828',
+          950: '#0c111d',
+        },
+        // Nền khung app (sidebar nằm trên nền này, nội dung là tấm trắng tách riêng).
+        paper: '#f2f4f7',
+        // Xanh dương thương hiệu: nút chính, liên kết, mục đang chọn.
         brand: {
+          50: '#eef2ff',
+          100: '#dfe6ff',
+          200: '#c7d4fe',
+          300: '#a3b8fd',
+          400: '#7591f8',
+          500: '#4f6ff1',
+          600: '#2f5bea',
+          700: '#2549c7',
+          800: '#1c3aa8',
+          900: '#1b3384',
+          950: '#131f4f',
+        },
+        // Trạng thái "ổn / đã liên kết / hoạt động".
+        success: {
           50: '#ecfdf3',
-          100: '#d1fae0',
-          200: '#a7f3c9',
-          300: '#6ee7ab',
-          400: '#34d485',
+          100: '#d1fadf',
+          200: '#abefc6',
           500: '#12b76a',
           600: '#079455',
           700: '#067647',
-          800: '#085d3a',
-          900: '#074d31',
-          950: '#03301f',
+          800: '#05603a',
         },
       },
       fontFamily: {
-        // Dùng chung 1 font duy nhất — Be Vietnam Pro — cho cả `font-sans` và `font-mono`. Trước đây
-        // `font-mono` trỏ IBM Plex Mono cho nhãn eyebrow/mã REQ-TC, nhưng muốn đồng bộ 1 font xuyên suốt
-        // thì đổi ở đây là đủ, không cần sửa từng chỗ dùng class `font-mono` trong toàn bộ app.
-        sans: ['"Be Vietnam Pro"', 'ui-sans-serif', 'system-ui', '-apple-system', '"Segoe UI"', 'Roboto', 'sans-serif'],
-        mono: ['"Be Vietnam Pro"', 'ui-sans-serif', 'system-ui', '-apple-system', '"Segoe UI"', 'Roboto', 'sans-serif'],
+        sans: ['Roboto', 'ui-sans-serif', 'system-ui', '-apple-system', '"Segoe UI"', 'sans-serif'],
       },
-      keyframes: {
-        blink: {
-          '0%, 100%': { opacity: '1' },
-          '50%': { opacity: '0' },
-        },
-        'pulse-ring': {
-          '0%': { boxShadow: '0 0 0 0 rgb(245 158 11 / 0.45)' },
-          '100%': { boxShadow: '0 0 0 8px rgb(245 158 11 / 0)' },
-        },
-        'draw-x': {
-          from: { transform: 'scaleX(0)' },
-          to: { transform: 'scaleX(1)' },
-        },
+      borderRadius: {
+        card: '12px',
+        control: '8px',
+        chip: '6px',
       },
-      animation: {
-        blink: 'blink 1.1s steps(2, start) infinite',
-        'pulse-ring': 'pulse-ring 1.8s ease-out infinite',
-        'draw-x': 'draw-x 0.7s cubic-bezier(0.22, 1, 0.36, 1) both',
+      boxShadow: {
+        xs: '0 1px 2px rgba(16,24,40,.05)',
+        pop: '0 12px 24px -6px rgba(16,24,40,.14), 0 4px 8px -4px rgba(16,24,40,.06)',
+        float: '0 24px 48px -12px rgba(16,24,40,.18)',
       },
     },
   },

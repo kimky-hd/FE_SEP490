@@ -1,5 +1,5 @@
 import { api } from '@/lib/apiClient'
-import type { ItemsDto, PermissionDto, RoleDto, RoleMemberDto, RoleScope } from '@/types/rbac'
+import type { ItemsDto, PermissionDto, RoleDto, RoleKind, RoleMemberDto, RoleScope } from '@/types/rbac'
 
 // doc/Workspace-RBAC-API-Contract.md §2 (danh mục quyền) và §3 (Role).
 
@@ -9,6 +9,8 @@ export interface RoleBody {
   description?: string
   scope: RoleScope
   permissionKeys: string[]
+  /** D05 (doc/BE-Changes-2026-10-28_30-API.md §E2): loại vai trò, chỉ có nghĩa với scope PROJECT. Mặc định OTHER. */
+  kind?: RoleKind
 }
 
 export const permissionApi = {

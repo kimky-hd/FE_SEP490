@@ -17,3 +17,24 @@ export const tokenStorage = {
     localStorage.removeItem(REFRESH_TOKEN_KEY)
   },
 }
+
+/** Key ngôn ngữ (src/i18n/index.tsx) — là tuỳ chọn của trình duyệt, không phải dữ liệu người dùng nên giữ lại. */
+const KEEP_KEYS = new Set(['ssam.lang'])
+
+/**
+ * Xoá mọi dữ liệu cục bộ của người dùng (mọi key `ssam.*` trong localStorage trừ ngôn ngữ): token, nháp
+ * wizard tạo dự án, mục/dự án gần đây, trạng thái cây tài liệu, tài liệu mở gần nhất, cờ lời mời, gợi ý đã
+ * xem, dữ liệu mock tài liệu… Gọi khi đăng xuất và khi phiên chết để người sau dùng chung máy không thấy lại.
+ */
+export function clearUserLocalData() {
+  try {
+    const keys: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith('ssam.') && !KEEP_KEYS.has(key)) keys.push(key)
+    }
+    keys.forEach((key) => localStorage.removeItem(key))
+  } catch {
+    // storage bị chặn (chế độ riêng tư…) — không có gì để xoá
+  }
+}

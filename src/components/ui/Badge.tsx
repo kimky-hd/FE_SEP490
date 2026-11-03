@@ -1,22 +1,24 @@
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
 
-type Tone = 'neutral' | 'brand' | 'amber' | 'red' | 'blue'
+type Tone = 'neutral' | 'brand' | 'success' | 'amber' | 'red' | 'blue'
 
+// Viên trạng thái: nền nhạt + viền cùng sắc. `brand` giữ nghĩa cũ "ổn / đang hoạt động" (xanh lá); `blue` là xanh thương hiệu.
 const toneClasses: Record<Tone, string> = {
-  neutral: 'border-gray-200 bg-gray-50 text-gray-600',
-  brand: 'border-brand-200 bg-brand-50 text-brand-700',
+  neutral: 'border-gray-200 bg-gray-50 text-gray-700',
+  brand: 'border-success-200 bg-success-50 text-success-700',
+  success: 'border-success-200 bg-success-50 text-success-700',
   amber: 'border-amber-200 bg-amber-50 text-amber-800',
   red: 'border-red-200 bg-red-50 text-red-700',
-  blue: 'border-blue-200 bg-blue-50 text-blue-700',
+  blue: 'border-brand-200 bg-brand-50 text-brand-800',
 }
 
-// Nhãn trạng thái gọn trong bảng/thẻ (Active, Hệ thống, Nhạy cảm…). Khác `Tag` ở chỗ không viết hoa mono.
+// Nhãn trạng thái gọn trong bảng/thẻ (Active, Hệ thống, Nhạy cảm…). Một dấu trạng thái mỗi dòng.
 export function Badge({ children, tone = 'neutral', dot }: { children: ReactNode; tone?: Tone; dot?: boolean }) {
   return (
     <span
       className={clsx(
-        'inline-flex items-center gap-1 whitespace-nowrap rounded-sm border px-1.5 py-0.5 text-[11px] font-medium',
+        'inline-flex flex-none items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium',
         toneClasses[tone],
       )}
     >

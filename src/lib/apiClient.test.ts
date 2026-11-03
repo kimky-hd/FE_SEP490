@@ -1,8 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import axios from 'axios'
 import MockAdapter from 'axios-mock-adapter'
-import { api, ApiError } from './apiClient'
+import { api, ApiError, isQuietWrite } from './apiClient'
 import { tokenStorage } from './storage'
+
+// Vài test thay window.location bằng object giả để bắt lệnh chuyển về /login — khôi phục lại sau mỗi test,
+// không thì file test khác chạy sau (cùng fork) mất history.pushState/location thật.
+const realLocation = Object.getOwnPropertyDescriptor(window, 'location')
+afterEach(() => {
+  if (realLocation) Object.defineProperty(window, 'location', realLocation)
+})
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL
 
@@ -234,6 +241,8 @@ describe('apiClient - tự động refresh token khi gặp 401', () => {
 
     apiMock.onGet('/secret').reply(401, { code: 'UNAUTHORIZED', message: 'expired' })
     axiosMock.onPost(`${BASE_URL}/auth/refresh`).reply(200, { ok: true })
+    localStorage.setItem('ssam.recentItems.1', '[]')
+    localStorage.setItem('ssam.lang', 'vi')
 
     Object.defineProperty(window, 'location', {
       configurable: true,
@@ -243,5 +252,20 @@ describe('apiClient - tự động refresh token khi gặp 401', () => {
     await expect(api.get('/secret')).rejects.toBeInstanceOf(ApiError)
     expect(tokenStorage.getAccessToken()).toBeNull()
     expect(tokenStorage.getRefreshToken()).toBeNull()
+    // Phiên chết -> xoá dữ liệu cục bộ của người dùng, giữ ngôn ngữ (F5).
+    expect(localStorage.getItem('ssam.recentItems.1')).toBeNull()
+    expect(localStorage.getItem('ssam.lang')).toBe('vi')
+    localStorage.removeItem('ssam.lang')
+  })
+})
+
+describe('apiClient - ghi "lặng" (tự lưu nội dung tài liệu)', () => {
+  it('chỉ PUT nội dung phiên bản là ghi lặng; các thao tác ghi khác vẫn báo toàn app', () => {
+    expect(isQuietWrite('put', '/documents/5/versions/9/content')).toBe(true)
+    expect(isQuietWrite('put', '/documents/5/versions/9/content?x=1')).toBe(true)
+    expect(isQuietWrite('post', '/documents/5/versions/9/submit')).toBe(false)
+    expect(isQuietWrite('post', '/documents/5/versions/9/content')).toBe(false)
+    expect(isQuietWrite('patch', '/documents/5')).toBe(false)
+    expect(isQuietWrite('put', '/projects/1/workflow')).toBe(false)
   })
 })

@@ -1,22 +1,30 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { AuthCard, AuthCardEyebrow } from '@/components/layout/AuthCard'
+import { AuthCard, authLinkClass } from '@/components/layout/AuthCard'
 import { TextField } from '@/components/ui/TextField'
 import { Button } from '@/components/ui/Button'
+import { Alert } from '@/components/ui/Alert'
 import { authApi } from '@/api/authApi'
-import { MailIcon } from '@/components/ui/icons'
+import { LockIcon, MailIcon } from '@/components/ui/icons'
+import { useI18n } from '@/i18n'
 
-const schema = z.object({
-  email: z.string().min(1, 'Vui lòng nhập email').email('Email không hợp lệ'),
-})
-type FormValues = z.infer<typeof schema>
+const buildSchema = (t: (vi: string, en: string) => string) =>
+  z.object({
+    email: z
+      .string()
+      .min(1, t('Vui lòng nhập email', 'Please enter your email'))
+      .email(t('Email không hợp lệ', 'Invalid email')),
+  })
+type FormValues = z.infer<ReturnType<typeof buildSchema>>
 
 export function ForgotPasswordPage() {
   const navigate = useNavigate()
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const { t } = useI18n()
+  const schema = useMemo(() => buildSchema(t), [t])
 
   const {
     register,
@@ -31,39 +39,41 @@ export function ForgotPasswordPage() {
       navigate('/forgot-password/sent', { state: { email: values.email } })
     } catch {
       // BE luôn trả 202 kể cả email không tồn tại; lỗi ở đây chỉ là lỗi mạng thật sự
-      setSubmitError('Có lỗi xảy ra, vui lòng thử lại.')
+      setSubmitError(t('Có lỗi xảy ra, vui lòng thử lại.', 'Something went wrong. Please try again.'))
     }
   }
 
   return (
-    <AuthCard>
-      <AuthCardEyebrow>// Quên mật khẩu</AuthCardEyebrow>
-      <h1 className="mt-3 text-3xl font-bold tracking-tight text-gray-950">Quên mật khẩu?</h1>
-      <p className="mt-2 text-sm text-gray-500">
-        Nhập email đăng ký, chúng tôi sẽ gửi link đặt lại mật khẩu.
-      </p>
+    <AuthCard
+      icon={<LockIcon className="h-5 w-5" />}
+      title={t('Quên mật khẩu?', 'Forgot your password?')}
+      description={t('Nhập email, chúng tôi sẽ gửi link đặt lại.', "Enter your email and we'll send a reset link.")}
+      footer={
+        <Link to="/login" className={authLinkClass}>
+          {t('Quay lại đăng nhập', 'Back to sign in')}
+        </Link>
+      }
+    >
+      {submitError && (
+        <div className="mb-4">
+          <Alert tone="error">{submitError}</Alert>
+        </div>
+      )}
 
-      {submitError && <p className="mt-4 text-sm text-red-600">{submitError}</p>}
-
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-6 space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
         <TextField
-          label="Email công việc"
+          label={t('Email công việc', 'Work email')}
           icon={<MailIcon className="h-4 w-4" />}
           type="email"
+          autoComplete="email"
           placeholder="name@company.com"
           error={errors.email?.message}
           {...register('email')}
         />
         <Button type="submit" isLoading={isSubmitting}>
-          Gửi link đặt lại mật khẩu
+          {t('Gửi link đặt lại mật khẩu', 'Send reset link')}
         </Button>
       </form>
-
-      <p className="mt-6 text-sm text-gray-500">
-        <Link to="/login" className="font-medium text-brand-700">
-          Quay lại đăng nhập
-        </Link>
-      </p>
     </AuthCard>
   )
 }

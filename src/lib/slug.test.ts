@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { slugify, toRoleCode, toProjectKey, PROJECT_KEY_PATTERN, ROLE_CODE_PATTERN, WORKSPACE_CODE_PATTERN } from './slug'
+import {
+  slugify,
+  toRoleCode,
+  toProjectKey,
+  PROJECT_KEY_PATTERN,
+  ROLE_CODE_PATTERN,
+  WORKSPACE_CODE_PATTERN,
+} from './slug'
 
 describe('slugify', () => {
   it('bỏ dấu tiếng Việt, đổi đ → d, nối bằng gạch ngang', () => {

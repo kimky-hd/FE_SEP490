@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { AuthCard, AuthCardEyebrow } from '@/components/layout/AuthCard'
+import { AuthCard, authLinkClass } from '@/components/layout/AuthCard'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
+import { EnvelopeOpenIcon } from '@/components/ui/icons'
 import { authApi } from '@/api/authApi'
+import { useI18n } from '@/i18n'
 
 const RESEND_COOLDOWN_SECONDS = 30
 
 export function VerifyEmailPendingPage() {
   const location = useLocation()
-  const email = (location.state as { email?: string } | null)?.email ?? 'sarah@fintechcorp.com'
+  const { t } = useI18n()
+  const email = (location.state as { email?: string } | null)?.email ?? ''
   const [cooldown, setCooldown] = useState(0)
   const [isSending, setIsSending] = useState(false)
   const [sent, setSent] = useState(false)
@@ -31,44 +34,44 @@ export function VerifyEmailPendingPage() {
       setSent(true)
       setCooldown(RESEND_COOLDOWN_SECONDS)
     } catch {
-      setSendError('Không gửi lại được email, vui lòng thử lại.')
+      setSendError(t('Không gửi lại được email, vui lòng thử lại.', 'Could not resend the email. Please try again.'))
     } finally {
       setIsSending(false)
     }
   }
 
   return (
-    <AuthCard>
-      <AuthCardEyebrow>// Xác thực email</AuthCardEyebrow>
-      <h1 className="mt-3 text-3xl font-bold tracking-tight text-gray-950">Kiểm tra hộp thư của bạn</h1>
-      <p className="mt-2 text-sm text-gray-500">
-        Chúng tôi đã gửi link xác thực tới{' '}
-        <span className="font-medium text-gray-800">{email || 'email của bạn'}</span>. Bấm vào link trong email để
-        kích hoạt tài khoản.
-      </p>
-
+    <AuthCard
+      icon={<EnvelopeOpenIcon className="h-5 w-5" />}
+      title={t('Kiểm tra hộp thư của bạn', 'Check your inbox')}
+      description={
+        <>
+          {t('Chúng tôi đã gửi link xác thực tới', 'We sent a verification link to')}{' '}
+          <span className="font-medium text-gray-900">{email || t('email của bạn', 'your email')}</span>.
+        </>
+      }
+      footer={
+        <Link to="/login" className={authLinkClass}>
+          {t('Quay lại đăng nhập', 'Back to sign in')}
+        </Link>
+      }
+    >
       {sent && !sendError && (
-        <div className="mt-4">
-          <Alert tone="success">Đã gửi lại email xác thực.</Alert>
+        <div className="mb-4">
+          <Alert tone="success">{t('Đã gửi lại email xác thực.', 'Verification email sent again.')}</Alert>
         </div>
       )}
       {sendError && (
-        <div className="mt-4">
+        <div className="mb-4">
           <Alert tone="error">{sendError}</Alert>
         </div>
       )}
 
-      <div className="mt-6">
-        <Button variant="secondary" onClick={handleResend} isLoading={isSending} disabled={!email || cooldown > 0}>
-          {cooldown > 0 ? `Gửi lại sau ${cooldown}s` : 'Không nhận được email? Gửi lại'}
-        </Button>
-      </div>
-
-      <p className="mt-6 text-sm text-gray-500">
-        <Link to="/login" className="font-medium text-brand-700">
-          Quay lại đăng nhập
-        </Link>
-      </p>
+      <Button variant="secondary" onClick={handleResend} isLoading={isSending} disabled={!email || cooldown > 0}>
+        {cooldown > 0
+          ? t(`Gửi lại sau ${cooldown}s`, `Resend in ${cooldown}s`)
+          : t('Không nhận được email? Gửi lại', "Didn't get the email? Resend")}
+      </Button>
     </AuthCard>
   )
 }

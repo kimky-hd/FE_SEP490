@@ -1,11 +1,16 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
-import { tokenStorage } from './storage'
+import { clearUserLocalData, tokenStorage } from './storage'
+import { clearCachedData, invalidateData } from './dataEvents'
 import type { ApiErrorBody } from '@/types/auth'
 
 export class ApiError extends Error {
   code: string
   errors?: Record<string, string[]>
   workflowIssues?: ApiErrorBody['workflowIssues']
+  /** D19: `current` của 409 VERSION_CONFLICT (người / lúc lưu bản trên máy chủ), nếu BE gửi. */
+  current?: ApiErrorBody['current']
+  /** Toàn bộ body lỗi (giữ các trường thêm ngoài code / message / errors). */
+  body: ApiErrorBody
   status: number
 
   constructor(status: number, body: ApiErrorBody) {
@@ -14,6 +19,8 @@ export class ApiError extends Error {
     this.code = body.code
     this.errors = body.errors
     this.workflowIssues = body.workflowIssues
+    this.current = body.current ?? undefined
+    this.body = body
   }
 }
 
@@ -78,7 +85,8 @@ async function refreshAccessToken(): Promise<string> {
     data = res.data
   } catch (err) {
     const status = axios.isAxiosError(err) ? err.response?.status : undefined
-    throw new RefreshFailure(status !== undefined && status >= 400 && status < 500)
+    // 429 (bị giới hạn tần suất) là lỗi tạm thời, không phải phiên chết: không đá người dùng ra màn đăng nhập.
+    throw new RefreshFailure(status !== undefined && status >= 400 && status < 500 && status !== 429)
   }
 
   if (typeof data?.accessToken !== 'string' || data.accessToken.length === 0) {
@@ -92,8 +100,27 @@ async function refreshAccessToken(): Promise<string> {
   return data.accessToken
 }
 
+// Thao tác ghi thành công → báo dữ liệu đổi để cache + các màn đang mở tự tải lại (trừ đăng nhập / refresh / đăng xuất).
+const WRITE_METHODS = new Set(['post', 'put', 'patch', 'delete'])
+const NON_DATA_PATHS = /\/auth\/(login|refresh|logout|google|register|verify-email|forgot-password|reset-password)/
+// Ghi "lặng" chỉ xoá cache: tự lưu chạy mỗi lần ngừng gõ và đã tự cập nhật state, báo toàn app thì mỗi
+// lượt lưu kéo theo ~10 request đọc.
+const QUIET_WRITE_PATHS = /\/documents\/\d+\/versions\/\d+\/content$/
+
+export function isQuietWrite(method: string, url: string) {
+  return method === 'put' && QUIET_WRITE_PATHS.test(url.split('?')[0])
+}
+
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const method = response.config.method?.toLowerCase() ?? 'get'
+    const url = response.config.url ?? ''
+    if (WRITE_METHODS.has(method) && !NON_DATA_PATHS.test(url)) {
+      if (isQuietWrite(method, url)) clearCachedData()
+      else invalidateData()
+    }
+    return response
+  },
   async (error: AxiosError<ApiErrorBody>) => {
     const originalRequest = error.config as InternalAxiosRequestConfig | undefined
 
@@ -101,11 +128,11 @@ api.interceptors.response.use(
     // nghiệp vụ thật, không phải access token hết hạn, nên không được kích hoạt refresh (nếu cố refresh mà
     // không có refresh token sẽ bị đá về /login giữa chừng luồng công khai).
     const shouldTryRefresh =
-      error.response?.status === 401
-      && originalRequest !== undefined
-      && !originalRequest._retry
-      && !originalRequest.skipAuth
-      && !originalRequest.url?.includes('/auth/refresh')
+      error.response?.status === 401 &&
+      originalRequest !== undefined &&
+      !originalRequest._retry &&
+      !originalRequest.skipAuth &&
+      !originalRequest.url?.includes('/auth/refresh')
 
     if (shouldTryRefresh) {
       originalRequest._retry = true
@@ -121,6 +148,9 @@ api.interceptors.response.use(
           return Promise.reject(toApiError(error))
         }
         tokenStorage.clear()
+        // Phiên chết: xoá luôn dữ liệu cục bộ của người dùng (nháp, gần đây, cache…) trước khi về /login.
+        clearUserLocalData()
+        clearCachedData()
         window.location.href = '/login'
         return Promise.reject(toApiError(error))
       }

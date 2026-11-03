@@ -3,6 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { AuthProvider, useAuth } from './AuthContext'
 import { tokenStorage } from '@/lib/storage'
+import { registerCache } from '@/lib/dataEvents'
 import { authApi } from '@/api/authApi'
 import type { MeResponseDto, UserDto } from '@/types/auth'
 
@@ -121,5 +122,30 @@ describe('AuthContext', () => {
 
     expect(tokenStorage.getAccessToken()).toBeNull()
     await waitFor(() => expect(result.current.user).toBeNull())
+  })
+  it('logout xoá mọi key ssam.* trong localStorage (trừ ngôn ngữ), giữ key ngoài app và xoá cache bộ nhớ', async () => {
+    tokenStorage.setTokens('access-1', 'refresh-1')
+    localStorage.setItem('ssam.lang', 'en')
+    localStorage.setItem('ssam.projectDraft.1.10', '{"name":"x"}')
+    localStorage.setItem('ssam.recentProjects.1', '[1]')
+    localStorage.setItem('ssam.docs.last.5', '42')
+    localStorage.setItem('ssam.mock.documents.v1', '{}')
+    localStorage.setItem('other.app', 'keep')
+    const clearCache = vi.fn()
+    registerCache(clearCache)
+    vi.mocked(authApi.me).mockResolvedValue(mockMeResponse)
+    vi.mocked(authApi.logout).mockResolvedValue({} as never)
+
+    const { result } = renderHook(() => useAuth(), { wrapper })
+    await waitFor(() => expect(result.current.isAuthenticated).toBe(true))
+    await result.current.logout()
+
+    const ssamKeys = Object.keys(localStorage).filter((k) => k.startsWith('ssam.'))
+    expect(ssamKeys).toEqual(['ssam.lang'])
+    expect(localStorage.getItem('ssam.lang')).toBe('en')
+    expect(localStorage.getItem('other.app')).toBe('keep')
+    expect(clearCache).toHaveBeenCalled()
+    localStorage.removeItem('other.app')
+    localStorage.removeItem('ssam.lang')
   })
 })

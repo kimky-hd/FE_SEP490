@@ -4,10 +4,6 @@
 
 @layer base {
   html {
-    /* Toàn bộ spacing/kích cỡ Tailwind tính theo rem (dựa vào font-size gốc), nên hạ xuống 90% cho
-       hiệu ứng tương đương "zoom 90%" của trình duyệt — web không có quyền tự đặt zoom thật của
-       trình duyệt, đây là cách tương đương không vỡ layout (khác với transform: scale()). */
-    font-size: 90%;
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -20,10 +16,77 @@
   }
 
   body {
-    @apply bg-paper font-sans text-gray-900;
+    @apply bg-paper font-sans text-gray-950;
+  }
+
+  /* Tiêu đề tự cân độ dài các dòng: không để một chữ lẻ rớt xuống dòng cuối. */
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
   }
 
   ::selection {
-    @apply bg-brand-200 text-brand-950;
+    @apply bg-brand-100 text-brand-950;
+  }
+
+  :focus-visible {
+    outline: 2px solid theme('colors.brand.500');
+    outline-offset: 2px;
+  }
+}
+
+/* Mô-típ dây truy xuất: vẽ dần từ nút đầu đến nút cuối, rồi nút cuối "bắt" vào. */
+@layer components {
+  .trace-draw {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: trace-draw 1.4s cubic-bezier(0.65, 0, 0.35, 1) 0.15s forwards;
+  }
+  .trace-node-end {
+    transform-box: fill-box;
+    transform-origin: center;
+    transform: scale(0);
+    animation: trace-node 0.5s cubic-bezier(0.16, 1, 0.3, 1) 1.45s forwards;
+  }
+  @keyframes trace-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes trace-node {
+    to {
+      transform: scale(1);
+    }
+  }
+  /* Cửa chớp: control phóng to mở từ mép phải, chữ bên trong lắng từ 1.12 về 1. */
+  .shutter {
+    clip-path: inset(0 0 0 100%);
+    transition: clip-path 0.8s cubic-bezier(0.77, 0, 0.18, 1);
+  }
+  .shutter > * {
+    transform: scale(1.12);
+    transform-origin: right bottom;
+    transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .shutter[data-open] {
+    clip-path: inset(0 0 0 0);
+  }
+  .shutter[data-open] > * {
+    transform: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .shutter,
+    .shutter > * {
+      clip-path: none;
+      transform: none;
+      transition: none;
+    }
+    .trace-draw,
+    .trace-node-end {
+      animation: none;
+      stroke-dashoffset: 0;
+      transform: none;
+    }
   }
 }

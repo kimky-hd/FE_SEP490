@@ -46,9 +46,7 @@ export const workspaceApi = {
 
   // --- Thành viên ---
   listMembers: (workspaceId: number, params: { search?: string; roleId?: number } = {}) =>
-    api
-      .get<ItemsDto<WorkspaceMemberDto>>(`/workspaces/${workspaceId}/members`, { params })
-      .then((r) => r.data.items),
+    api.get<ItemsDto<WorkspaceMemberDto>>(`/workspaces/${workspaceId}/members`, { params }).then((r) => r.data.items),
 
   listMemberCandidates: (workspaceId: number, search?: string) =>
     api
@@ -56,9 +54,7 @@ export const workspaceApi = {
       .then((r) => r.data.items),
 
   addMembers: (workspaceId: number, members: { userId: number; roleId: number | null }[]) =>
-    api
-      .post<ItemsDto<WorkspaceMemberDto>>(`/workspaces/${workspaceId}/members`, { members })
-      .then((r) => r.data.items),
+    api.post<ItemsDto<WorkspaceMemberDto>>(`/workspaces/${workspaceId}/members`, { members }).then((r) => r.data.items),
 
   changeMemberRole: (workspaceId: number, userId: number, roleId: number) =>
     api.patch<WorkspaceMemberDto>(`/workspaces/${workspaceId}/members/${userId}`, { roleId }).then((r) => r.data),

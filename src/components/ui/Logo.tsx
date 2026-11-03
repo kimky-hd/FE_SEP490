@@ -30,7 +30,7 @@ export function Logo({ className, inverted = false }: { className?: string; inve
       <LogoMark />
       <span
         className={clsx(
-          'font-mono text-[15px] font-semibold tracking-tight',
+          'tabular-nums text-[15px] font-semibold tracking-tight',
           inverted ? 'text-white' : 'text-gray-950',
         )}
       >

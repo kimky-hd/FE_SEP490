@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import clsx from 'clsx'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
-import { ErrorState, ForbiddenState, LoadingBlock } from '@/components/layout/PageParts'
+import { Card, ErrorState, ForbiddenState, LoadingBlock, PageHeader } from '@/components/layout/PageParts'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
 import { Badge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
-import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, CloseIcon, DocumentIcon } from '@/components/ui/icons'
+import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, DocumentIcon } from '@/components/ui/icons'
 import { useAuth } from '@/context/AuthContext'
 import { workspaceApi } from '@/api/workspaceApi'
 import { roleApi } from '@/api/roleApi'
@@ -19,6 +19,8 @@ import { hasPermission } from '@/lib/permissions'
 import { toProjectKey } from '@/lib/slug'
 import { draftToPhaseBody, templateToDraft, validateDraftPhases, type DraftPhase } from '@/lib/workflowDraft'
 import { PERMISSIONS } from '@/types/rbac'
+import { tr, useI18n } from '@/i18n'
+import { templateName } from '@/i18n/sdlc'
 import type { SdlcMethod, WorkflowIssue } from '@/types/project'
 import { PhaseWorkflowEditor } from '../PhaseWorkflowEditor'
 import { StepProjectInfo, type KeyCheck } from './StepProjectInfo'
@@ -28,13 +30,27 @@ import { clearDraft, loadDraft, saveDraft, validateStepOne, type WizardState, ty
 // Wizard tạo dự án 3 bước — Figma hàng 2 frame 02 → 03 → 04 · Screen List #16 ("General Info → Workflow Template →
 // Invite Members") · BF-02. Gửi 1 request duy nhất ở bước cuối (doc/Workspace-RBAC-API-Contract.md §10.4).
 
-const STEPS: { step: WizardStep; title: string; description: string }[] = [
-  { step: 1, title: 'Project & Phases', description: 'Định danh dự án & cấu hình các giai đoạn SDLC tuỳ biến.' },
-  { step: 2, title: 'Issue Workflow', description: 'Trạng thái issue, luật chuyển dịch & Kanban lanes.' },
-  { step: 3, title: 'Invite Users', description: 'Phân quyền thành viên: Product Owner, Tech Lead, Developers.' },
+// Tạo lúc render để đổi ngôn ngữ là cập nhật ngay.
+const getSteps = (): { step: WizardStep; title: string; description: string }[] => [
+  {
+    step: 1,
+    title: tr('Dự án và giai đoạn', 'Project and phases'),
+    description: tr('Tên, mã dự án và các giai đoạn làm việc.', 'Name, project key and work phases.'),
+  },
+  {
+    step: 2,
+    title: tr('Luồng issue', 'Issue workflow'),
+    description: tr('Trạng thái của issue và ai được chuyển bước.', 'Issue statuses and who can move them.'),
+  },
+  {
+    step: 3,
+    title: tr('Thành viên', 'Members'),
+    description: tr('Ai tham gia dự án và với vai trò gì.', 'Who joins the project and in what role.'),
+  },
 ]
 
 export function CreateProjectWizardPage() {
+  const { t, lang } = useI18n()
   const workspaceId = Number(useParams().workspaceId)
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -44,7 +60,10 @@ export function CreateProjectWizardPage() {
   const canCreate = workspace.data ? hasPermission(workspace.data.myPermissions, PERMISSIONS.projectCreate) : false
   const templates = useAsync(() => (canCreate ? projectApi.templates() : Promise.resolve([])), [canCreate])
   const projectRoles = useAsync(
-    () => (canCreate && companyId !== null ? roleApi.list(companyId, { scope: 'PROJECT', includeInactive: false }) : Promise.resolve([])),
+    () =>
+      canCreate && companyId !== null
+        ? roleApi.list(companyId, { scope: 'PROJECT', includeInactive: false })
+        : Promise.resolve([]),
     [canCreate, companyId],
   )
   const members = useAsync(
@@ -64,7 +83,7 @@ export function CreateProjectWizardPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [pendingMethod, setPendingMethod] = useState<SdlcMethod | null>(null)
   const [confirmCancel, setConfirmCancel] = useState(false)
-    const keyRequest = useRef(0)
+  const keyRequest = useRef(0)
 
   const ready = !!(templates.data?.length && projectRoles.data && members.data && user)
 
@@ -81,7 +100,8 @@ export function CreateProjectWizardPage() {
       }
       return
     }
-    const custom = templates.data!.find((t) => t.method === 'CUSTOM') ?? templates.data![0]
+    // Mặc định Scrum: quen thuộc nhất với đội nhỏ; pipeline vẫn sửa được ngay bên dưới.
+    const custom = templates.data!.find((x) => x.method === 'SCRUM') ?? templates.data![0]
     setState({
       step: 1,
       name: '',
@@ -96,9 +116,10 @@ export function CreateProjectWizardPage() {
     })
   }, [ready, state, user, workspaceId, templates.data, projectRoles.data])
 
-
-
-  const update = useCallback((patch: Partial<WizardState>) => setState((prev) => (prev ? { ...prev, ...patch } : prev)), [])
+  const update = useCallback(
+    (patch: Partial<WizardState>) => setState((prev) => (prev ? { ...prev, ...patch } : prev)),
+    [],
+  )
 
   // Key tự sinh theo tên cho tới khi người dùng tự sửa (badge "AUTO").
   useEffect(() => {
@@ -115,7 +136,8 @@ export function CreateProjectWizardPage() {
       setKeyCheck({ state: 'checking' })
       try {
         const result = await projectApi.checkKey(workspaceId, key)
-        if (id === keyRequest.current) setKeyCheck({ state: result.available ? 'available' : 'taken', suggestion: result.suggestion })
+        if (id === keyRequest.current)
+          setKeyCheck({ state: result.available ? 'available' : 'taken', suggestion: result.suggestion })
         return result.available
       } catch {
         if (id === keyRequest.current) setKeyCheck({ state: 'idle' })
@@ -133,7 +155,7 @@ export function CreateProjectWizardPage() {
 
   const clientIssues = useMemo(() => (state ? validateDraftPhases(state.phases) : []), [state])
   const issues = serverIssues ?? clientIssues
-  const template = templates.data?.find((t) => t.method === state?.sdlcMethod)
+  const template = templates.data?.find((x) => x.method === state?.sdlcMethod)
 
   if (workspace.isLoading && !workspace.data) {
     return (
@@ -145,28 +167,47 @@ export function CreateProjectWizardPage() {
   if (workspace.error || !workspace.data) {
     return (
       <DashboardLayout>
-        {isForbidden(workspace.error) ? <ForbiddenState /> : <ErrorState message={apiErrorMessage(workspace.error)} onRetry={workspace.reload} />}
+        {isForbidden(workspace.error) ? (
+          <ForbiddenState />
+        ) : (
+          <ErrorState message={apiErrorMessage(workspace.error)} onRetry={workspace.reload} />
+        )}
       </DashboardLayout>
     )
   }
   if (!canCreate) {
     return (
       <DashboardLayout>
-        <ForbiddenState message={`Bạn cần role có quyền “Tạo dự án” (project.create) trong workspace “${workspace.data.name}”, ví dụ Project Initiator.`} />
+        <ForbiddenState
+          message={t(
+            `Bạn cần role có quyền “Tạo dự án” (project.create) trong workspace “${workspace.data.name}”, ví dụ Project Initiator.`,
+            `You need a role with the “Create project” permission (project.create) in workspace “${workspace.data.name}”, such as Project Initiator.`,
+          )}
+        />
       </DashboardLayout>
     )
   }
   if (companyId === null) {
     return (
       <DashboardLayout>
-        <Alert tone="info">Dự án trong workspace cá nhân sẽ được hỗ trợ sau — role dự án được định nghĩa ở cấp công ty.</Alert>
+        <Alert tone="info">
+          {t(
+            'Dự án trong workspace cá nhân sẽ được hỗ trợ sau — role dự án được định nghĩa ở cấp công ty.',
+            'Projects in personal workspaces are coming later — project roles are defined at the company level.',
+          )}
+        </Alert>
       </DashboardLayout>
     )
   }
   if (workspace.data.status === 'ARCHIVED') {
     return (
       <DashboardLayout>
-        <Alert tone="warning">Workspace đã được lưu trữ, không tạo được dự án mới.</Alert>
+        <Alert tone="warning">
+          {t(
+            'Workspace đã được lưu trữ, không tạo được dự án mới.',
+            "The workspace is archived; new projects can't be created.",
+          )}
+        </Alert>
       </DashboardLayout>
     )
   }
@@ -189,14 +230,15 @@ export function CreateProjectWizardPage() {
   }
 
   const ws = workspace.data
+  const STEPS = getSteps()
   const roles = projectRoles.data ?? []
   const activePhase = state.phases.find((p) => p.key === activePhaseKey) ?? state.phases[0]
   const issuesOf = (phaseIndex: number) => issues.filter((i) => i.phaseIndex === phaseIndex)
 
   const applyMethod = (method: SdlcMethod) => {
-    const t = templates.data!.find((x) => x.method === method)!
+    const chosen = templates.data!.find((x) => x.method === method)!
     setServerIssues(null)
-    update({ sdlcMethod: method, phases: templateToDraft(t.phases, roles), phasesTouched: false, baseTemplateName: undefined })
+    update({ sdlcMethod: method, phases: templateToDraft(chosen.phases, roles), phasesTouched: false })
     setActivePhaseKey(null)
   }
 
@@ -214,7 +256,9 @@ export function CreateProjectWizardPage() {
         if (Object.keys(errors).length) return
         const available = keyCheck.state === 'available' ? true : await checkKey(state.key)
         if (!available) {
-          setStepOneErrors({ key: 'Project Key đã được dùng trong workspace' })
+          setStepOneErrors({
+            key: t('Project Key đã được dùng trong workspace', 'This project key is already used in the workspace'),
+          })
           return
         }
       }
@@ -255,7 +299,11 @@ export function CreateProjectWizardPage() {
         description: state.description.trim() || undefined,
         sdlcMethod: state.sdlcMethod,
         aiEnabled: state.aiEnabled,
-        phases: state.phases.map((p) => ({ name: p.name.trim(), description: p.description?.trim() || null, ...draftToPhaseBody(p) })),
+        phases: state.phases.map((p) => ({
+          name: p.name.trim(),
+          description: p.description?.trim() || null,
+          ...draftToPhaseBody(p),
+        })),
         members: state.members,
       })
       clearDraft(user!.id, ws.workspaceId)
@@ -286,31 +334,32 @@ export function CreateProjectWizardPage() {
     navigate(`/workspaces/${ws.workspaceId}/projects`)
   }
 
-  const savedLabel = savedAt ? new Date(savedAt).toLocaleTimeString('vi-VN') : null
+  const locale = lang === 'en' ? 'en-GB' : 'vi-VN'
+  const savedLabel = savedAt ? new Date(savedAt).toLocaleTimeString(locale) : null
 
   return (
     <DashboardLayout>
-      {/* Thanh tiêu đề wizard (Figma frame 02) */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <Link to={`/workspaces/${ws.workspaceId}/projects`} className="inline-flex items-center gap-1 text-gray-500 hover:text-gray-800">
-            <ArrowLeftIcon className="h-4 w-4" /> {ws.name}
-          </Link>
-          <span className="text-gray-300">/</span>
-          <span className="font-semibold text-gray-900">Tạo mới dự án</span>
-
-        </div>
-        {savedLabel && (
-          <span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-gray-500">
-            <CheckIcon className="h-3.5 w-3.5 text-brand-600" /> Đã lưu bản nháp: {savedLabel}
-          </span>
-        )}
-      </div>
+      <PageHeader
+        crumbs={[
+          { label: ws.name, to: `/workspaces/${ws.workspaceId}/projects` },
+          { label: t('Tạo mới dự án', 'New project') },
+        ]}
+        title={t('Tạo dự án mới', 'Create a project')}
+        actions={
+          savedLabel && (
+            <span className="inline-flex items-center gap-1.5 text-sm tabular-nums text-gray-500">
+              <CheckIcon className="h-4 w-4 text-success-600" aria-hidden="true" />{' '}
+              {t('Đã lưu nháp lúc', 'Draft saved at')} {savedLabel}
+            </span>
+          )
+        }
+      />
 
       {restoredAt && (
-        <div className="mt-4">
+        <div className="mt-6">
           <Alert tone="info">
-            Đã khôi phục bản nháp lưu lúc {new Date(restoredAt).toLocaleString('vi-VN')}.{' '}
+            {t('Đã khôi phục bản nháp lưu lúc', 'Restored the draft saved at')}{' '}
+            {new Date(restoredAt).toLocaleString(locale)}.{' '}
             <button
               type="button"
               className="font-semibold underline"
@@ -318,58 +367,70 @@ export function CreateProjectWizardPage() {
                 clearDraft(user!.id, ws.workspaceId)
                 setRestoredAt(null)
                 setMaxCompletedStep(0)
-                                setStepOneErrors({})
+                setStepOneErrors({})
                 setKeyCheck({ state: 'idle' })
-                setState(null) // effect khởi tạo lại từ mẫu Custom
+                setState(null) // effect khởi tạo lại từ mẫu Scrum
               }}
             >
-              Bỏ nháp, làm lại từ đầu
+              {t('Bỏ nháp, làm lại từ đầu', 'Discard draft and start over')}
             </button>
           </Alert>
         </div>
       )}
 
-      {/* Stepper */}
-      <ol className="mt-4 grid grid-cols-1 gap-2 rounded-md border border-gray-200 bg-white p-3 md:grid-cols-3">
-        {STEPS.map(({ step, title, description }) => {
-          const isPassed = step <= maxCompletedStep
+      {/* Stepper: chấm số + nhãn, xanh cho bước đang làm / đã xong. */}
+      <ol
+        aria-label={t('Các bước tạo dự án', 'Project creation steps')}
+        className="mt-6 flex items-center gap-2 sm:gap-3"
+      >
+        {STEPS.map(({ step, title, description }, i) => {
+          const isPassed = step <= maxCompletedStep && step !== state.step
           const isActive = step === state.step
           return (
-            <li key={step}>
+            <li
+              key={step}
+              className={clsx('flex min-w-0 items-center gap-2 sm:gap-3', i < STEPS.length - 1 && 'flex-1')}
+            >
               <button
                 type="button"
+                title={description}
                 disabled={step > Math.max(state.step, maxCompletedStep + 1)}
                 onClick={() => void goTo(step)}
-                className={clsx(
-                  'flex w-full gap-3 rounded-md border p-3 text-left transition-colors',
-                  isActive ? 'border-brand-500 bg-brand-50/50' : 'border-transparent hover:bg-gray-50 disabled:hover:bg-transparent',
-                )}
+                aria-current={isActive ? 'step' : undefined}
+                className="group flex min-h-11 shrink-0 items-center gap-2 rounded-control pr-1 text-left focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-100 disabled:cursor-not-allowed"
               >
                 <span
                   className={clsx(
-                    'flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-mono text-xs font-semibold',
-                    isPassed ? 'bg-brand-600 text-white' : isActive ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500',
+                    'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums transition-colors',
+                    isActive
+                      ? 'bg-brand-600 text-white ring-4 ring-brand-100'
+                      : isPassed
+                        ? 'bg-brand-600 text-white'
+                        : 'border border-gray-300 bg-white text-gray-500',
                   )}
                 >
-                  {isPassed ? <CheckIcon className="h-4 w-4" /> : String(step).padStart(2, '0')}
+                  {isPassed ? <CheckIcon className="h-3.5 w-3.5" /> : step}
                 </span>
-                <span className="min-w-0">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className={clsx('text-sm font-semibold', isActive ? 'text-brand-700' : 'text-gray-800')}>
-                      Bước {step}: {title}
-                    </span>
-                    <span
-                      className={clsx(
-                        'rounded-sm px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider',
-                        isPassed ? 'bg-brand-100 text-brand-700 font-semibold' : isActive ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500',
-                      )}
-                    >
-                      {isPassed ? 'Done' : isActive ? 'In progress' : 'Pending'}
-                    </span>
-                  </span>
-                  <span className="mt-0.5 block text-xs text-gray-500">{description}</span>
+                <span
+                  className={clsx(
+                    'whitespace-nowrap text-sm',
+                    isActive
+                      ? 'font-semibold text-gray-950'
+                      : isPassed
+                        ? 'font-medium text-gray-700 group-hover:text-gray-950'
+                        : 'text-gray-500',
+                    !isActive && 'hidden sm:inline',
+                  )}
+                >
+                  {title}
                 </span>
               </button>
+              {i < STEPS.length - 1 && (
+                <span
+                  aria-hidden="true"
+                  className={clsx('h-px min-w-4 flex-1', step <= maxCompletedStep ? 'bg-brand-600' : 'bg-gray-200')}
+                />
+              )}
             </li>
           )
         })}
@@ -393,59 +454,73 @@ export function CreateProjectWizardPage() {
         )}
 
         {state.step === 2 && activePhase && (
-          <section className="rounded-md border border-gray-200 bg-white">
-            <div className="border-b border-gray-200 px-5 py-4">
-              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-gray-400">Pipeline engine / Transition governance</p>
-              <h2 className="mt-1 text-xl font-semibold tracking-tight text-gray-950">Configure Issue Status & Transitions</h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Xác lập các trạng thái xử lý issue, trạng thái khởi tạo và ma trận phân quyền chuyển bước (State Machine) cho từng phase.
+          <Card>
+            <div className="px-5 pt-5 sm:px-6">
+              <h2 className="text-base font-semibold text-gray-950">{t('Luồng issue', 'Issue workflow')}</h2>
+              <p className="mt-0.5 text-sm text-gray-500">
+                {t(
+                  'Trạng thái của issue trong từng giai đoạn và ai được chuyển bước.',
+                  'Issue statuses in each phase and who can move them.',
+                )}
               </p>
             </div>
-            <div className="flex gap-1 overflow-x-auto border-b border-gray-200 px-3 pt-2">
+            <div className="mt-4 flex gap-5 overflow-x-auto border-b border-gray-200 px-5 sm:px-6">
               {state.phases.map((phase, index) => {
                 const count = issuesOf(index).length
+                const isCurrent = phase.key === activePhase.key
                 return (
                   <button
                     key={phase.key}
                     type="button"
+                    aria-pressed={isCurrent}
                     onClick={() => setActivePhaseKey(phase.key)}
                     className={clsx(
-                      '-mb-px flex items-center gap-2 whitespace-nowrap border-b-2 px-3 pb-2 pt-1 text-sm font-medium',
-                      phase.key === activePhase.key ? 'border-brand-600 text-gray-950' : 'border-transparent text-gray-500 hover:text-gray-800',
+                      '-mb-px flex min-h-11 items-center gap-2 whitespace-nowrap border-b-2 px-0.5 pb-2.5 pt-1 text-sm transition-colors',
+                      isCurrent
+                        ? 'border-brand-600 font-medium text-gray-950'
+                        : 'border-transparent text-gray-600 hover:text-gray-950',
                     )}
                   >
-                    <span className="font-mono text-[10px] text-gray-400">P{index + 1}</span>
                     {phase.name}
                     {count > 0 ? (
-                      <span className="rounded-full bg-red-100 px-1.5 text-[10px] font-semibold text-red-700">{count}</span>
+                      <span
+                        className="rounded-full border border-red-200 bg-red-50 px-1.5 text-xs font-medium tabular-nums text-red-700"
+                        aria-label={t(`${count} lỗi`, `${count} ${count === 1 ? 'error' : 'errors'}`)}
+                      >
+                        {count}
+                      </span>
                     ) : (
-                      <CheckIcon className="h-3.5 w-3.5 text-brand-600" />
+                      <CheckIcon className="h-3.5 w-3.5 text-success-600" aria-label={t('Hợp lệ', 'Valid')} />
                     )}
                   </button>
                 )
               })}
             </div>
-            <div className="p-5">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm text-gray-600">
-                  Phase <span className="font-semibold text-gray-900">{activePhase.name}</span>
-                  {activePhase.description && <span className="text-gray-400"> — {activePhase.description}</span>}
-                </p>
-                {template?.phases.some((p) => p.name === activePhase.name) && (
-                  <Button type="button" variant="ghost" inline className="!h-8 !px-2 text-xs" onClick={() => resetPhaseToTemplate(activePhase)}>
-                    Khôi phục theo mẫu {template.name}
-                  </Button>
-                )}
-              </div>
+            <div className="p-5 sm:p-6">
+              {(activePhase.description || template?.phases.some((p) => p.name === activePhase.name)) && (
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm text-gray-500">{activePhase.description}</p>
+                  {template?.phases.some((p) => p.name === activePhase.name) && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      inline
+                      className="!px-2 text-sm lg:!h-8"
+                      onClick={() => resetPhaseToTemplate(activePhase)}
+                    >
+                      {t('Khôi phục theo mẫu', 'Reset to template')} {templateName(template.method, template.name)}
+                    </Button>
+                  )}
+                </div>
+              )}
               <PhaseWorkflowEditor
                 phase={activePhase}
                 onChange={updatePhase}
                 roles={roles}
                 issues={issuesOf(state.phases.indexOf(activePhase))}
               />
-
             </div>
-          </section>
+          </Card>
         )}
 
         {state.step === 3 && (
@@ -469,59 +544,66 @@ export function CreateProjectWizardPage() {
         </div>
       )}
 
-      {/* Footer hành động (Figma frame 02–04) */}
-      <div className="sticky bottom-0 z-10 mt-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-gray-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur">
-        <div className="flex items-center gap-2">
+      {/* Thanh hành động dính đáy: Quay lại (phụ) bên trái, Tiếp (chính) bên phải. */}
+      <div className="sticky bottom-0 z-10 -mx-4 -mb-6 mt-8 border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-10 lg:-mb-8 lg:rounded-b-card lg:px-10">
+        {state.step === 2 && issues.length > 0 && (
+          <p className="mb-2 text-sm text-red-700 sm:text-right" role="alert">
+            {(() => {
+              const phaseCount = new Set(issues.map((i) => i.phaseIndex)).size
+              return t(
+                `Còn ${issues.length} lỗi ở ${phaseCount} giai đoạn. Sửa xong mới sang bước 3.`,
+                `${issues.length} ${issues.length === 1 ? 'error' : 'errors'} left in ${phaseCount} ${phaseCount === 1 ? 'phase' : 'phases'}. Fix them to continue to step 3.`,
+              )
+            })()}
+          </p>
+        )}
+        <div className="flex items-center justify-between gap-2">
           {state.step === 1 ? (
             <Button type="button" variant="ghost" inline onClick={() => setConfirmCancel(true)}>
-              <CloseIcon className="h-4 w-4" /> Huỷ bỏ
+              {t('Huỷ bỏ', 'Cancel')}
             </Button>
           ) : (
             <Button type="button" variant="secondary" inline onClick={() => void goTo((state.step - 1) as WizardStep)}>
-              <ArrowLeftIcon className="h-4 w-4" /> Back: {STEPS[state.step - 2].title}
+              <ArrowLeftIcon className="h-4 w-4" /> {t('Quay lại', 'Back')}
             </Button>
           )}
-          <span className="hidden font-mono text-[10px] text-gray-400 md:inline">Chỉ lưu nháp khi bấm 'Lưu bản nháp' (chưa gửi lên máy chủ).</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            inline
-            onClick={() => {
-              const at = saveDraft(user!.id, ws.workspaceId, state)
-              setSavedAt(at)
-              setRestoredAt(null)
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              inline
+              title={t('Bản nháp chỉ lưu trên trình duyệt này.', 'Drafts are saved in this browser only.')}
+              onClick={() => {
+                const at = saveDraft(user!.id, ws.workspaceId, state)
+                setSavedAt(at)
+                setRestoredAt(null)
                 setMaxCompletedStep(0)
-            }}
-          >
-            <DocumentIcon className="h-4 w-4" /> Lưu bản nháp
-          </Button>
-          {state.step < 3 ? (
-            <Button type="button" inline onClick={() => void goTo((state.step + 1) as WizardStep)}>
-              Next: {STEPS[state.step].title} <ArrowRightIcon className="h-4 w-4" />
+              }}
+            >
+              <DocumentIcon className="h-4 w-4 sm:hidden" />{' '}
+              <span className="sr-only sm:not-sr-only">{t('Lưu bản nháp', 'Save draft')}</span>
             </Button>
-          ) : (
-            <Button type="button" inline isLoading={isSubmitting} onClick={() => void submit()}>
-              Submit to Create Project
-            </Button>
-          )}
+            {state.step < 3 ? (
+              <Button type="button" inline onClick={() => void goTo((state.step + 1) as WizardStep)}>
+                {t('Tiếp tục', 'Continue')} <ArrowRightIcon className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button type="button" inline isLoading={isSubmitting} onClick={() => void submit()}>
+                {t('Tạo dự án', 'Create project')}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
-      {state.step === 2 && issues.length > 0 && (
-        <p className="mt-2 text-right text-xs text-red-600">
-          Còn {issues.length} lỗi workflow ở {new Set(issues.map((i) => i.phaseIndex)).size} phase — sửa xong mới sang bước 3.
-        </p>
-      )}
 
       <Modal
         open={pendingMethod !== null}
         onClose={() => setPendingMethod(null)}
-        title="Đổi phương pháp SDLC?"
+        title={t('Đổi phương pháp SDLC?', 'Change SDLC method?')}
         footer={
           <>
             <Button variant="secondary" inline onClick={() => setPendingMethod(null)}>
-              Giữ cấu hình hiện tại
+              {t('Giữ cấu hình hiện tại', 'Keep current setup')}
             </Button>
             <Button
               inline
@@ -530,14 +612,21 @@ export function CreateProjectWizardPage() {
                 setPendingMethod(null)
               }}
             >
-              Áp dụng mẫu mới
+              {t('Áp dụng mẫu mới', 'Apply new template')}
             </Button>
           </>
         }
       >
         <p className="text-sm text-gray-600">
-          Phase, trạng thái và luật chuyển bạn đã chỉnh sẽ bị thay bằng mẫu{' '}
-          <Badge>{templates.data?.find((t) => t.method === pendingMethod)?.name}</Badge>.
+          {t(
+            'Phase, trạng thái và luật chuyển bạn đã chỉnh sẽ bị thay bằng mẫu',
+            'The phases, statuses and transitions you edited will be replaced by the template',
+          )}{' '}
+          <Badge>
+            {pendingMethod &&
+              templateName(pendingMethod, templates.data?.find((x) => x.method === pendingMethod)?.name ?? '')}
+          </Badge>
+          .
         </p>
       </Modal>
 
@@ -545,19 +634,24 @@ export function CreateProjectWizardPage() {
         open={confirmCancel}
         tone="danger"
         onClose={() => setConfirmCancel(false)}
-        title="Huỷ tạo dự án?"
+        title={t('Huỷ tạo dự án?', 'Cancel project creation?')}
         footer={
           <>
             <Button variant="secondary" inline onClick={() => setConfirmCancel(false)}>
-              Tiếp tục soạn
+              {t('Tiếp tục soạn', 'Keep editing')}
             </Button>
             <Button inline onClick={discard} className="!bg-red-600 !shadow-none hover:!bg-red-700">
-              Huỷ và xoá nháp
+              {t('Huỷ và xoá nháp', 'Cancel and delete draft')}
             </Button>
           </>
         }
       >
-        <p className="text-sm text-gray-600">Bản nháp của wizard sẽ bị xoá. Muốn giữ lại để làm tiếp sau, hãy bấm “Save as Draft” rồi rời trang.</p>
+        <p className="text-sm text-gray-600">
+          {t(
+            'Bản nháp của wizard sẽ bị xoá. Muốn giữ lại để làm tiếp sau, hãy bấm “Lưu bản nháp” rồi rời trang.',
+            'The wizard draft will be deleted. To continue later, click “Save draft” and then leave the page.',
+          )}
+        </p>
       </Modal>
     </DashboardLayout>
   )

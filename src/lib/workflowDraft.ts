@@ -1,13 +1,7 @@
 // Mô hình "bản nháp" workflow dùng ở wizard tạo dự án (bước 1–2) và màn Cấu hình Workflow, cùng các hàm chuyển
 // qua lại giữa mẫu SDLC (§9.1), dữ liệu đã lưu (§12.1) và body gửi BE (§10.4 / §12.4).
 
-import type {
-  PhaseDto,
-  StatusCategory,
-  StatusInput,
-  TemplatePhase,
-  TransitionInput,
-} from '@/types/project'
+import type { PhaseDto, StatusCategory, StatusInput, TemplatePhase, TransitionInput } from '@/types/project'
 import type { RoleDto } from '@/types/rbac'
 import { DEFAULT_CATEGORY_COLOR, validatePhaseWorkflow } from './workflowValidation'
 import type { WorkflowIssue } from '@/types/project'
@@ -85,13 +79,23 @@ export function templateToDraft(phases: TemplatePhase[], projectRoles: RoleDto[]
     const statuses = phase.statuses.map((s) => {
       const key = uid('st')
       keyMap.set(s.key, key)
-      return { key, name: s.name, category: s.category, color: s.color, description: s.description, isInitial: s.isInitial, isActive: true }
+      return {
+        key,
+        name: s.name,
+        category: s.category,
+        color: s.color,
+        description: s.description,
+        isInitial: s.isInitial,
+        isActive: true,
+      }
     })
     const transitions = phase.transitions.map((t) => ({
       key: uid('tr'),
       from: keyMap.get(t.from)!,
       to: keyMap.get(t.to)!,
-      allowedRoleIds: t.allowedRoleCodes.map((code) => idOfCode.get(code)).filter((id): id is number => id !== undefined),
+      allowedRoleIds: t.allowedRoleCodes
+        .map((code) => idOfCode.get(code))
+        .filter((id): id is number => id !== undefined),
       requireComment: t.requireComment,
       commentHint: t.commentHint,
       condition: t.condition,

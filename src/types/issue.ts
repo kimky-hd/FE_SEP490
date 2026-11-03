@@ -1,124 +1,194 @@
-// Định nghĩa dữ liệu cho phân hệ Quản lý Công việc & Lỗi (Task & Bug Tracking / Issues)
+// Khớp 1-1 với doc/Issues-Testcases-API-Contract.md §2 (Kanban: issue, sprint, board) — sửa API thì sửa cả 2 chỗ.
+
 import type { StatusCategory } from './project'
-import type { TraceSyncStatus } from './document'
 
-export type IssueType = 'TASK' | 'BUG'
+export type IssueType = 'TASK' | 'BUG' | 'STORY' | 'DESIGN'
 export type IssuePriority = 'HIGHEST' | 'HIGH' | 'MEDIUM' | 'LOW'
-export type BugSeverity = 'BLOCKER' | 'CRITICAL' | 'MAJOR' | 'MINOR'
-export type TraceabilityStatus = TraceSyncStatus
+export const SPRINT_STATUSES = ['PLANNED', 'ACTIVE', 'COMPLETED'] as const
+export type SprintStatus = (typeof SPRINT_STATUSES)[number]
+export const ISSUE_ACTIVITY_ACTIONS = [
+  'CREATED',
+  'UPDATED',
+  'TRANSITIONED',
+  'ASSIGNED',
+  'SPRINT_CHANGED',
+  'REQ_LINKED',
+  'REQ_ACKED',
+  'REQ_CHANGED',
+  'COMMENTED',
+  'DELETED',
+] as const
+/** D10: `REQ_CHANGED` do hệ thống ghi, actor = { userId: 0, fullName: 'SSAM' }. */
+export type IssueActivityAction = (typeof ISSUE_ACTIVITY_ACTIONS)[number]
+export type RunResultLite = 'NOT_RUN' | 'PASS' | 'FAIL' | 'BLOCKED'
 
-export type DepartmentLabel =
-  | 'Backend Team'
-  | 'Frontend Team'
-  | 'BA & Product'
-  | 'QA / Testing Team'
-  | 'DevOps & SecOps'
-  | 'UI/UX Design'
+export const ISSUE_TYPES: IssueType[] = ['TASK', 'BUG', 'STORY', 'DESIGN']
+export const ISSUE_PRIORITIES: IssuePriority[] = ['HIGHEST', 'HIGH', 'MEDIUM', 'LOW']
 
-export type DataClassification = 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL_PII' | 'RESTRICTED'
+export interface UserRef {
+  userId: number
+  fullName: string
+}
 
-export type EnvironmentType = 'DEV' | 'STAGING' | 'UAT' | 'PRODUCTION'
+/** REQ liên kết, giải theo bản baseline mới nhất (§1.2, §3). */
+export interface ReqRefDto {
+  documentId: number
+  documentCode: string
+  reqUid: string
+  /** null nếu REQ đã bị xoá khỏi tài liệu. */
+  reqKey: string | null
+  title: string | null
+  freshness: 'FRESH' | 'STALE' | null
+  /** vd 'Đổi trong bản 1.2' khi REQ thay đổi sau khi liên kết / ack. */
+  changedNote: string | null
+}
 
-export interface IssueWatcher {
+export interface RequirementRef {
+  documentId: number
+  reqUid: string
+}
+
+export interface BoardColumnDto {
+  statusId: number
   name: string
-  role: string
-}
-
-export interface IssueComment {
-  id: string
-  authorName: string
-  authorRole: string
-  authorAvatar?: string
-  body: string
-  mentions?: string[]
-  createdAt: string
-}
-
-export interface IssueActivity {
-  id: string
-  authorName: string
-  action: string
-  details?: string
-  timestamp: string
-}
-
-export interface ProjectIssue {
-  id: string
-  projectId: number
-  key: string // VD: 'CORE-101', 'TEST-102'
-  type: IssueType
-  summary: string
-  description: string
-
-  // Dành riêng cho BUG
-  severity?: BugSeverity
-  stepsToReproduce?: string
-  linkedTestCaseCode?: string // VD: 'TC-01'
-
-  // Quy trình 2 tầng (Đồng bộ với Project.phases và Workflow)
+  category: StatusCategory
+  color: string | null
   phaseId: number
   phaseName: string
-  statusId: number
-  statusName: string
-  statusCategory: StatusCategory // 'TODO' | 'IN_PROGRESS' | 'DONE'
-
-  // Thuộc tính quản trị & Nhân sự 4 vai trò
-  priority: IssuePriority
-  storyPoints?: number // 1, 2, 3, 5, 8...
-  originalEstimate?: string // '2h', '1d 4h', '3d'
-  dueDate?: string // 'YYYY-MM-DD'
-
-  // Nhân sự & Trách nhiệm (4 vai trò)
-  assigneeName: string
-  assigneeRole: string
-  assigneeAvatar?: string
-  ownerName: string
-  ownerRole: string
-  reporterName: string
-  reporterRole: string
-  watchers: IssueWatcher[]
-
-  // Phân loại Tổ chức, Phân hệ & Bảo mật
-  departmentLabel: DepartmentLabel
-  component: string
-  dataClassification: DataClassification
-  environment: EnvironmentType
-  labels: string[]
-
-  createdAt: string
-  updatedAt: string
-
-  // Cầu nối Truy xuất với Tài liệu Đặc tả (Requirement REQ Link)
-  linkedDocumentId?: number
-  linkedRequirementItemId?: string
-  linkedRequirementKeyCode?: string // VD: 'REQ-01'
-  linkedRequirementTitle?: string
-  traceabilityStatus: TraceabilityStatus // 'FRESH' | 'UNCONFIRMED_STALE' | 'CONFIRMED_STALE'
-
-  // Bình luận và Nhật ký hoạt động bất biến
-  comments: IssueComment[]
-  activityLog: IssueActivity[]
+  position: number
+  /** D14: trạng thái khởi đầu của giai đoạn (nút "+" dưới cột, issue mới). */
+  isInitial: boolean
+  wipLimit: number | null
 }
 
-export interface IssueFilterState {
-  search: string
-  type: 'ALL' | 'TASK' | 'BUG'
-  priority: 'ALL' | IssuePriority
-  phaseId: number | 'ALL'
-  statusCategory: 'ALL' | StatusCategory
-  assignee: string | 'ALL'
-  departmentLabel: 'ALL' | DepartmentLabel
-  component: 'ALL' | string
-  dataClassification: 'ALL' | DataClassification
-  onlyMine: boolean
-  onlyStale: boolean
+export interface BoardDto {
+  columns: BoardColumnDto[]
+  activeSprint: SprintDto | null
 }
 
-export interface ProjectIssueStats {
+export interface IssueTestCounts {
   total: number
-  open: number
-  done: number
-  tasks: number
-  bugs: number
-  staleCount: number
+  pass: number
+  fail: number
+  blocked: number
+  notRun: number
+}
+
+export interface IssueSummaryDto {
+  issueId: number
+  key: string
+  type: IssueType
+  title: string
+  statusId: number
+  priority: IssuePriority
+  points: number | null
+  assignee: UserRef | null
+  sprintId: number | null
+  parentId: number | null
+  rank: string
+  labels: string[]
+  requirements: ReqRefDto[]
+  reqChanged: boolean
+  tests: IssueTestCounts
+  subtaskCount: number
+  subtaskDone: number
+  updatedAt: string
+}
+
+export interface IssueDetailDto extends IssueSummaryDto {
+  /** D25: text thuần (≤ 10 000 ký tự), không phải JSON TipTap. */
+  description: string | null
+  reporter: UserRef
+  dueDate: string | null
+  subtasks: IssueSummaryDto[]
+  testCases: { testCaseId: number; key: string; title: string; lastResult: RunResultLite | null }[]
+  allowedTransitions: { toStatusId: number; name: string }[]
+  can: { edit: boolean; assign: boolean; changeStatus: boolean; delete: boolean }
+  createdAt: string
+}
+
+export interface SprintDto {
+  sprintId: number
+  name: string
+  goal: string | null
+  startDate: string | null
+  endDate: string | null
+  status: SprintStatus
+  capacityPoints: number | null
+  committedPoints: number
+  donePoints: number
+  issueCount: number
+}
+
+export interface IssueCommentDto {
+  commentId: number
+  parentId: number | null
+  body: string
+  mentions: UserRef[]
+  author: UserRef
+  createdAt: string
+}
+
+export interface IssueActivityDto {
+  activityId: number
+  action: IssueActivityAction
+  actor: UserRef
+  note: string | null
+  createdAt: string
+}
+
+// ---------- Body ----------
+
+/** `sprintId`: 'active' | số | 'backlog'; `assigneeId`: 'me' | số. */
+export interface IssueListQuery {
+  sprintId?: 'active' | 'backlog' | number
+  assigneeId?: 'me' | number
+  type?: IssueType
+  statusId?: number
+  reqUid?: string
+  reqChanged?: boolean
+  search?: string
+  parentId?: number
+}
+
+export interface CreateIssueBody {
+  type: IssueType
+  title: string
+  description?: string | null
+  priority?: IssuePriority
+  points?: number | null
+  assigneeId?: number | null
+  sprintId?: number | null
+  parentId?: number | null
+  labels?: string[]
+  requirementRefs?: RequirementRef[]
+  /**
+   * Ngoài hợp đồng v1.0 (đề xuất): tạo thẳng ở một trạng thái IsInitial của phase khác (nút "+ Tạo issue" dưới cột).
+   * Bỏ trống = trạng thái IsInitial của phase đầu.
+   */
+  statusId?: number
+}
+
+export interface UpdateIssueBody {
+  title?: string
+  description?: string | null
+  type?: IssueType
+  priority?: IssuePriority
+  points?: number | null
+  assigneeId?: number | null
+  sprintId?: number | null
+  labels?: string[]
+  dueDate?: string | null
+}
+
+export interface CreateSprintBody {
+  name: string
+  goal?: string | null
+  startDate?: string | null
+  endDate?: string | null
+  capacityPoints?: number | null
+}
+
+export interface UpdateSprintBody extends Partial<CreateSprintBody> {
+  status?: 'ACTIVE'
 }

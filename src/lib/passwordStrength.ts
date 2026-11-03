@@ -1,6 +1,8 @@
 // Đúng checklist hiển thị ở ảnh Figma #1 (Đăng ký): tối thiểu 8 ký tự, có chữ số,
 // có hoa & thường, có ký tự đặc biệt. Dùng lại ở RegisterPage và ResetPasswordPage.
 
+import { tr } from '@/i18n'
+
 export interface PasswordChecklist {
   minLength: boolean
   hasDigit: boolean
@@ -27,3 +29,9 @@ export function isPasswordValid(password: string): boolean {
 }
 
 export const PASSWORD_STRENGTH_LABEL = ['Rất yếu', 'Yếu', 'Trung bình', 'Khá', 'Mạnh']
+export const PASSWORD_STRENGTH_LABEL_EN = ['Very weak', 'Weak', 'Fair', 'Good', 'Strong']
+
+// Nhãn độ mạnh theo ngôn ngữ hiện tại (score 0–4).
+export function passwordStrengthLabel(score: number): string {
+  return tr(PASSWORD_STRENGTH_LABEL[score] ?? '', PASSWORD_STRENGTH_LABEL_EN[score] ?? '')
+}

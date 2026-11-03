@@ -9,6 +9,7 @@ import { SearchIcon } from '@/components/ui/icons'
 import { workspaceApi } from '@/api/workspaceApi'
 import { apiErrorMessage } from '@/lib/apiErrors'
 import type { RoleDto, UserRefDto, WorkspaceMemberDto } from '@/types/rbac'
+import { useI18n } from '@/i18n'
 
 interface Props {
   open: boolean
@@ -23,6 +24,7 @@ const SEARCH_DEBOUNCE_MS = 250
 
 // UC-26 / UC §II.5.5: chọn người từ danh sách nhân viên công ty chưa ở trong workspace, gán chung 1 role.
 export function AddMembersModal({ open, workspaceId, roles, onClose, onAdded }: Props) {
+  const { t } = useI18n()
   const [search, setSearch] = useState('')
   const [candidates, setCandidates] = useState<UserRefDto[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -89,15 +91,21 @@ export function AddMembersModal({ open, workspaceId, roles, onClose, onAdded }: 
     <Modal
       open={open}
       onClose={onClose}
-      title="Thêm thành viên vào workspace"
-      description="Chọn nhân viên trong công ty. Người chưa có tài khoản hãy mời ở mục Mời thành viên."
+      title={t('Thêm thành viên vào workspace', 'Add members to workspace')}
+      description={t(
+        'Chọn nhân viên trong công ty. Người chưa có tài khoản hãy mời ở mục Mời thành viên.',
+        'Pick people from your company. For people without an account, use Invite members.',
+      )}
       footer={
         <>
           <Button variant="secondary" inline onClick={onClose}>
-            Huỷ
+            {t('Huỷ', 'Cancel')}
           </Button>
           <Button inline disabled={selected.size === 0} isLoading={isSubmitting} onClick={() => void submit()}>
-            Thêm {selected.size > 0 ? `${selected.size} người` : ''}
+            {t('Thêm', 'Add')}{' '}
+            {selected.size > 0
+              ? t(`${selected.size} người`, `${selected.size} ${selected.size === 1 ? 'person' : 'people'}`)
+              : ''}
           </Button>
         </>
       }
@@ -106,26 +114,28 @@ export function AddMembersModal({ open, workspaceId, roles, onClose, onAdded }: 
         {error && <Alert tone="error">{error}</Alert>}
 
         <label className="relative block">
-          <span className="sr-only">Tìm nhân viên</span>
-          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <span className="sr-only">{t('Tìm nhân viên', 'Search people')}</span>
+          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
           <input
             autoFocus
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm theo tên hoặc email…"
-            className="h-10 w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
+            placeholder={t('Tìm theo tên hoặc email…', 'Search by name or email…')}
+            className="h-10 w-full rounded-control border border-gray-300 bg-white pl-9 pr-3 text-sm text-gray-900 shadow-xs placeholder:text-gray-500 focus:border-brand-600 focus:outline-none focus:ring-4 focus:ring-brand-100"
           />
         </label>
 
-        <div className="max-h-64 overflow-y-auto rounded-md border border-gray-200">
+        <div className="max-h-64 overflow-y-auto rounded-control border border-gray-200">
           {isLoading && candidates.length === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-gray-400">Đang tải…</p>
+            <p className="px-3 py-6 text-center text-sm text-gray-500">{t('Đang tải…', 'Loading…')}</p>
           ) : candidates.length === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-gray-400">
-              {search ? 'Không tìm thấy nhân viên phù hợp.' : 'Mọi nhân viên đều đã ở trong workspace.'}
+            <p className="px-3 py-6 text-center text-sm text-gray-500">
+              {search
+                ? t('Không tìm thấy nhân viên phù hợp.', 'No matching people found.')
+                : t('Mọi nhân viên đều đã ở trong workspace.', 'Everyone is already in this workspace.')}
             </p>
           ) : (
-            <ul className="divide-y divide-gray-100">
+            <ul className="divide-y divide-gray-200">
               {candidates.map((c) => {
                 const checked = selected.has(c.userId)
                 return (
@@ -133,7 +143,7 @@ export function AddMembersModal({ open, workspaceId, roles, onClose, onAdded }: 
                     <label
                       className={clsx(
                         'flex cursor-pointer items-center gap-3 px-3 py-2.5 transition-colors',
-                        checked ? 'bg-brand-50/60' : 'hover:bg-gray-50',
+                        checked ? 'bg-brand-50' : 'hover:bg-gray-50',
                       )}
                     >
                       <input
@@ -156,8 +166,8 @@ export function AddMembersModal({ open, workspaceId, roles, onClose, onAdded }: 
         </div>
 
         <SelectField
-          label="Role trong workspace"
-          hint="Áp dụng cho tất cả người được chọn"
+          label={t('Role trong workspace', 'Workspace role')}
+          hint={t('Áp dụng cho tất cả người được chọn', 'Applies to everyone selected')}
           value={roleId}
           onChange={(e) => setRoleId(Number(e.target.value))}
         >

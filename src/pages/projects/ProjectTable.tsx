@@ -1,102 +1,95 @@
 import { Link } from 'react-router-dom'
 import clsx from 'clsx'
-import { Card } from '@/components/layout/PageParts'
 import { Badge } from '@/components/ui/Badge'
 import { formatRelative } from '@/lib/format'
+import { tr, useI18n } from '@/i18n'
 import type { ProjectDto, SdlcMethod } from '@/types/project'
+import { CodeChip, tableWrap, th, theadRow } from '@/components/ui/listControls'
 
+// Nhãn tiếng Việt cố định — giữ cho chỗ cũ còn import; code mới dùng `sdlcLabel()` (đổi theo ngôn ngữ).
 export const SDLC_LABEL: Record<SdlcMethod, string> = {
   SCRUM: 'Agile Scrum',
-  WATERFALL: 'Waterfall',
-  ITERATIVE: 'Iterative & Incremental',
-  V_MODEL: 'V-Model',
   KANBAN: 'Kanban',
-  SPIRAL: 'Spiral Model',
-  RAD: 'RAD / Rapid Prototyping',
-  CUSTOM: 'Custom SDLC',
+  CUSTOM: 'SDLC tuỳ chỉnh',
 }
 
-// Bảng dự án — mockup "Dự án" (cột Mã · Dự án · Trạng thái · Issue · Tài liệu · Phụ trách · Cập nhật), FR §III.5.1.
-export function ProjectTable({ projects, emptyText, showWorkspace }: { projects: ProjectDto[]; emptyText: string; showWorkspace?: boolean }) {
+export function sdlcLabel(method: SdlcMethod): string {
+  if (method === 'CUSTOM') return tr('SDLC tuỳ chỉnh', 'Custom SDLC')
+  return SDLC_LABEL[method]
+}
+
+// Bảng dự án: tối đa 5 cột. Tên + mã nằm chung một ô (mã là chip xám), phương pháp là dòng phụ.
+// Không có cột Trạng thái: danh sách luôn được lọc theo một trạng thái ở trên (bộ lọc đã nói rõ).
+// Cột Issue / Tài liệu được bỏ cho tới khi các module đó có thật.
+export function ProjectTable({
+  projects,
+  emptyText,
+  showWorkspace,
+}: {
+  projects: ProjectDto[]
+  emptyText: string
+  showWorkspace?: boolean
+}) {
+  const { t } = useI18n()
   return (
-    <Card className="overflow-x-auto">
-      <table className="w-full min-w-[820px] text-sm">
-        <thead>
-          <tr className="border-b border-gray-200 text-left font-mono text-[10px] uppercase tracking-[0.12em] text-gray-500">
-            <th className="px-4 py-3 font-medium">Key</th>
-            <th className="px-4 py-3 font-medium">Project</th>
-            {showWorkspace && <th className="px-4 py-3 font-medium">Workspace</th>}
-            <th className="px-4 py-3 font-medium">Status</th>
-            <th className="px-4 py-3 font-medium">Issues</th>
-            <th className="px-4 py-3 font-medium">Requirements</th>
-            <th className="px-4 py-3 font-medium">Lead</th>
-            <th className="px-4 py-3 font-medium">Your Role</th>
-            <th className="px-4 py-3 font-medium">Updated</th>
+    <div className={tableWrap}>
+      <table className="w-full text-sm">
+        <thead className="hidden sm:table-header-group">
+          <tr className={theadRow}>
+            <th className={th}>{t('Dự án', 'Project')}</th>
+            {showWorkspace && <th className={clsx(th, 'hidden md:table-cell')}>Workspace</th>}
+            <th className={clsx(th, 'hidden lg:table-cell')}>{t('Phụ trách', 'Lead')}</th>
+            <th className={th}>{t('Role của bạn', 'Your role')}</th>
+            <th className={clsx(th, 'text-right')}>{t('Cập nhật', 'Updated')}</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100">
+        <tbody className="divide-y divide-gray-200">
           {projects.map((p) => (
-            <tr key={p.projectId} className={clsx(p.status === 'ARCHIVED' && 'bg-gray-50/60 text-gray-500')}>
-              <td className="px-4 py-3">
-                <span className="rounded-sm border border-gray-300 px-1.5 py-0.5 font-mono text-[11px] font-medium text-gray-700">{p.key}</span>
-              </td>
-              <td className="px-4 py-3">
-                <div className="flex items-center gap-1.5">
-                  <Link to={`/projects/${p.projectId}`} className="font-semibold text-gray-900 hover:text-brand-700 hover:underline">
+            <tr
+              key={p.projectId}
+              className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 transition-colors hover:bg-gray-50 sm:table-row sm:p-0"
+            >
+              <td className="block w-full sm:table-cell sm:w-auto sm:px-4 sm:py-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Link
+                    to={`/projects/${p.projectId}`}
+                    className="truncate font-medium text-gray-950 hover:text-brand-700 hover:underline"
+                  >
                     {p.name}
                   </Link>
-                  <a
-                    href={`/projects/${p.projectId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={`Open ${p.name} Space in a new browser tab`}
-                    className="inline-flex h-5 w-5 items-center justify-center rounded border border-gray-200 bg-gray-50 text-[10px] font-bold text-gray-500 hover:bg-gray-100 hover:text-gray-900 transition-colors"
-                  >
-                    ↗
-                  </a>
+                  <CodeChip>{p.key}</CodeChip>
                 </div>
-                <p className="text-xs text-gray-400">
-                  {SDLC_LABEL[p.sdlcMethod]} · {p.phaseCount} phases
+                <p className="mt-0.5 truncate text-xs text-gray-500">
+                  {sdlcLabel(p.sdlcMethod)} · {p.phaseCount} {t('giai đoạn', p.phaseCount === 1 ? 'phase' : 'phases')}
+                  {/* Màn hẹp: workspace không có cột riêng nên nối vào dòng phụ. */}
+                  {showWorkspace && <span className="md:hidden"> · {p.workspaceName}</span>}
                 </p>
               </td>
-              {showWorkspace && <td className="px-4 py-3 text-gray-500">{p.workspaceName}</td>}
-              <td className="px-4 py-3">
-                {p.status === 'ACTIVE' ? (
-                  <Badge tone="brand" dot>
-                    Active
-                  </Badge>
+              {showWorkspace && <td className="hidden px-4 py-3 text-gray-700 md:table-cell">{p.workspaceName}</td>}
+              <td className="hidden px-4 py-3 text-gray-700 lg:table-cell">
+                {p.lead?.fullName ?? <span className="text-gray-500">—</span>}
+              </td>
+              <td className="block sm:table-cell sm:px-4 sm:py-3">
+                {p.myRole ? (
+                  <Badge>{p.myRole.name}</Badge>
                 ) : (
-                  <Badge tone="amber" dot>
-                    Archived
-                  </Badge>
+                  <span className="text-xs text-gray-500">{t('Chỉ xem', 'View only')}</span>
                 )}
               </td>
-              <td className="px-4 py-3 text-gray-600">
-                <Link to={`/projects/${p.projectId}/issues`} className="hover:text-blue-600 hover:underline font-medium">
-                  📋 {p.openIssueCount} open / {p.doneIssueCount} done
-                </Link>
+              <td className="ml-auto block text-right text-xs text-gray-500 sm:table-cell sm:px-4 sm:py-3">
+                {formatRelative(p.updatedAt)}
               </td>
-              <td className="px-4 py-3 text-gray-600">
-                <Link to={`/projects/${p.projectId}/documents`} className="hover:text-emerald-600 hover:underline font-medium">
-                  📄 {p.documentCount} specs
-                </Link>
-              </td>
-              <td className="px-4 py-3 text-gray-700">{p.lead?.fullName ?? '—'}</td>
-              <td className="px-4 py-3">
-                {p.myRole ? <Badge tone={p.myRole.code === 'PROJECT_MANAGER' ? 'brand' : 'neutral'}>{p.myRole.name}</Badge> : <span className="text-xs text-gray-400">Viewer</span>}
-              </td>
-              <td className="px-4 py-3 text-xs text-gray-400">{formatRelative(p.updatedAt)}</td>
             </tr>
           ))}
           {projects.length === 0 && (
             <tr>
-              <td colSpan={showWorkspace ? 9 : 8} className="px-4 py-10 text-center text-sm text-gray-400">
+              <td colSpan={showWorkspace ? 5 : 4} className="px-4 py-10 text-center text-sm text-gray-500">
                 {emptyText}
               </td>
             </tr>
           )}
         </tbody>
       </table>
-    </Card>
+    </div>
   )
 }

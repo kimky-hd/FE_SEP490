@@ -9,14 +9,7 @@ interface SwitchProps {
   className?: string
 }
 
-export function Switch({
-  checked,
-  onChange,
-  disabled = false,
-  label,
-  size = 'md',
-  className,
-}: SwitchProps) {
+export function Switch({ checked, onChange, disabled = false, label, size = 'md', className }: SwitchProps) {
   const isSm = size === 'sm'
 
   return (
@@ -39,22 +32,22 @@ export function Switch({
           }
         }}
         className={clsx(
-          'relative inline-flex flex-shrink-0 transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2',
+          'relative inline-flex flex-shrink-0 transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-100',
           isSm ? 'h-5 w-9 rounded-full' : 'h-6 w-11 rounded-full',
-          checked ? 'bg-emerald-500' : 'bg-gray-200',
+          checked ? 'bg-brand-600' : 'bg-gray-200',
         )}
       >
         <span
           aria-hidden="true"
           className={clsx(
-            'pointer-events-none inline-block transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out',
+            'pointer-events-none inline-block transform rounded-full bg-white ring-0 transition duration-200 ease-in-out',
             isSm
               ? clsx('h-3.5 w-3.5 mt-[3px] ml-[3px]', checked ? 'translate-x-4' : 'translate-x-0')
               : clsx('h-5 w-5 mt-[2px] ml-[2px]', checked ? 'translate-x-5' : 'translate-x-0'),
           )}
         />
       </button>
-      {label && <span className="text-sm font-medium text-gray-700">{label}</span>}
+      {label && <span className="text-sm font-medium text-gray-900">{label}</span>}
     </label>
   )
 }

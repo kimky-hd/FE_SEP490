@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
-import { Card } from '@/components/layout/PageParts'
 import { ErrorState, ForbiddenState, LoadingBlock } from '@/components/layout/PageParts'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
@@ -8,8 +7,8 @@ import { Avatar } from '@/components/ui/Avatar'
 import { Alert } from '@/components/ui/Alert'
 import { Modal } from '@/components/ui/Modal'
 import { SelectField } from '@/components/ui/SelectField'
-import { Switch } from '@/components/ui/Switch'
-import { PlusIcon, SearchIcon } from '@/components/ui/icons'
+import { useRoleChangeGuard } from '@/lib/useRoleChangeGuard'
+import { PlusIcon } from '@/components/ui/icons'
 import { useAuth } from '@/context/AuthContext'
 import { workspaceApi } from '@/api/workspaceApi'
 import { roleApi } from '@/api/roleApi'
@@ -19,12 +18,16 @@ import { formatDate } from '@/lib/format'
 import { PERMISSIONS, type RoleDto, type WorkspaceMemberDto } from '@/types/rbac'
 import { useWorkspaceContext } from './WorkspaceLayout'
 import { AddMembersModal } from './AddMembersModal'
+import { SectionBar } from '@/components/layout/tabParts'
+import { useI18n } from '@/i18n'
+import { SearchInput, tableWrap, th, theadRow } from '@/components/ui/listControls'
 
 // Tab Thành viên (FR §III.4.5, UC-25~27, wireframe "Thành viên Workspace"). Role ở đây chỉ áp dụng cho
 // workspace này — cùng 1 người có thể mang role khác ở workspace khác (WorkspaceMembers.role_id).
 export function WorkspaceMembersPage() {
   const { workspace, can, isArchived, isPersonal, reload: reloadWorkspace } = useWorkspaceContext()
   const { user, refreshMe } = useAuth()
+  const { t } = useI18n()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
@@ -44,6 +47,13 @@ export function WorkspaceMembersPage() {
         : Promise.resolve([]),
     [canManage, workspace.companyId],
   )
+
+  // Gọi trước mọi return sớm (luật hooks); `apply` bọc lại vì changeRole khai báo phía dưới.
+  const roleGuard = useRoleChangeGuard<WorkspaceMemberDto>({
+    selfId: user?.id,
+    scopeLabel: t('workspace này', 'this workspace'),
+    apply: (m, roleId) => changeRole(m, roleId),
+  })
 
   if (isPersonal) return <Navigate to={`/workspaces/${workspaceId}`} replace />
   if (!can(PERMISSIONS.workspaceMemberView)) return <ForbiddenState />
@@ -65,16 +75,24 @@ export function WorkspaceMembersPage() {
     if (memberUserId === user?.id) await Promise.all([refreshMe(), reloadWorkspace()])
   }
 
-  const changeRole = async (member: WorkspaceMemberDto, roleId: number) => {
+  const changeRole = async (member: WorkspaceMemberDto, roleId: number): Promise<boolean> => {
     setNotice(null)
     setSavingUserId(member.userId)
     try {
       const updated = await workspaceApi.changeMemberRole(workspaceId, member.userId, roleId)
       members.setData((prev) => prev?.map((m) => (m.userId === updated.userId ? updated : m)))
-      setNotice({ tone: 'success', text: `Đã đổi role của ${member.fullName} thành ${updated.role.name}.` })
+      setNotice({
+        tone: 'success',
+        text: t(
+          `Đã đổi role của ${member.fullName} thành ${updated.role.name}.`,
+          `Changed ${member.fullName}’s role to ${updated.role.name}.`,
+        ),
+      })
       await afterSelfChange(member.userId)
+      return true
     } catch (err) {
       setNotice({ tone: 'error', text: apiErrorMessage(err) })
+      return false
     } finally {
       setSavingUserId(null)
     }
@@ -92,7 +110,10 @@ export function WorkspaceMembersPage() {
         navigate('/workspaces')
         return
       }
-      setNotice({ tone: 'success', text: `Đã vô hiệu hóa thành viên ${removing.fullName} trong workspace.` })
+      setNotice({
+        tone: 'success',
+        text: t(`Đã gỡ ${removing.fullName} khỏi workspace.`, `Removed ${removing.fullName} from the workspace.`),
+      })
       await Promise.all([members.reload(), reloadWorkspace()])
     } catch (err) {
       setNotice({ tone: 'error', text: apiErrorMessage(err) })
@@ -104,30 +125,34 @@ export function WorkspaceMembersPage() {
 
   return (
     <div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <label className="relative block sm:w-72">
-          <span className="sr-only">Tìm thành viên</span>
-          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Tìm theo tên hoặc email…"
-            className="h-9 w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
-          />
-        </label>
-        {canManage && (
-          <Button inline onClick={() => setAddOpen(true)}>
-            <PlusIcon className="h-4 w-4" />
-            Thêm thành viên
-          </Button>
-        )}
-      </div>
+      <SectionBar
+        title={t('Thành viên', 'Members')}
+        caption={members.data ? String(members.data.length) : undefined}
+        actions={
+          <>
+            <SearchInput
+              className="w-full sm:w-64"
+              value={search}
+              onChange={setSearch}
+              label={t('Tìm thành viên', 'Search members')}
+              placeholder={t('Tìm theo tên hoặc email…', 'Search by name or email…')}
+            />
+            {canManage && (
+              <Button inline onClick={() => setAddOpen(true)}>
+                <PlusIcon className="h-4 w-4" />
+                {t('Thêm thành viên', 'Add members')}
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {notice && (
         <div className="mt-4">
           <Alert tone={notice.tone}>{notice.text}</Alert>
         </div>
       )}
+      {roleGuard.undoBar}
 
       <div className="mt-4">
         {members.isLoading && !members.data ? (
@@ -135,42 +160,51 @@ export function WorkspaceMembersPage() {
         ) : members.error ? (
           <ErrorState message={apiErrorMessage(members.error)} onRetry={members.reload} />
         ) : (
-          <Card className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 text-left font-mono text-[10px] uppercase tracking-[0.12em] text-gray-500">
-                  <th className="px-4 py-3 font-medium">Thành viên</th>
-                  <th className="px-4 py-3 font-medium">Role (workspace này)</th>
-                  <th className="px-4 py-3 font-medium">Role công ty</th>
-                  <th className="px-4 py-3 font-medium">Tham gia</th>
-                  <th className="px-4 py-3 text-right font-medium">Trạng thái</th>
+          <div className={tableWrap}>
+            <table className="w-full text-sm">
+              <thead className="hidden sm:table-header-group">
+                <tr className={theadRow}>
+                  <th className={th}>{t('Thành viên', 'Member')}</th>
+                  <th className={th}>{t('Role trong workspace', 'Workspace role')}</th>
+                  <th className={`${th} hidden lg:table-cell`}>{t('Role công ty', 'Company role')}</th>
+                  <th className={`${th} hidden md:table-cell`}>{t('Tham gia', 'Joined')}</th>
+                  <th className={`${th} text-right`}>
+                    <span className="sr-only">{t('Thao tác', 'Actions')}</span>
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-200">
                 {visible.map((m) => {
                   const isSelf = m.userId === user?.id
                   return (
-                    <tr key={m.userId} className="align-middle">
-                      <td className="px-4 py-3">
+                    <tr
+                      key={m.userId}
+                      className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 align-middle transition-colors hover:bg-gray-50 sm:table-row sm:p-0"
+                    >
+                      <td className="block w-full p-0 sm:table-cell sm:w-auto sm:px-4 sm:py-3">
                         <div className="flex items-center gap-3">
                           <Avatar name={m.fullName} />
                           <div className="min-w-0">
-                            <p className="truncate font-medium text-gray-900">
+                            <p className="truncate font-medium text-gray-950">
                               {m.fullName}
-                              {isSelf && <span className="ml-1.5 text-xs font-normal text-gray-400">(bạn)</span>}
+                              {isSelf && (
+                                <span className="ml-1.5 text-xs font-normal text-gray-500">{t('(bạn)', '(you)')}</span>
+                              )}
                             </p>
                             <p className="truncate text-xs text-gray-500">{m.email}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="block p-0 sm:table-cell sm:px-4 sm:py-3">
                         {canManage && roles.data && roles.data.length > 0 ? (
                           <SelectField
                             compact
-                            aria-label={`Role của ${m.fullName}`}
-                            value={m.role.roleId}
+                            aria-label={t(`Role của ${m.fullName}`, `Role of ${m.fullName}`)}
+                            value={roleGuard.valueFor(m)}
                             disabled={savingUserId === m.userId}
-                            onChange={(e) => void changeRole(m, Number(e.target.value))}
+                            onChange={(e) =>
+                              roleGuard.request(m, Number(e.target.value), e.target.selectedOptions[0]?.text ?? '')
+                            }
                             className="min-w-[11rem]"
                           >
                             {/* Role hiện tại có thể đã bị tắt → vẫn giữ trong danh sách để select không trống. */}
@@ -184,40 +218,52 @@ export function WorkspaceMembersPage() {
                             ))}
                           </SelectField>
                         ) : (
-                          <Badge tone={m.role.code === 'WORKSPACE_ADMIN' ? 'brand' : 'neutral'}>{m.role.name}</Badge>
+                          <Badge tone={m.role.code === 'WORKSPACE_ADMIN' ? 'blue' : 'neutral'}>{m.role.name}</Badge>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-gray-500">{m.companyRole.name}</td>
-                      <td className="px-4 py-3 text-gray-500">{formatDate(m.joinedAt)}</td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-2.5">
-                          <span className="text-xs font-medium text-emerald-700">Đang hoạt động</span>
-                          <Switch
-                            size="sm"
-                            checked={true}
-                            disabled={!(canManage || (isSelf && !isArchived))}
-                            onChange={() => setRemoving(m)}
-                          />
-                        </div>
+                      <td className="hidden px-4 py-3 text-gray-600 lg:table-cell">{m.companyRole.name}</td>
+                      <td className="hidden px-4 py-3 text-gray-600 md:table-cell">{formatDate(m.joinedAt)}</td>
+                      <td className="ml-auto block p-0 text-right sm:table-cell sm:px-4 sm:py-3">
+                        {(canManage || (isSelf && !isArchived)) && (
+                          <Button
+                            variant="ghost"
+                            inline
+                            className="!px-2.5 text-red-700 hover:!bg-red-50 hover:!text-red-800"
+                            aria-label={
+                              isSelf
+                                ? t('Rời workspace', 'Leave workspace')
+                                : t(`Gỡ ${m.fullName} khỏi workspace`, `Remove ${m.fullName} from workspace`)
+                            }
+                            onClick={() => setRemoving(m)}
+                          >
+                            {isSelf ? t('Rời workspace', 'Leave workspace') : t('Gỡ', 'Remove')}
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   )
                 })}
                 {visible.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-10 text-center text-sm text-gray-400">
-                      {keyword ? 'Không có thành viên phù hợp.' : 'Workspace chưa có thành viên.'}
+                    <td colSpan={5} className="px-4 py-10 text-center text-sm text-gray-500">
+                      {keyword
+                        ? t('Không có thành viên phù hợp.', 'No matching members.')
+                        : t('Workspace chưa có thành viên.', 'This workspace has no members yet.')}
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
-          </Card>
+          </div>
         )}
-        <p className="mt-3 text-xs text-gray-400">
-          Role ở đây chỉ áp dụng riêng cho workspace này — cùng một người có thể mang role khác ở workspace khác. Role
-          cấp công ty do Tenant Admin quản lý ở mục Người dùng.
-        </p>
+        {canManage && (
+          <p className="mt-3 text-xs text-gray-500">
+            {t(
+              'Role ở đây chỉ áp dụng cho workspace này. Role công ty được quản lý ở mục Người dùng.',
+              'Roles here apply only to this workspace. Company roles are managed under Users.',
+            )}
+          </p>
+        )}
       </div>
 
       {canManage && workspace.companyId !== null && (
@@ -228,7 +274,13 @@ export function WorkspaceMembersPage() {
           onClose={() => setAddOpen(false)}
           onAdded={async (added) => {
             setAddOpen(false)
-            setNotice({ tone: 'success', text: `Đã thêm ${added.length} thành viên.` })
+            setNotice({
+              tone: 'success',
+              text: t(
+                `Đã thêm ${added.length} thành viên.`,
+                `Added ${added.length} ${added.length === 1 ? 'member' : 'members'}.`,
+              ),
+            })
             await Promise.all([members.reload(), reloadWorkspace()])
           }}
         />
@@ -238,21 +290,32 @@ export function WorkspaceMembersPage() {
         open={removing !== null}
         tone="danger"
         onClose={() => setRemoving(null)}
-        title="Vô hiệu hóa thành viên trong workspace?"
+        title={
+          removing?.userId === user?.id
+            ? t('Rời workspace này?', 'Leave this workspace?')
+            : t('Gỡ thành viên khỏi workspace?', 'Remove member from workspace?')
+        }
         footer={
           <>
             <Button variant="secondary" inline onClick={() => setRemoving(null)}>
-              Huỷ
+              {t('Huỷ', 'Cancel')}
             </Button>
-            <Button inline isLoading={isRemoving} onClick={() => void confirmRemove()} className="!bg-red-600 hover:!bg-red-700 !shadow-none">
-              'Xác nhận vô hiệu hóa'
+            <Button
+              inline
+              isLoading={isRemoving}
+              onClick={() => void confirmRemove()}
+              className="!bg-red-700 hover:!bg-red-800"
+            >
+              {removing?.userId === user?.id
+                ? t('Rời workspace', 'Leave workspace')
+                : t('Gỡ khỏi workspace', 'Remove from workspace')}
             </Button>
           </>
         }
       >
         {removing && (
           <div className="space-y-3 text-sm text-gray-600">
-            <div className="flex items-center gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+            <div className="flex items-center gap-3 rounded-control border border-gray-200 bg-gray-50 px-3 py-2">
               <Avatar name={removing.fullName} size="sm" />
               <div className="min-w-0">
                 <p className="font-medium text-gray-900">{removing.fullName}</p>
@@ -262,15 +325,22 @@ export function WorkspaceMembersPage() {
               </div>
             </div>
             <p>
-              {removing.userId === user?.id ? 'Bạn' : 'Người này'} sẽ mất quyền truy cập workspace{' '}
-              <span className="font-semibold text-gray-900">{workspace.name}</span> và mọi dự án bên trong.
+              {removing.userId === user?.id
+                ? t('Bạn sẽ mất quyền truy cập workspace', 'You will lose access to the workspace')
+                : t('Người này sẽ mất quyền truy cập workspace', 'This person will lose access to the workspace')}{' '}
+              <span className="font-semibold text-gray-900">{workspace.name}</span>{' '}
+              {t('và mọi dự án bên trong.', 'and every project in it.')}
             </p>
             <p className="text-xs text-gray-500">
-              Thành viên sẽ được cập nhật trạng thái vô hiệu hóa (is_active = false). Lịch sử công việc, bình luận và dữ liệu đã tạo vẫn được bảo lưu nguyên vẹn trong hệ thống, có thể kích hoạt lại sau.
+              {t(
+                'Lịch sử công việc, bình luận và dữ liệu người này đã tạo vẫn được giữ nguyên. Có thể thêm lại vào workspace sau.',
+                'Their work history, comments and data are kept. They can be added back to the workspace later.',
+              )}
             </p>
           </div>
         )}
       </Modal>
+      {roleGuard.confirm}
     </div>
   )
 }

@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { AuthCard, AuthCardEyebrow } from '@/components/layout/AuthCard'
+import { AuthCard } from '@/components/layout/AuthCard'
 import { Button } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
+import { ClockIcon } from '@/components/ui/icons'
 import { companyApi } from '@/api/companyApi'
 import { useAuth } from '@/context/AuthContext'
+import { useI18n } from '@/i18n'
 
 interface LocationState {
   companyId?: number
@@ -16,11 +18,8 @@ export function PendingApprovalPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { refreshMe } = useAuth()
-  const {
-    companyId = 1,
-    requestId = 101,
-    companyName = 'Acme Fintech Corp',
-  } = (location.state as LocationState | null) ?? {}
+  const { t } = useI18n()
+  const { companyId, requestId, companyName } = (location.state as LocationState | null) ?? {}
   const [isChecking, setIsChecking] = useState(false)
   const [rejected, setRejected] = useState(false)
   const [checkError, setCheckError] = useState<string | null>(null)
@@ -39,37 +38,45 @@ export function PendingApprovalPage() {
       }
       if (status === 'rejected') setRejected(true)
     } catch {
-      setCheckError('Không kiểm tra được trạng thái, vui lòng thử lại.')
+      setCheckError(
+        t('Không kiểm tra được trạng thái, vui lòng thử lại.', 'Could not check the status. Please try again.'),
+      )
     } finally {
       setIsChecking(false)
     }
   }
 
   return (
-    <AuthCard>
-      <AuthCardEyebrow>// Đang chờ duyệt</AuthCardEyebrow>
-      <h1 className="mt-3 text-3xl font-bold tracking-tight text-gray-950">Yêu cầu đang chờ duyệt</h1>
-      <p className="mt-2 text-sm text-gray-500">
-        Quản trị viên của <span className="font-medium text-gray-800">{companyName ?? 'công ty'}</span> cần phê duyệt
-        yêu cầu tham gia của bạn. Bạn sẽ nhận được email khi có kết quả.
-      </p>
-
+    <AuthCard
+      icon={<ClockIcon className="h-5 w-5" />}
+      title={t('Yêu cầu đang chờ duyệt', 'Your request is pending')}
+      description={
+        <>
+          {t('Quản trị viên của', 'An admin of')}{' '}
+          <span className="font-medium text-gray-900">{companyName ?? t('công ty', 'the company')}</span>{' '}
+          {t(
+            'sẽ duyệt yêu cầu. Bạn sẽ nhận email khi có kết quả.',
+            "will review it. You'll get an email with the result.",
+          )}
+        </>
+      }
+    >
       {rejected && (
-        <div className="mt-4">
-          <Alert tone="warning">Yêu cầu tham gia của bạn đã bị từ chối.</Alert>
+        <div className="mb-4">
+          <Alert tone="warning">
+            {t('Yêu cầu tham gia của bạn đã bị từ chối.', 'Your request to join was declined.')}
+          </Alert>
         </div>
       )}
       {checkError && (
-        <div className="mt-4">
+        <div className="mb-4">
           <Alert tone="error">{checkError}</Alert>
         </div>
       )}
 
-      <div className="mt-6">
-        <Button variant="secondary" onClick={handleCheck} isLoading={isChecking}>
-          Kiểm tra lại
-        </Button>
-      </div>
+      <Button variant="secondary" onClick={handleCheck} isLoading={isChecking}>
+        {t('Kiểm tra lại', 'Check again')}
+      </Button>
     </AuthCard>
   )
 }

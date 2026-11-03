@@ -82,4 +82,12 @@ export interface ApiErrorBody {
   errors?: Record<string, string[]>
   /** Chỉ có ở 400 WORKFLOW_INVALID (doc/Workspace-RBAC-API-Contract.md §12.5). */
   workflowIssues?: import('./project').WorkflowIssue[]
+  /** D19: chỉ có ở 409 VERSION_CONFLICT (tuỳ chọn) — bản đang lưu trên máy chủ. */
+  current?: VersionConflictCurrent | null
+}
+
+export interface VersionConflictCurrent {
+  rowVersion: number
+  updatedAt: string
+  updatedBy: { userId: number; fullName: string }
 }

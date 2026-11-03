@@ -4,11 +4,17 @@ export type RoleScope = 'TENANT' | 'WORKSPACE' | 'PROJECT'
 export type WorkspaceStatus = 'ACTIVE' | 'ARCHIVED'
 export type MemberStatus = 'ACTIVE' | 'DEACTIVATED'
 
+/** D05: loại vai trò "làm việc" của role dự án (doc/BE-Changes-2026-10-28_30-API.md §E2). */
+export type RoleKind = 'BA' | 'DESIGNER' | 'QA' | 'DEV' | 'PM' | 'OTHER'
+export const ROLE_KINDS: RoleKind[] = ['BA', 'DESIGNER', 'QA', 'DEV', 'PM', 'OTHER']
+
 export interface RoleRefDto {
   roleId: number
   code: string | null
   name: string
   scope: RoleScope
+  /** D05: BE trả luôn; tuỳ chọn ở FE để chạy được với BE cũ / mock RBAC (khi thiếu thì đoán theo tên). */
+  kind?: RoleKind
 }
 
 export interface PermissionDto {
@@ -26,6 +32,8 @@ export interface RoleDto {
   name: string
   description: string | null
   scope: RoleScope
+  /** D05: loại vai trò (chỉ có nghĩa với scope PROJECT; TENANT / WORKSPACE luôn OTHER). */
+  kind?: RoleKind
   isSystem: boolean
   isLocked: boolean
   isActive: boolean
@@ -129,6 +137,8 @@ export const PERMISSIONS = {
   issueAssign: 'issue.assign',
   issueChangeStatus: 'issue.change_status',
   issueDelete: 'issue.delete',
+  // Key mới đề xuất trong doc/Issues-Testcases-API-Contract.md §0 (BE cần thêm vào PermissionKeys.cs).
+  sprintManage: 'sprint.manage',
   documentView: 'document.view',
   documentEdit: 'document.edit',
   documentApprove: 'document.approve',
@@ -139,6 +149,7 @@ export const PERMISSIONS = {
   figmaArchive: 'figma.archive',
   testCaseView: 'testcase.view',
   testCaseManage: 'testcase.manage',
+  testCaseExecute: 'testcase.execute',
   commentView: 'comment.view',
   commentWrite: 'comment.write',
   activityView: 'activity.view',

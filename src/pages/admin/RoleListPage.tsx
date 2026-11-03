@@ -2,24 +2,27 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import clsx from 'clsx'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
-import { Card, ErrorState, ForbiddenState, LoadingBlock, PageHeader } from '@/components/layout/PageParts'
+import { ErrorState, ForbiddenState, LoadingBlock, PageHeader } from '@/components/layout/PageParts'
 import { Button, buttonClasses } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Alert } from '@/components/ui/Alert'
-import { LockIcon, PlusIcon, SearchIcon } from '@/components/ui/icons'
+import { LockIcon, PlusIcon } from '@/components/ui/icons'
 import { useAuth } from '@/context/AuthContext'
-import { permissionApi, roleApi } from '@/api/roleApi'
+import { roleApi } from '@/api/roleApi'
 import { useAsync } from '@/lib/useAsync'
 import { apiErrorMessage } from '@/lib/apiErrors'
-import { SCOPE_LABEL, formatDate } from '@/lib/format'
+import { useI18n } from '@/i18n'
+import { scopeLabel } from '@/i18n/permissions'
 import { PERMISSIONS, type RoleDto, type RoleScope } from '@/types/rbac'
 import { RoleMembersModal } from './RoleMembersModal'
+import { CodeChip, SearchInput, tableWrap, th, theadRow } from '@/components/ui/listControls'
 
 type ScopeFilter = 'ALL' | RoleScope
 
 // Figma C "Role Catalog" (bản gọn) · UC-11~14 · FR §III.3.2.1.
 export function RoleListPage() {
   const { currentCompany, can } = useAuth()
+  const { t } = useI18n()
   const companyId = currentCompany?.companyId
   const canView = companyId !== undefined && can(PERMISSIONS.roleView)
   const canManage = canView && can(PERMISSIONS.roleManage)
@@ -30,19 +33,18 @@ export function RoleListPage() {
   const [membersOf, setMembersOf] = useState<RoleDto | null>(null)
 
   const roles = useAsync(() => (canView ? roleApi.list(companyId!) : Promise.resolve([])), [canView, companyId])
-  const catalog = useAsync(() => (canView ? permissionApi.list() : Promise.resolve([])), [canView])
 
   if (!canView) {
     return (
       <DashboardLayout>
-        <ForbiddenState message="Requires “View roles” permission (role.view)." />
+        <ForbiddenState
+          message={t('Cần quyền “Xem danh mục role” (role.view).', 'Requires the “View roles” permission (role.view).')}
+        />
       </DashboardLayout>
     )
   }
 
   const all = roles.data ?? []
-  const totalOfScope = (s: RoleScope) => (catalog.data ?? []).filter((p) => p.scope === s).length
-  const sensitiveKeys = new Set((catalog.data ?? []).filter((p) => p.isSensitive).map((p) => p.key))
   const keyword = search.trim().toLowerCase()
   const visible = all
     .filter((r) => scope === 'ALL' || r.scope === scope)
@@ -54,7 +56,12 @@ export function RoleListPage() {
     try {
       const updated = await roleApi.setActive(companyId!, role.roleId, !role.isActive)
       roles.setData((prev) => prev?.map((r) => (r.roleId === updated.roleId ? updated : r)))
-      setNotice({ tone: 'success', text: `${updated.isActive ? 'Enabled' : 'Disabled'} role ${updated.name}.` })
+      setNotice({
+        tone: 'success',
+        text: updated.isActive
+          ? t(`Đã bật role ${updated.name}.`, `Role ${updated.name} enabled.`)
+          : t(`Đã tắt role ${updated.name}.`, `Role ${updated.name} disabled.`),
+      })
     } catch (err) {
       setNotice({ tone: 'error', text: apiErrorMessage(err) })
     } finally {
@@ -62,73 +69,68 @@ export function RoleListPage() {
     }
   }
 
-  const stats = [
-    { label: 'Total Roles', value: all.length, sub: `${all.filter((r) => r.isSystem).length} system · ${all.filter((r) => !r.isSystem).length} custom · ${all.filter((r) => !r.isActive).length} disabled` },
-    { label: 'Company Level', value: all.filter((r) => r.scope === 'TENANT').length, sub: 'Assigned 1 role per user in company' },
-    { label: 'Workspace Level', value: all.filter((r) => r.scope === 'WORKSPACE').length, sub: 'Assigned per workspace' },
-    { label: 'Project Level', value: all.filter((r) => r.scope === 'PROJECT').length, sub: 'Assigned in project · used for workflow transitions' },
-  ]
+  const customCount = all.filter((r) => !r.isSystem).length
 
   return (
     <DashboardLayout>
       <PageHeader
-        eyebrow="// Organization Admin"
-        title="Roles & Permissions"
-        description="Define roles and grant permissions for each role. Company-level roles are assigned to company users; workspace-level roles are assigned per workspace."
+        title={t('Vai trò & quyền', 'Roles & permissions')}
+        description={
+          roles.data
+            ? t(`${all.length} role · ${customCount} tự tạo`, `${all.length} roles · ${customCount} custom`)
+            : undefined
+        }
         actions={
           canManage && (
             <Link to="/admin/roles/new" className={buttonClasses({ inline: true })}>
               <PlusIcon className="h-4 w-4" />
-              Create New Role
+              {t('Tạo role mới', 'New role')}
             </Link>
           )
         }
       />
 
-      <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {stats.map((s) => (
-          <Card key={s.label} className="p-4">
-            <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-gray-400">{s.label}</p>
-            <p className="mt-2 text-2xl font-semibold text-gray-950">{roles.data ? s.value : '—'}</p>
-            <p className="mt-0.5 text-[11px] text-gray-400">{s.sub}</p>
-          </Card>
-        ))}
-      </div>
-
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="inline-flex rounded-md border border-gray-200 bg-white p-0.5 text-sm">
-          {(
-            [
-              ['ALL', 'All', all.length],
-              ['TENANT', SCOPE_LABEL.TENANT, all.filter((r) => r.scope === 'TENANT').length],
-              ['WORKSPACE', SCOPE_LABEL.WORKSPACE, all.filter((r) => r.scope === 'WORKSPACE').length],
-              ['PROJECT', SCOPE_LABEL.PROJECT, all.filter((r) => r.scope === 'PROJECT').length],
-            ] as const
-          ).map(([value, label, count]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setScope(value)}
-              className={clsx(
-                'rounded px-3 py-1.5 font-medium transition-colors',
-                scope === value ? 'bg-gray-900 text-white' : 'text-gray-500 hover:text-gray-800',
-              )}
-            >
-              {label}
-              <span className={clsx('ml-1.5 text-xs', scope === value ? 'text-white/60' : 'text-gray-400')}>{count}</span>
-            </button>
-          ))}
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          label={t('Tìm role', 'Search roles')}
+          placeholder={t('Tìm theo tên hoặc mã role…', 'Search by role name or key…')}
+          className="sm:w-72"
+        />
+        {/* Thanh lọc phạm vi: một hàng, cuộn ngang trên màn hẹp. */}
+        <div
+          role="group"
+          aria-label={t('Lọc theo phạm vi', 'Filter by scope')}
+          className="-mx-4 flex overflow-x-auto px-4 sm:mx-0 sm:px-0"
+        >
+          <div className="inline-flex shrink-0 rounded-control border border-gray-200 bg-gray-50 p-0.5 text-sm">
+            {(
+              [
+                ['ALL', t('Tất cả', 'All'), all.length],
+                ['TENANT', scopeLabel('TENANT'), all.filter((r) => r.scope === 'TENANT').length],
+                ['WORKSPACE', scopeLabel('WORKSPACE'), all.filter((r) => r.scope === 'WORKSPACE').length],
+                ['PROJECT', scopeLabel('PROJECT'), all.filter((r) => r.scope === 'PROJECT').length],
+              ] as const
+            ).map(([value, label, count]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={scope === value}
+                onClick={() => setScope(value)}
+                className={clsx(
+                  'flex min-h-10 items-center whitespace-nowrap rounded-[6px] px-3 font-medium transition-colors lg:min-h-8',
+                  scope === value
+                    ? 'bg-white text-gray-950 shadow-xs ring-1 ring-gray-200'
+                    : 'text-gray-600 hover:text-gray-950',
+                )}
+              >
+                {label}
+                <span className="ml-1.5 tabular-nums text-xs text-gray-500">{count}</span>
+              </button>
+            ))}
+          </div>
         </div>
-        <label className="relative block sm:w-72">
-          <span className="sr-only">Search roles</span>
-          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by role name or code…"
-            className="h-9 w-full rounded-md border border-gray-300 bg-white pl-9 pr-3 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
-          />
-        </label>
       </div>
 
       {notice && (
@@ -143,98 +145,95 @@ export function RoleListPage() {
         ) : roles.error ? (
           <ErrorState message={apiErrorMessage(roles.error)} onRetry={roles.reload} />
         ) : (
-          <Card className="overflow-x-auto">
-            <table className="w-full min-w-[860px] text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 text-left font-mono text-[10px] uppercase tracking-[0.12em] text-gray-500">
-                  <th className="px-4 py-3 font-medium">Role Name</th>
-                  <th className="px-4 py-3 font-medium">Code</th>
-                  <th className="px-4 py-3 font-medium">Scope</th>
-                  <th className="px-4 py-3 font-medium">Permissions</th>
-                  <th className="px-4 py-3 font-medium">Members</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Updated</th>
-                  <th className="px-4 py-3" />
+          // Dưới md: mỗi role là một thẻ (tên + mô tả, rồi phạm vi / số người / thao tác), không cuộn ngang.
+          <div className={tableWrap}>
+            <table className="w-full text-sm">
+              <thead className="hidden md:table-header-group">
+                <tr className={theadRow}>
+                  <th className={th}>{t('Vai trò', 'Role')}</th>
+                  <th className={th}>{t('Phạm vi', 'Scope')}</th>
+                  <th className={th}>{t('Người dùng', 'Users')}</th>
+                  <th className={th}>
+                    <span className="sr-only">{t('Thao tác', 'Actions')}</span>
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {visible.map((r) => {
-                  const sensitive = r.permissionKeys.filter((k) => sensitiveKeys.has(k)).length
-                  return (
-                    <tr key={r.roleId} className={clsx('align-top', !r.isActive && 'bg-gray-50/60')}>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <Link to={`/admin/roles/${r.roleId}`} className="font-medium text-gray-900 hover:text-brand-700">
-                            {r.name}
-                          </Link>
-                          {r.isLocked && <LockIcon className="h-3.5 w-3.5 text-gray-400" aria-label="Role is locked" />}
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                          <Badge tone={r.isSystem ? 'neutral' : 'blue'}>{r.isSystem ? 'System' : 'Custom'}</Badge>
-                          {r.description && <span className="line-clamp-1 max-w-xs text-xs text-gray-400">{r.description}</span>}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-gray-500">{r.code ?? '—'}</td>
-                      <td className="px-4 py-3">
-                        <Badge tone={r.scope === 'TENANT' ? 'brand' : r.scope === 'PROJECT' ? 'blue' : 'neutral'}>{SCOPE_LABEL[r.scope]}</Badge>
-                      </td>
-                      <td className="px-4 py-3 text-gray-700">
-                        <span className="font-medium">{r.permissionKeys.length}</span>
-                        <span className="text-gray-400">/{totalOfScope(r.scope) || '—'}</span>
-                        {r.code === 'TENANT_ADMIN' && <p className="text-[11px] text-gray-400">Full access</p>}
-                        {sensitive > 0 && r.code !== 'TENANT_ADMIN' && (
-                          <p className="text-[11px] text-amber-700">{sensitive} sensitive permissions</p>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => setMembersOf(r)}
-                          className="font-medium text-gray-700 underline-offset-2 hover:text-brand-700 hover:underline"
-                        >
-                          {r.memberCount} members
-                        </button>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge tone={r.isActive ? 'brand' : 'neutral'} dot>
-                          {r.isActive ? 'Active' : 'Disabled'}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-400">{formatDate(r.updatedAt)}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end gap-1">
-                          <Link
-                            to={`/admin/roles/${r.roleId}`}
-                            className="rounded px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
-                          >
-                            {canManage && !r.isLocked ? 'Edit' : 'View'}
-                          </Link>
-                          {canManage && !r.isSystem && (
-                            <Button
-                              variant="ghost"
-                              inline
-                              className="!h-auto !px-2 !py-1 text-xs"
-                              isLoading={togglingId === r.roleId}
-                              onClick={() => void toggleActive(r)}
-                            >
-                              {r.isActive ? 'Disable' : 'Enable'}
-                            </Button>
+              <tbody className="divide-y divide-gray-200">
+                {visible.map((r) => (
+                  <tr
+                    key={r.roleId}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 transition-colors hover:bg-gray-50 md:table-row md:p-0"
+                  >
+                    <td className="block w-full md:table-cell md:w-auto md:px-4 md:py-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          to={`/admin/roles/${r.roleId}`}
+                          className={clsx(
+                            'font-medium hover:underline',
+                            r.isActive ? 'text-gray-900' : 'text-gray-500',
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
+                        >
+                          {r.name}
+                        </Link>
+                        {r.isLocked && (
+                          <LockIcon
+                            className="h-3.5 w-3.5 text-gray-500"
+                            aria-label={t('Role có sẵn, không sửa được', 'Built-in role, cannot be edited')}
+                          />
+                        )}
+                        {/* Chỉ đánh dấu role tự tạo / đang tắt; role có sẵn, đang bật là mặc định. */}
+                        {!r.isSystem && <Badge tone="blue">{t('Tự tạo', 'Custom')}</Badge>}
+                        {!r.isActive && <Badge tone="amber">{t('Đang tắt', 'Disabled')}</Badge>}
+                      </div>
+                      <p className="mt-0.5 line-clamp-1 max-w-xl text-sm text-gray-500">
+                        {r.description || (r.code ? <CodeChip>{r.code}</CodeChip> : '—')}
+                      </p>
+                    </td>
+                    <td className="block md:table-cell md:px-4 md:py-3">
+                      <Badge>{scopeLabel(r.scope)}</Badge>
+                    </td>
+                    <td className="block md:table-cell md:px-4 md:py-3">
+                      <button
+                        type="button"
+                        onClick={() => setMembersOf(r)}
+                        className="inline-flex min-h-11 items-center whitespace-nowrap tabular-nums text-gray-700 underline-offset-2 hover:text-brand-700 hover:underline md:min-h-0"
+                      >
+                        {r.memberCount} {t('người', r.memberCount === 1 ? 'user' : 'users')}
+                      </button>
+                    </td>
+                    <td className="ml-auto block md:table-cell md:px-4 md:py-3">
+                      <div className="flex justify-end gap-1">
+                        <Link
+                          to={`/admin/roles/${r.roleId}`}
+                          className="inline-flex min-h-11 items-center rounded-control px-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-950 lg:min-h-8"
+                        >
+                          {canManage && !r.isLocked ? t('Sửa', 'Edit') : t('Xem', 'View')}
+                        </Link>
+                        {canManage && !r.isSystem && (
+                          <Button
+                            variant="ghost"
+                            inline
+                            className="!px-2.5 text-sm lg:!h-8"
+                            isLoading={togglingId === r.roleId}
+                            onClick={() => void toggleActive(r)}
+                          >
+                            {r.isActive ? t('Tắt', 'Disable') : t('Bật', 'Enable')}
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
                 {visible.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-4 py-10 text-center text-sm text-gray-400">
-                      No matching roles found.
+                    <td colSpan={4} className="block px-4 py-12 text-center text-sm text-gray-500 md:table-cell">
+                      {t('Không có role phù hợp.', 'No matching roles.')}
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
-          </Card>
+          </div>
         )}
       </div>
 

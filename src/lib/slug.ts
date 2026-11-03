@@ -37,10 +37,20 @@ export const PROJECT_KEY_PATTERN = /^[A-Z][A-Z0-9]{1,9}$/
  * không có thì lấy chữ cái đầu mỗi từ ("Thanh toán QR" → TTQR).
  */
 export function toProjectKey(name: string) {
-  const words = stripVietnamese(name).split(/[^A-Za-z0-9]+/).filter(Boolean)
+  const words = stripVietnamese(name)
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean)
   const acronym = words.find((w) => /^[A-Z][A-Z0-9]{1,9}$/.test(w) && w.length >= 2)
   if (acronym) return acronym
-  let key = words.map((w) => w[0]).join('').toUpperCase().replace(/^[0-9]+/, '')
-  if (key.length < 2) key = (words[0] ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^[0-9]+/, '')
+  let key = words
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+    .replace(/^[0-9]+/, '')
+  if (key.length < 2)
+    key = (words[0] ?? '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '')
+      .replace(/^[0-9]+/, '')
   return key.slice(0, 10)
 }

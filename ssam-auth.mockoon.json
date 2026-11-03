@@ -1,0 +1,1289 @@
+{
+  "uuid": "a0000000-0000-4000-8000-000000000037",
+  "lastMigration": 32,
+  "name": "SSAM Auth Mock",
+  "endpointPrefix": "api/v1",
+  "latency": 0,
+  "port": 5000,
+  "hostname": "",
+  "folders": [],
+  "routes": [
+    {
+      "uuid": "a0000000-0000-4000-8000-000000000004",
+      "type": "http",
+      "documentation": "",
+      "method": "post",
+      "endpoint": "auth/register",
+      "responses": [
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000001",
+          "body": "{\n  \"accountId\": 123,\n  \"email\": \"sarah@fintechcorp.com\",\n  \"emailVerified\": false\n}",
+          "latency": 0,
+          "statusCode": 201,
+          "label": "Thành công",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000002",
+          "body": "{\n  \"code\": \"EMAIL_ALREADY_EXISTS\",\n  \"message\": \"Email đã được sử dụng.\"\n}",
+          "latency": 0,
+          "statusCode": 409,
+          "label": "Email đã tồn tại",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000003",
+          "body": "{\n  \"code\": \"VALIDATION_ERROR\",\n  \"message\": \"Dữ liệu không hợp lệ.\",\n  \"errors\": {\n    \"password\": [\n      \"Mật khẩu phải có ít nhất 8 ký tự\"\n    ]\n  }\n}",
+          "latency": 0,
+          "statusCode": 400,
+          "label": "Lỗi validate",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "a0000000-0000-4000-8000-000000000008",
+      "type": "http",
+      "documentation": "",
+      "method": "post",
+      "endpoint": "auth/google",
+      "responses": [
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000005",
+          "body": "{\n  \"accessToken\": \"mock-access-token\",\n  \"refreshToken\": \"mock-refresh-token\",\n  \"expiresIn\": 900,\n  \"user\": {\n    \"id\": 123,\n    \"fullName\": \"Sarah Lin\",\n    \"email\": \"sarah@fintechcorp.com\",\n    \"avatarUrl\": null,\n    \"emailVerified\": true\n  },\n  \"isNewAccount\": true\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Thành công - tài khoản mới",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000006",
+          "body": "{\n  \"accessToken\": \"mock-access-token\",\n  \"refreshToken\": \"mock-refresh-token\",\n  \"expiresIn\": 900,\n  \"user\": {\n    \"id\": 123,\n    \"fullName\": \"Sarah Lin\",\n    \"email\": \"sarah@fintechcorp.com\",\n    \"avatarUrl\": null,\n    \"emailVerified\": true\n  },\n  \"isNewAccount\": false\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Thành công - tài khoản đã tồn tại",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000007",
+          "body": "{\n  \"code\": \"TOKEN_INVALID\",\n  \"message\": \"idToken không hợp lệ hoặc đã hết hạn.\"\n}",
+          "latency": 0,
+          "statusCode": 400,
+          "label": "Token Google không hợp lệ",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "a0000000-0000-4000-8000-00000000000d",
+      "type": "http",
+      "documentation": "",
+      "method": "post",
+      "endpoint": "auth/login",
+      "responses": [
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000009",
+          "body": "{\n  \"accessToken\": \"mock-access-token\",\n  \"refreshToken\": \"mock-refresh-token\",\n  \"expiresIn\": 900,\n  \"user\": {\n    \"id\": 123,\n    \"fullName\": \"Sarah Lin\",\n    \"email\": \"sarah@fintechcorp.com\",\n    \"avatarUrl\": null,\n    \"emailVerified\": true\n  }\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Thành công",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "a0000000-0000-4000-8000-00000000000a",
+          "body": "{\n  \"code\": \"UNAUTHORIZED\",\n  \"message\": \"Email hoặc mật khẩu không đúng.\"\n}",
+          "latency": 0,
+          "statusCode": 401,
+          "label": "Sai email hoặc mật khẩu",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "a0000000-0000-4000-8000-00000000000b",
+          "body": "{\n  \"code\": \"EMAIL_NOT_VERIFIED\",\n  \"message\": \"Email chưa được xác thực. Vui lòng kiểm tra hộp thư.\"\n}",
+          "latency": 0,
+          "statusCode": 403,
+          "label": "Email chưa xác thực",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "a0000000-0000-4000-8000-00000000000c",
+          "body": "{\n  \"code\": \"ACCOUNT_DISABLED\",\n  \"message\": \"Tài khoản của bạn đã bị vô hiệu hóa.\"\n}",
+          "latency": 0,
+          "statusCode": 403,
+          "label": "Tài khoản bị khóa",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "a0000000-0000-4000-8000-000000000010",
+      "type": "http",
+      "documentation": "",
+      "method": "post",
+      "endpoint": "auth/refresh",
+      "responses": [
+        {
+          "uuid": "a0000000-0000-4000-8000-00000000000e",
+          "body": "{\n  \"accessToken\": \"mock-access-token-2\",\n  \"refreshToken\": \"mock-refresh-token-2\",\n  \"expiresIn\": 900\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Thành công",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "a0000000-0000-4000-8000-00000000000f",
+          "body": "{\n  \"code\": \"UNAUTHORIZED\",\n  \"message\": \"Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.\"\n}",
+          "latency": 0,
+          "statusCode": 401,
+          "label": "Refresh token hết hạn / đã bị thu hồi",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "a0000000-0000-4000-8000-000000000012",
+      "type": "http",
+      "documentation": "",
+      "method": "post",
+      "endpoint": "auth/logout",
+      "responses": [
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000011",
+          "body": "",
+          "latency": 0,
+          "statusCode": 204,
+          "label": "Thành công",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "a0000000-0000-4000-8000-000000000015",
+      "type": "http",
+      "documentation": "",
+      "method": "get",
+      "endpoint": "auth/me",
+      "responses": [
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000013",
+          "body": "{\n  \"user\": {\n    \"id\": 123,\n    \"fullName\": \"Sarah Lin\",\n    \"email\": \"sarah@fintechcorp.com\",\n    \"avatarUrl\": null,\n    \"emailVerified\": true\n  },\n  \"companies\": [],\n  \"workspaces\": []\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Chưa onboard (vừa đăng ký xong)",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000014",
+          "body": "{\n  \"user\": {\n    \"id\": 123,\n    \"fullName\": \"Sarah Lin\",\n    \"email\": \"sarah@fintechcorp.com\",\n    \"avatarUrl\": null,\n    \"emailVerified\": true\n  },\n  \"companies\": [\n    {\n      \"companyId\": 1,\n      \"companyName\": \"Acme Fintech Corp\",\n      \"roleName\": \"Tenant Admin\"\n    }\n  ],\n  \"workspaces\": [\n    {\n      \"workspaceId\": 10,\n      \"workspaceName\": \"Acme Fintech Corp\",\n      \"companyId\": 1\n    }\n  ]\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Đã onboard (đã có Company + Workspace)",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "a0000000-0000-4000-8000-000000000019",
+      "type": "http",
+      "documentation": "",
+      "method": "post",
+      "endpoint": "auth/email/verify",
+      "responses": [
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000016",
+          "body": "{\n  \"verified\": true\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Thành công",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000017",
+          "body": "{\n  \"code\": \"TOKEN_EXPIRED\",\n  \"message\": \"Link xác thực đã hết hạn.\"\n}",
+          "latency": 0,
+          "statusCode": 400,
+          "label": "Token hết hạn",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000018",
+          "body": "{\n  \"code\": \"TOKEN_INVALID\",\n  \"message\": \"Link xác thực không hợp lệ hoặc đã được sử dụng.\"\n}",
+          "latency": 0,
+          "statusCode": 400,
+          "label": "Token không hợp lệ",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "a0000000-0000-4000-8000-00000000001b",
+      "type": "http",
+      "documentation": "",
+      "method": "post",
+      "endpoint": "auth/email/resend",
+      "responses": [
+        {
+          "uuid": "a0000000-0000-4000-8000-00000000001a",
+          "body": "{}",
+          "latency": 0,
+          "statusCode": 202,
+          "label": "Đã gửi (luôn 202)",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "a0000000-0000-4000-8000-00000000001d",
+      "type": "http",
+      "documentation": "",
+      "method": "post",
+      "endpoint": "auth/password/forgot",
+      "responses": [
+        {
+          "uuid": "a0000000-0000-4000-8000-00000000001c",
+          "body": "{}",
+          "latency": 0,
+          "statusCode": 202,
+          "label": "Đã gửi (luôn 202)",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "a0000000-0000-4000-8000-000000000020",
+      "type": "http",
+      "documentation": "",
+      "method": "post",
+      "endpoint": "auth/password/reset",
+      "responses": [
+        {
+          "uuid": "a0000000-0000-4000-8000-00000000001e",
+          "body": "{\n  \"success\": true\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Thành công",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "a0000000-0000-4000-8000-00000000001f",
+          "body": "{\n  \"code\": \"TOKEN_EXPIRED\",\n  \"message\": \"Link đặt lại mật khẩu đã hết hạn.\"\n}",
+          "latency": 0,
+          "statusCode": 400,
+          "label": "Token hết hạn",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "a0000000-0000-4000-8000-000000000023",
+      "type": "http",
+      "documentation": "",
+      "method": "get",
+      "endpoint": "companies/match",
+      "responses": [
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000021",
+          "body": "{\n  \"matched\": false\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Không khớp domain",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000022",
+          "body": "{\n  \"matched\": true,\n  \"company\": {\n    \"id\": 1,\n    \"name\": \"Tập đoàn FPT (FPT Corporation)\",\n    \"domain\": \"fpt.edu.vn\",\n    \"logoUrl\": null,\n    \"autoJoinEnabled\": false\n  }\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Có khớp domain (FPT)",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "a0000000-0000-4000-8000-000000000026",
+      "type": "http",
+      "documentation": "",
+      "method": "post",
+      "endpoint": "companies",
+      "responses": [
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000024",
+          "body": "{\n  \"id\": 1,\n  \"name\": \"Acme Fintech Corp\",\n  \"code\": \"acme-fintech\",\n  \"emailDomain\": \"fintechcorp.com\",\n  \"domainAutoJoinEnabled\": false,\n  \"taxCode\": \"0109876543\",\n  \"address\": \"Level 12, Landmark 81, 720A Dien Bien Phu, Binh Thanh District, HCMC\",\n  \"logoUrl\": null\n}",
+          "latency": 0,
+          "statusCode": 201,
+          "label": "Thành công",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000025",
+          "body": "{\n  \"code\": \"WORKSPACE_SLUG_TAKEN\",\n  \"message\": \"Địa chỉ workspace này đã có người dùng.\"\n}",
+          "latency": 0,
+          "statusCode": 409,
+          "label": "Địa chỉ workspace đã tồn tại",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "a0000000-0000-4000-8000-000000000029",
+      "type": "http",
+      "documentation": "",
+      "method": "post",
+      "endpoint": "companies/:companyId/join",
+      "responses": [
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000027",
+          "body": "{\n  \"companyId\": 1,\n  \"status\": \"joined\"\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Thành công",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000028",
+          "body": "{\n  \"code\": \"AUTO_JOIN_NOT_ALLOWED\",\n  \"message\": \"Công ty này chưa bật tự động tham gia.\"\n}",
+          "latency": 0,
+          "statusCode": 403,
+          "label": "Auto-join đang tắt",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "a0000000-0000-4000-8000-00000000002b",
+      "type": "http",
+      "documentation": "",
+      "method": "post",
+      "endpoint": "companies/:companyId/join-requests",
+      "responses": [
+        {
+          "uuid": "a0000000-0000-4000-8000-00000000002a",
+          "body": "{\n  \"requestId\": 55,\n  \"status\": \"pending\"\n}",
+          "latency": 0,
+          "statusCode": 201,
+          "label": "Thành công",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "a0000000-0000-4000-8000-00000000002f",
+      "type": "http",
+      "documentation": "",
+      "method": "get",
+      "endpoint": "companies/:companyId/join-requests/:requestId",
+      "responses": [
+        {
+          "uuid": "a0000000-0000-4000-8000-00000000002c",
+          "body": "{\n  \"status\": \"pending\"\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Đang chờ duyệt",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "a0000000-0000-4000-8000-00000000002d",
+          "body": "{\n  \"status\": \"approved\"\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Đã được duyệt",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "a0000000-0000-4000-8000-00000000002e",
+          "body": "{\n  \"status\": \"rejected\"\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Bị từ chối",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "a0000000-0000-4000-8000-000000000033",
+      "type": "http",
+      "documentation": "",
+      "method": "get",
+      "endpoint": "invitations/:token",
+      "responses": [
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000030",
+          "body": "{\n  \"valid\": true,\n  \"email\": \"member@fintechcorp.com\",\n  \"companyName\": \"Acme Fintech Corp\",\n  \"workspaceName\": null,\n  \"roleName\": \"BA\",\n  \"expiresAt\": \"2026-10-07T00:00:00Z\"\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Lời mời hợp lệ",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000031",
+          "body": "{\n  \"valid\": false,\n  \"reason\": \"EXPIRED\"\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Đã hết hạn",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000032",
+          "body": "{\n  \"valid\": false,\n  \"reason\": \"ALREADY_USED\"\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Đã được sử dụng",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "a0000000-0000-4000-8000-000000000036",
+      "type": "http",
+      "documentation": "",
+      "method": "post",
+      "endpoint": "invitations/:token/accept",
+      "responses": [
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000034",
+          "body": "{\n  \"accessToken\": \"mock-access-token\",\n  \"refreshToken\": \"mock-refresh-token\",\n  \"expiresIn\": 900,\n  \"companyId\": 1,\n  \"workspaceId\": null\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Thành công - người mới (tạo tài khoản)",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        },
+        {
+          "uuid": "a0000000-0000-4000-8000-000000000035",
+          "body": "{\n  \"companyId\": 1,\n  \"workspaceId\": null\n}",
+          "latency": 0,
+          "statusCode": 200,
+          "label": "Thành công - đã đăng nhập sẵn",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": false,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "bdcd1509-eafc-4ab9-9fd9-3578dfb61d79",
+      "type": "http",
+      "documentation": "",
+      "method": "post",
+      "endpoint": "workspaces",
+      "responses": [
+        {
+          "uuid": "fc42eecc-7992-4518-9504-665d9145c6b9",
+          "body": "{\n  \"workspaceId\": 10,\n  \"workspaceName\": \"Acme Fintech Corp\",\n  \"companyId\": 1\n}",
+          "latency": 0,
+          "statusCode": 201,
+          "label": "Thành công",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    },
+    {
+      "uuid": "8a9cd73b-fa98-478c-9e0b-1dc85a2cef4e",
+      "type": "http",
+      "documentation": "",
+      "method": "post",
+      "endpoint": "companies/:companyId/invitations",
+      "responses": [
+        {
+          "uuid": "f940f09b-8262-46aa-8dfd-52026fb14af7",
+          "body": "{\n  \"invitationId\": 55,\n  \"token\": \"demo-invite-token-123\",\n  \"inviteUrl\": \"http://localhost:5174/invite/demo-invite-token-123\"\n}",
+          "latency": 0,
+          "statusCode": 201,
+          "label": "Thành công",
+          "headers": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "bodyType": "INLINE",
+          "filePath": "",
+          "databucketID": "",
+          "sendFileAsBody": false,
+          "rules": [],
+          "rulesOperator": "OR",
+          "disableTemplating": false,
+          "fallbackTo404": false,
+          "default": true,
+          "crudKey": "id",
+          "callbacks": []
+        }
+      ],
+      "responseMode": null,
+      "streamingMode": null,
+      "streamingInterval": 0
+    }
+  ],
+  "rootChildren": [
+    {
+      "type": "route",
+      "uuid": "a0000000-0000-4000-8000-000000000004"
+    },
+    {
+      "type": "route",
+      "uuid": "a0000000-0000-4000-8000-000000000008"
+    },
+    {
+      "type": "route",
+      "uuid": "a0000000-0000-4000-8000-00000000000d"
+    },
+    {
+      "type": "route",
+      "uuid": "a0000000-0000-4000-8000-000000000010"
+    },
+    {
+      "type": "route",
+      "uuid": "a0000000-0000-4000-8000-000000000012"
+    },
+    {
+      "type": "route",
+      "uuid": "a0000000-0000-4000-8000-000000000015"
+    },
+    {
+      "type": "route",
+      "uuid": "a0000000-0000-4000-8000-000000000019"
+    },
+    {
+      "type": "route",
+      "uuid": "a0000000-0000-4000-8000-00000000001b"
+    },
+    {
+      "type": "route",
+      "uuid": "a0000000-0000-4000-8000-00000000001d"
+    },
+    {
+      "type": "route",
+      "uuid": "a0000000-0000-4000-8000-000000000020"
+    },
+    {
+      "type": "route",
+      "uuid": "a0000000-0000-4000-8000-000000000023"
+    },
+    {
+      "type": "route",
+      "uuid": "a0000000-0000-4000-8000-000000000026"
+    },
+    {
+      "type": "route",
+      "uuid": "a0000000-0000-4000-8000-000000000029"
+    },
+    {
+      "type": "route",
+      "uuid": "a0000000-0000-4000-8000-00000000002b"
+    },
+    {
+      "type": "route",
+      "uuid": "a0000000-0000-4000-8000-00000000002f"
+    },
+    {
+      "type": "route",
+      "uuid": "a0000000-0000-4000-8000-000000000033"
+    },
+    {
+      "type": "route",
+      "uuid": "a0000000-0000-4000-8000-000000000036"
+    },
+    {
+      "type": "route",
+      "uuid": "bdcd1509-eafc-4ab9-9fd9-3578dfb61d79"
+    },
+    {
+      "type": "route",
+      "uuid": "8a9cd73b-fa98-478c-9e0b-1dc85a2cef4e"
+    }
+  ],
+  "proxyMode": false,
+  "proxyHost": "",
+  "proxyRemovePrefix": false,
+  "tlsOptions": {
+    "enabled": false,
+    "type": "CERT",
+    "pfxPath": "",
+    "certPath": "",
+    "keyPath": "",
+    "caPath": "",
+    "passphrase": ""
+  },
+  "cors": true,
+  "headers": [
+    {
+      "key": "Content-Type",
+      "value": "application/json"
+    },
+    {
+      "key": "Access-Control-Allow-Origin",
+      "value": "*"
+    },
+    {
+      "key": "Access-Control-Allow-Methods",
+      "value": "GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS"
+    },
+    {
+      "key": "Access-Control-Allow-Headers",
+      "value": "Content-Type, Origin, Accept, Authorization, Content-Length, X-Requested-With"
+    }
+  ],
+  "responseHeaders": [],
+  "requestHeaders": [],
+  "data": [],
+  "callbacks": []
+}

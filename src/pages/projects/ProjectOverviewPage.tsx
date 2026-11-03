@@ -1,146 +1,218 @@
-import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { Card, SectionTitle } from '@/components/layout/PageParts'
-import { Badge } from '@/components/ui/Badge'
+import { Card } from '@/components/layout/PageParts'
+import { Avatar } from '@/components/ui/Avatar'
+import { buttonClasses } from '@/components/ui/Button'
 import { projectApi } from '@/api/projectApi'
 import { documentApi } from '@/api/documentApi'
-import { issueApi } from '@/api/issueApi'
 import { useAsync } from '@/lib/useAsync'
-import { formatDate } from '@/lib/format'
+import { formatDate, formatRelative } from '@/lib/format'
 import { PERMISSIONS } from '@/types/rbac'
 import type { ProjectMemberDto } from '@/types/project'
-import { SDLC_LABEL } from './ProjectTable'
+import type { DocumentNodeDto } from '@/types/document'
+import { useI18n } from '@/i18n'
 import { useProjectContext } from './ProjectLayout'
+import { sdlcLabel } from './ProjectTable'
+import { CodeChip, InfoRow, StatBox, tableWrap, th, theadRow } from '@/components/ui/listControls'
+import { StatusPill } from '../documents/docUi'
+import { TabBody, TabSection } from '@/components/layout/tabParts'
 
-// Tab Tổng quan — mockup "Chi tiết Dự án": 4 ô số liệu, "Thông tin dự án" (Issue Key prefix, Workflow đang dùng, Module AI,
-// Tạo lúc), "Thành viên dự án" (+ Thêm thành viên). "Hoạt động gần đây" cần module Issue/Tài liệu → thay bằng pipeline phase.
+// Tab Tổng quan: 4 ô số liệu (Tài liệu · Yêu cầu · Chờ duyệt · Thành viên), rồi Tài liệu gần đây bên trái,
+// Thông tin dự án + thành viên bên phải. Giai đoạn chi tiết nằm ở tab Workflow (không lặp lại ở đây).
 export function ProjectOverviewPage() {
+  const { t } = useI18n()
   const { project, can } = useProjectContext()
   const canSeeMembers = can(PERMISSIONS.projectView)
+  const canSeeDocs = can(PERMISSIONS.documentView)
   const members = useAsync<ProjectMemberDto[]>(
     () => (canSeeMembers ? projectApi.listMembers(project.projectId) : Promise.resolve([])),
     [project.projectId, canSeeMembers],
   )
-  const workflow = useAsync(() => projectApi.workflow(project.projectId), [project.projectId])
-  const docStats = useAsync(() => documentApi.getProjectStats(project.projectId), [project.projectId])
-  const issueStats = useAsync(() => issueApi.getProjectIssueStats(project.projectId), [project.projectId])
-  const activePhases = (workflow.data?.phases ?? []).filter((p) => p.isActive)
+  const docs = useAsync<DocumentNodeDto[]>(
+    () => (canSeeDocs ? documentApi.listTree(project.projectId) : Promise.resolve([])),
+    [project.projectId, canSeeDocs],
+  )
+  const pages = (docs.data ?? []).filter((n) => n.kind === 'PAGE')
+  const recent = [...pages].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 6)
+  const reqTotal = pages.reduce((sum, n) => sum + n.reqCount, 0)
+  const inReview = pages.filter((n) => n.currentVersion?.status === 'IN_REVIEW').length
+  const docsReady = canSeeDocs && docs.data !== undefined
+  const num = (v: number) => (docsReady ? v : '—')
+  const linkClass = 'font-medium text-brand-700 hover:underline'
+  const canAddMembers = can(PERMISSIONS.projectMemberManage) && project.status === 'ACTIVE'
+  const docsHref = `/projects/${project.projectId}/documents`
 
   return (
-    <div className="space-y-4">
+    <TabBody>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Link to="issues" className="block hover:opacity-90 transition-opacity">
-          <Stat
-            label="Open / Closed Issues"
-            value={`${issueStats.data?.open ?? project.openIssueCount} / ${issueStats.data?.done ?? project.doneIssueCount}`}
-            hint={
-              issueStats.data
-                ? `${issueStats.data.tasks} Task · ${issueStats.data.bugs} Bug${issueStats.data.staleCount > 0 ? ` (${issueStats.data.staleCount} stale warnings)` : ''}`
-                : 'Loading issue data…'
-            }
-          />
-        </Link>
-        <Link to="documents" className="block hover:opacity-90 transition-opacity">
-          <Stat
-            label="Requirements"
-            value={docStats.data?.totalDocs ?? project.documentCount}
-            hint={`${docStats.data?.approvedDocs ?? 0} approved · ${docStats.data?.totalItems ?? 0} requirement items`}
-          />
-        </Link>
-        <Stat label="Test Cases" value="—" hint="Test case module coming soon" />
-        <Stat label="Members" value={project.memberCount} />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="p-4">
-          <SectionTitle>Project Details</SectionTitle>
-          <dl className="mt-3 divide-y divide-gray-100 text-sm">
-            <Row label="Issue Key Prefix">
-              <span className="font-mono">{project.key}-</span>
-            </Row>
-            <Row label="Active Workflow">
-              <Link to="workflow" className="text-brand-700 hover:underline">
-                {SDLC_LABEL[project.sdlcMethod]} · {project.phaseCount} phases
-              </Link>
-            </Row>
-            <Row label="AI Module (BA/QA)">{project.aiEnabled ? <Badge tone="brand">Enabled</Badge> : <Badge>Disabled</Badge>}</Row>
-            <Row label="Project Manager">{project.lead?.fullName ?? '—'}</Row>
-            <Row label="Created By">{project.createdBy.fullName}</Row>
-            <Row label="Created At">{formatDate(project.createdAt)}</Row>
-          </dl>
-        </Card>
-
-        <Card className="p-4">
-          <SectionTitle>Project Members</SectionTitle>
-          {!canSeeMembers ? (
-            <p className="mt-3 text-sm text-gray-400">You do not have permission to view project members.</p>
-          ) : (
-            <ul className="mt-3 divide-y divide-gray-100 text-sm">
-              {(members.data ?? []).slice(0, 6).map((m) => (
-                <li key={m.userId} className="flex items-center justify-between gap-3 py-2">
-                  <span className="text-gray-800">{m.fullName}</span>
-                  <span className="text-gray-500">{m.role.name}</span>
-                </li>
-              ))}
-              {members.isLoading && !members.data && <li className="py-2 text-gray-400">Loading…</li>}
-            </ul>
-          )}
-          {can(PERMISSIONS.projectMemberManage) && project.status === 'ACTIVE' ? (
-            <Link to="members?add=1" className="mt-2 inline-block text-sm font-medium text-brand-700 hover:underline">
-              + Add member to project
-            </Link>
-          ) : (
-            canSeeMembers &&
-            project.memberCount > 6 && (
-              <Link to="members" className="mt-2 inline-block text-sm font-medium text-brand-700 hover:underline">
-                View all {project.memberCount} members →
+        <StatBox
+          label={t('Tài liệu', 'Documents')}
+          value={num(pages.length)}
+          sub={
+            canSeeDocs && (
+              <Link to={docsHref} className={linkClass}>
+                {t('Mở tài liệu', 'Open documents')}
               </Link>
             )
-          )}
-        </Card>
+          }
+        />
+        <StatBox
+          label={t('Yêu cầu (REQ)', 'Requirements (REQ)')}
+          value={num(reqTotal)}
+          sub={canSeeDocs && <span>{t('trong các trang đặc tả', 'across spec pages')}</span>}
+        />
+        <StatBox
+          label={t('Chờ duyệt', 'In review')}
+          value={num(inReview)}
+          sub={
+            canSeeDocs &&
+            (inReview > 0 ? (
+              <Link
+                to={`${docsHref}/${pages.find((n) => n.currentVersion?.status === 'IN_REVIEW')?.documentId}`}
+                className={linkClass}
+              >
+                {t('Xem trang chờ duyệt', 'Open a page in review')}
+              </Link>
+            ) : (
+              <span>{t('Không có trang nào', 'Nothing waiting')}</span>
+            ))
+          }
+        />
+        <StatBox
+          label={t('Thành viên', 'Members')}
+          value={project.memberCount}
+          sub={
+            canAddMembers ? (
+              <Link to="members?add=1" className={linkClass}>
+                {t('Thêm thành viên', 'Add members')}
+              </Link>
+            ) : (
+              canSeeMembers && (
+                <Link to="members" className={linkClass}>
+                  {t('Xem thành viên', 'View members')}
+                </Link>
+              )
+            )
+          }
+        />
       </div>
 
-      <Card className="p-4">
-        <SectionTitle description="Sequence of SDLC phases and issue statuses within each phase.">Phase Pipeline</SectionTitle>
-        <ol className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {activePhases.map((phase, index) => (
-            <li key={phase.phaseId} className="rounded-md border border-gray-200 p-3">
-              <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-gray-400">Phase {index + 1}</p>
-              <p className="mt-0.5 text-sm font-semibold text-gray-900">{phase.name}</p>
-              <div className="mt-2 flex flex-wrap gap-1">
-                {phase.statuses
-                  .filter((s) => s.isActive)
-                  .map((s) => (
-                    <span key={s.statusId} className="inline-flex items-center gap-1 rounded-sm border border-gray-200 px-1.5 py-0.5 text-[11px] text-gray-700">
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: s.color ?? '#a8a29e' }} />
-                      {s.name}
-                    </span>
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-3">
+        <TabSection
+          className="xl:col-span-2"
+          title={t('Tài liệu gần đây', 'Recent documents')}
+          caption={docsReady && pages.length > 0 ? String(pages.length) : undefined}
+          actions={
+            canSeeDocs &&
+            pages.length > 0 && (
+              <Link to={docsHref} className={buttonClasses({ variant: 'secondary', inline: true })}>
+                {t('Xem tất cả', 'View all')}
+              </Link>
+            )
+          }
+        >
+          <div className={tableWrap}>
+            {!canSeeDocs ? (
+              <p className="px-4 py-8 text-center text-sm text-gray-500">
+                {t('Bạn chưa có quyền xem tài liệu của dự án này.', "You can't view this project's documents yet.")}
+              </p>
+            ) : docs.isLoading && !docs.data ? (
+              <p className="px-4 py-8 text-center text-sm text-gray-500">{t('Đang tải…', 'Loading…')}</p>
+            ) : recent.length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-gray-500">
+                {t('Chưa có tài liệu.', 'No documents yet.')}{' '}
+                <Link to={docsHref} className={linkClass}>
+                  {t('Bắt đầu tài liệu', 'Start documenting')}
+                </Link>
+              </p>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="hidden sm:table-header-group">
+                  <tr className={theadRow}>
+                    <th className={th}>{t('Trang', 'Page')}</th>
+                    <th className={th}>{t('Trạng thái', 'Status')}</th>
+                    <th className={`${th} text-right`}>{t('Cập nhật', 'Updated')}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {recent.map((n) => (
+                    <tr
+                      key={n.documentId}
+                      className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 hover:bg-gray-50 sm:table-row sm:p-0"
+                    >
+                      <td className="w-full min-w-0 sm:w-auto sm:px-4 sm:py-3">
+                        <Link
+                          to={`${docsHref}/${n.documentId}`}
+                          className="flex min-w-0 items-center gap-2 font-medium text-gray-950 hover:underline"
+                        >
+                          <span className="truncate">{n.title}</span>
+                          {n.code && <CodeChip>{n.code}</CodeChip>}
+                        </Link>
+                      </td>
+                      <td className="sm:px-4 sm:py-3">
+                        {n.currentVersion && <StatusPill status={n.currentVersion.status} />}
+                      </td>
+                      <td className="text-xs text-gray-500 sm:px-4 sm:py-3 sm:text-right sm:text-sm">
+                        {formatRelative(n.updatedAt)}
+                      </td>
+                    </tr>
                   ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </TabSection>
+
+        <TabSection title={t('Thông tin dự án', 'Project details')}>
+          <Card className="p-5">
+            {project.description && <p className="mb-2 text-sm text-gray-700">{project.description}</p>}
+            <dl className="divide-y divide-gray-200 text-sm">
+              <InfoRow label="Project Manager">{project.lead?.fullName ?? '—'}</InfoRow>
+              <InfoRow label={t('Phương pháp', 'Methodology')}>{sdlcLabel(project.sdlcMethod)}</InfoRow>
+              <InfoRow label={t('Giai đoạn', 'Phases')}>
+                {project.phaseCount} ·{' '}
+                <Link to="workflow" className={linkClass}>
+                  {t('Xem workflow', 'View workflow')}
+                </Link>
+              </InfoRow>
+              <InfoRow label={t('Tạo bởi', 'Created by')}>
+                {project.createdBy.fullName} ·{' '}
+                <span className="font-normal text-gray-500">{formatDate(project.createdAt)}</span>
+              </InfoRow>
+            </dl>
+
+            <div className="mt-4 border-t border-gray-200 pt-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium text-gray-950">{t('Thành viên', 'Members')}</p>
+                {canSeeMembers && project.memberCount > 5 && (
+                  <Link to="members" className={`text-sm ${linkClass}`}>
+                    {t(`Xem tất cả ${project.memberCount}`, `View all ${project.memberCount}`)}
+                  </Link>
+                )}
               </div>
-            </li>
-          ))}
-          {workflow.isLoading && !workflow.data && <li className="text-sm text-gray-400">Loading…</li>}
-        </ol>
-      </Card>
-    </div>
-  )
-}
-
-function Stat({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
-  return (
-    <Card className="p-4">
-      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-gray-400">{label}</p>
-      <p className="mt-2 text-2xl font-semibold text-gray-950">{value}</p>
-      {hint && <p className="mt-0.5 text-[11px] text-gray-400">{hint}</p>}
-    </Card>
-  )
-}
-
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-4 py-2">
-      <dt className="text-gray-500">{label}</dt>
-      <dd className="text-right font-medium text-gray-800">{children}</dd>
-    </div>
+              {!canSeeMembers ? (
+                <p className="mt-2 text-sm text-gray-500">
+                  {t('Bạn không có quyền xem thành viên dự án.', "You don't have permission to view project members.")}
+                </p>
+              ) : (
+                <ul className="mt-1 text-sm">
+                  {(members.data ?? []).slice(0, 5).map((m) => (
+                    <li key={m.userId} className="flex items-center justify-between gap-3 py-1.5">
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <Avatar name={m.fullName} size="sm" />
+                        <span className="truncate text-gray-900">{m.fullName}</span>
+                      </span>
+                      <span className="shrink-0 text-xs text-gray-500">{m.role.name}</span>
+                    </li>
+                  ))}
+                  {members.isLoading && !members.data && (
+                    <li className="py-2 text-gray-500">{t('Đang tải…', 'Loading…')}</li>
+                  )}
+                </ul>
+              )}
+            </div>
+          </Card>
+        </TabSection>
+      </div>
+    </TabBody>
   )
 }

@@ -1,20 +1,26 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, Outlet, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom'
-import clsx from 'clsx'
-import { DashboardLayout } from '@/components/layout/DashboardLayout'
+import { useEffect, useMemo, useState } from 'react'
+import { useLocation, useOutletContext, useParams } from 'react-router-dom'
+import { LazyOutlet } from '@/components/layout/LazyOutlet'
+import { DashboardLayout, PAGE_BODY } from '@/components/layout/DashboardLayout'
 import { ErrorState, ForbiddenState, LoadingBlock } from '@/components/layout/PageParts'
+import { ProjectSidebar } from '@/components/layout/ProjectSidebar'
 import { Badge } from '@/components/ui/Badge'
 import { Alert } from '@/components/ui/Alert'
-import { projectApi } from '@/api/projectApi'
-import { documentApi } from '@/api/documentApi'
-import { issueApi } from '@/api/issueApi'
 import { useAuth } from '@/context/AuthContext'
+import { projectApi } from '@/api/projectApi'
 import { useAsync } from '@/lib/useAsync'
 import { apiErrorMessage, isForbidden } from '@/lib/apiErrors'
 import { hasPermission } from '@/lib/permissions'
-import { PERMISSIONS } from '@/types/rbac'
+import { rememberProject } from '@/lib/recentProjects'
+import { rememberItem } from '@/lib/recentItems'
+import { resolveProjectRole, ROLE_SHORT, type ProjectRoleKind } from '@/lib/projectRole'
+import { useWorkItems } from '@/lib/useMyWork'
+import type { WorkItem } from '@/lib/myWorkRules'
 import type { ProjectDto } from '@/types/project'
-import { SDLC_LABEL } from './ProjectTable'
+import { useI18n } from '@/i18n'
+import { ExpandIcon, IconButton } from '../documents/docUi'
+import { EntityHeader } from '@/components/layout/tabParts'
+import { HelpTips } from '@/help/HelpTips'
 
 export interface ProjectOutletContext {
   project: ProjectDto
@@ -22,366 +28,223 @@ export interface ProjectOutletContext {
   isArchived: boolean
   reload: () => Promise<void>
   setProject: (project: ProjectDto) => void
+  /** Chế độ toàn màn hình của tab Tài liệu (ẩn sidebar app và header dự án). */
+  fullscreen: boolean
+  setFullscreen: (value: boolean) => void
+  /** Vai trò làm việc trong dự án (BA, QA, Dev…), quyết định menu và "Việc của tôi". */
+  role: ProjectRoleKind
+  /** "Việc của tôi" trong dự án (dùng chung với sidebar). */
+  work: { items: WorkItem[]; loading: boolean; error: unknown; reload: () => void }
 }
 
 export const useProjectContext = () => useOutletContext<ProjectOutletContext>()
 
-/**
- * Unified Full-Screen Project Workspace Shell (100vw x 100vh)
- * Row 1: Stationary Master Project Header (shared across all 7 tabs: Overview, Specs, Kanban, Test Cases, Workflow, Members, Settings)
- * Row 2: Contextual Module Sub-Toolbar
- * Row 3: Module Viewport (<Outlet />)
- */
+/** Lề thân tab (trừ tab Tài liệu, vốn tràn sát mép khung trắng). */
+export const PROJECT_TAB_PAD = PAGE_BODY
+
+const isTyping = (el: EventTarget | null) =>
+  el instanceof HTMLElement &&
+  (el.isContentEditable || !!el.closest('input, textarea, select, [contenteditable="true"]'))
+
+// Khung /projects/:projectId/* — sidebar trái trở thành menu của dự án (ProjectSidebar, sắp theo vai trò), không còn
+// thanh tab ngang. Trong khung trắng chỉ còn một header mảnh: tên trang + hành động của trang (⤢ ở tab Tài liệu).
+// Tab Tài liệu: thân tab chiếm phần còn lại của khung trắng, có chế độ toàn màn hình (⤢ / phím F, Esc thoát).
 export function ProjectLayout() {
+  const { t } = useI18n()
+  const { user } = useAuth()
   const projectId = Number(useParams().projectId)
   const location = useLocation()
-  const navigate = useNavigate()
-  const { user, currentCompany } = useAuth()
-
   const { data: project, error, isLoading, reload, setData } = useAsync(() => projectApi.get(projectId), [projectId])
-  const docStats = useAsync(() => documentApi.getProjectStats(projectId), [projectId])
-  const issueStats = useAsync(() => issueApi.getProjectIssueStats(projectId), [projectId])
-  const allProjectsAsync = useAsync(() => projectApi.listMine(currentCompany?.companyId ?? null), [currentCompany?.companyId])
+  const justCreated = (location.state as { created?: boolean } | null)?.created === true
+  const isDocs = /^\/projects\/\d+\/documents(\/|$)/.test(location.pathname)
+  const [fullscreen, setFullscreen] = useState(false)
+  const loadedId = project?.projectId
+  const projectList = useMemo(() => (project ? [project] : null), [project])
+  const work = useWorkItems(projectList)
+  const section = location.pathname.match(/^\/projects\/\d+\/([^/]+)/)?.[1] ?? ''
 
-  const [switcherOpen, setSwitcherOpen] = useState(false)
-  const switcherRef = useRef<HTMLDivElement>(null)
+  // Dự án vừa mở lên đầu nhóm "Dự án gần đây" ở sidebar.
+  useEffect(() => {
+    if (user && loadedId) rememberProject(user.id, loadedId)
+  }, [user, loadedId])
+
+  // "Tiếp tục" trong Ctrl K: các trang dự án đã mở (trừ Việc của tôi; tài liệu do tab Tài liệu tự ghi).
+  const pageTitle = sectionTitle(section, t)
+  useEffect(() => {
+    if (!user || !project || isDocs || section === 'my-work' || !pageTitle) return
+    rememberItem(user.id, { href: location.pathname, title: `${pageTitle} · ${project.name}`, code: project.key })
+  }, [user, project, isDocs, section, pageTitle, location.pathname])
 
   useEffect(() => {
-    if (!switcherOpen) return
-    const handleClickOutside = (e: MouseEvent) => {
-      if (!switcherRef.current?.contains(e.target as Node)) {
-        setSwitcherOpen(false)
+    if (!isDocs) setFullscreen(false)
+  }, [isDocs])
+
+  useEffect(() => {
+    if (!isDocs) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return
+      if (document.querySelector('[aria-modal="true"]')) return
+      if (e.key === 'Escape' && fullscreen) {
+        setFullscreen(false)
+        return
+      }
+      if ((e.key === 'f' || e.key === 'F') && !e.repeat && !isTyping(e.target)) {
+        e.preventDefault()
+        setFullscreen((v) => !v)
       }
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [switcherOpen])
-
-  useEffect(() => {
-    setSwitcherOpen(false)
-  }, [location.pathname])
-
-  const justCreated = (location.state as { created?: boolean } | null)?.created === true
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isDocs, fullscreen])
 
   if (isLoading && !project) {
     return (
       <DashboardLayout>
-        <LoadingBlock />
+        <div className={PROJECT_TAB_PAD}>
+          <LoadingBlock />
+        </div>
       </DashboardLayout>
     )
   }
-
   if (error || !project) {
     return (
       <DashboardLayout>
-        {isForbidden(error) ? (
-          <ForbiddenState message="Project does not exist or you are not a member." />
-        ) : (
-          <ErrorState message={apiErrorMessage(error)} onRetry={reload} />
-        )}
+        <div className={PROJECT_TAB_PAD}>
+          {isForbidden(error) ? (
+            <ForbiddenState
+              message={t(
+                'Dự án không tồn tại hoặc bạn không phải thành viên.',
+                "The project doesn't exist or you're not a member.",
+              )}
+            />
+          ) : (
+            <ErrorState message={apiErrorMessage(error)} onRetry={reload} />
+          )}
+        </div>
       </DashboardLayout>
     )
   }
 
   const can = (permission: string) => hasPermission(project.myPermissions, permission)
   const isArchived = project.status === 'ARCHIVED'
-  const base = `/projects/${project.projectId}`
+  const role = resolveProjectRole(project)
+  const items = work.byProject.get(project.projectId) ?? []
   const context: ProjectOutletContext = {
     project,
     can,
     isArchived,
     reload,
     setProject: (next) => setData(() => next),
+    fullscreen: isDocs && fullscreen,
+    setFullscreen,
+    role,
+    work: {
+      items,
+      loading: work.loading && !work.byProject.has(project.projectId),
+      error: work.error,
+      reload: work.reload,
+    },
   }
 
-  // Determine active module tab
-  const pathname = location.pathname
-  const getActiveTab = () => {
-    if (pathname.includes('/documents')) return 'documents'
-    if (pathname.includes('/issues') || pathname.includes('/kanban')) return 'issues'
-    if (pathname.includes('/testcases')) return 'testcases'
-    if (pathname.includes('/workflow')) return 'workflow'
-    if (pathname.includes('/members')) return 'members'
-    if (pathname.includes('/settings')) return 'settings'
-    return 'overview'
-  }
-  const activeTab = getActiveTab()
-
-  // Switch project while keeping the current active sub-tab
-  const handleSwitchProject = (targetProjectId: number) => {
-    setSwitcherOpen(false)
-    const subPath = activeTab === 'overview' ? '' : `/${activeTab}`
-    navigate(`/projects/${targetProjectId}${subPath}`)
-  }
-
-  const isFullCanvasTab =
-    activeTab === 'documents' || activeTab === 'issues' || activeTab === 'testcases'
-
-  const navTabs = [
-    { key: 'overview', icon: '📊', label: 'Overview', to: base, count: undefined, hidden: false },
-    {
-      key: 'documents',
-      icon: '📄',
-      label: 'Documents',
-      to: `${base}/documents`,
-      count: docStats.data?.totalDocs,
-      hidden: false,
-    },
-    {
-      key: 'issues',
-      icon: '📋',
-      label: 'Issues',
-      to: `${base}/issues`,
-      count: issueStats.data?.open,
-      hidden: false,
-    },
-    {
-      key: 'testcases',
-      icon: '🧪',
-      label: 'Test Cases',
-      to: `${base}/testcases`,
-      count: undefined,
-      hidden: false,
-    },
-    {
-      key: 'workflow',
-      icon: '🔄',
-      label: 'Workflow',
-      to: `${base}/workflow`,
-      count: project.phaseCount,
-      hidden: false,
-    },
-    {
-      key: 'members',
-      icon: '👥',
-      label: 'Members',
-      to: `${base}/members`,
-      count: project.memberCount,
-      hidden: !can(PERMISSIONS.projectView),
-    },
-    {
-      key: 'settings',
-      icon: '⚙️',
-      label: 'Settings',
-      to: `${base}/settings`,
-      count: undefined,
-      hidden: !can(PERMISSIONS.projectUpdate) && !can(PERMISSIONS.projectArchive),
-    },
-  ].filter((t) => !t.hidden)
-
-  const projectList = allProjectsAsync.data ?? []
-
-  return (
-    <div className="fixed inset-0 z-40 flex h-screen w-screen flex-col bg-slate-50 text-slate-900 overflow-hidden">
-      {/* =================================================================== */}
-      {/* ROW 1: MASTER PROJECT HEADER (56PX — 100% IDENTICAL ACROSS ALL TABS) */}
-      {/* =================================================================== */}
-      <header className="h-14 bg-white border-b border-slate-200 px-4 flex items-center justify-between gap-3 shrink-0 shadow-2xs z-30">
-        {/* LEFT ZONE: PORTAL EXIT + PROJECT SPACE SWITCHER + NEW TAB BUTTON */}
-        <div className="flex items-center gap-2 shrink-0 min-w-0">
-          <Link
-            to={`/workspaces/${project.workspaceId}/projects`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 px-2.5 py-1.5 text-xs font-bold text-slate-700 transition-colors shrink-0"
-            title="Exit Project Space and return to Organization Portal"
-          >
-            <span>← Portal</span>
-          </Link>
-
-          <span className="h-4 w-px bg-slate-200 shrink-0" />
-
-          {/* Project Space Switcher Dropdown */}
-          <div className="relative" ref={switcherRef}>
-            <button
-              type="button"
-              onClick={() => setSwitcherOpen((v) => !v)}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200/90 bg-white hover:bg-slate-50 px-2.5 py-1 text-left transition-colors shadow-2xs"
-              title="Switch to another Project Space"
-            >
-              <span className="rounded bg-blue-600 px-1.5 py-0.5 font-mono text-[11px] font-bold text-white shrink-0">
-                {project.key}
-              </span>
-              <span className="font-extrabold text-sm text-slate-900 truncate max-w-[140px] xl:max-w-[200px]">
-                {project.name}
-              </span>
-              <span className="text-[10px] text-slate-400">▾</span>
-            </button>
-
-            {switcherOpen && (
-              <div className="absolute left-0 top-full mt-1.5 w-80 rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl z-50">
-                <div className="px-2.5 py-1.5 border-b border-slate-100 flex items-center justify-between">
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Switch Project Space
-                  </span>
-                  <span className="text-[10px] text-slate-400">{projectList.length} projects</span>
-                </div>
-                <div className="max-h-64 overflow-y-auto py-1 space-y-0.5">
-                  {projectList.map((p) => {
-                    const isCurrent = p.projectId === project.projectId
-                    const subPath = activeTab === 'overview' ? '' : `/${activeTab}`
-                    const targetHref = `/projects/${p.projectId}${subPath}`
-                    return (
-                      <div
-                        key={p.projectId}
-                        className={clsx(
-                          'flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-xs transition-colors',
-                          isCurrent ? 'bg-blue-50 text-blue-900 font-bold' : 'hover:bg-slate-50 text-slate-700',
-                        )}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => handleSwitchProject(p.projectId)}
-                          className="flex items-center gap-2 min-w-0 flex-1 text-left"
-                        >
-                          <span className="rounded bg-slate-100 border border-slate-200 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-700 shrink-0">
-                            {p.key}
-                          </span>
-                          <span className="truncate">{p.name}</span>
-                        </button>
-                        <a
-                          href={targetHref}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          title={`Open ${p.name} in a new browser tab`}
-                          className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 shrink-0"
-                        >
-                          ↗
-                        </a>
-                      </div>
-                    )
-                  })}
-                </div>
-                <div className="border-t border-slate-100 pt-1 mt-1 flex items-center justify-between px-2 py-1">
-                  <Link
-                    to="/projects"
-                    className="text-xs font-semibold text-blue-600 hover:underline"
-                  >
-                    📁 View all projects in Portal →
-                  </Link>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Open Current Project Space in New Browser Tab */}
-          <a
-            href={location.pathname}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Open this Project Space in a new browser tab"
-            className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors shrink-0"
-          >
-            ↗
-          </a>
-        </div>
-
-        {/* CENTER ZONE: STATIONARY 7-TAB PROJECT NAVIGATION BAR */}
-        <nav
-          aria-label="Project space modules"
-          className="flex items-center gap-1 rounded-xl border border-slate-200/90 bg-slate-100/90 p-1 text-xs font-semibold shadow-2xs overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden shrink-0"
-        >
-          {navTabs.map((tab) => {
-            const isActive = activeTab === tab.key
-            return (
-              <Link
-                key={tab.key}
-                to={tab.to}
-                className={clsx(
-                  'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs transition-all whitespace-nowrap shrink-0',
-                  isActive
-                    ? 'bg-white text-blue-700 font-bold shadow-xs border border-slate-200/80'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60',
-                )}
-              >
-                <span>{tab.icon}</span>
-                <span>{tab.label}</span>
-                {tab.count !== undefined && (
-                  <span
-                    className={clsx(
-                      'rounded-full px-1.5 py-0.2 font-mono text-[10px] font-bold',
-                      isActive ? 'bg-blue-50 text-blue-700' : 'bg-slate-200/80 text-slate-600',
-                    )}
-                  >
-                    {tab.count}
-                  </span>
-                )}
-              </Link>
-            )
-          })}
-        </nav>
-
-        {/* RIGHT ZONE: PROJECT STATUS & USER IDENTITY */}
-        <div className="hidden xl:flex items-center gap-2 shrink-0">
-          {isArchived ? (
-            <Badge tone="amber">Archived</Badge>
-          ) : (
-            <Badge tone="brand" dot>
-              Active
-            </Badge>
+  const hasAlerts = justCreated || isArchived
+  const alerts = hasAlerts && (
+    <div className="space-y-3">
+      {justCreated && (
+        <Alert tone="success">
+          {t('Đã khởi tạo dự án ', 'Created project ')}
+          <b>{project.name}</b>
+          {t(
+            ` với ${project.phaseCount} giai đoạn và ${project.memberCount} thành viên. Bạn là Project Manager của dự án này.`,
+            ` with ${project.phaseCount} ${project.phaseCount === 1 ? 'phase' : 'phases'} and ${project.memberCount} ${project.memberCount === 1 ? 'member' : 'members'}. You're the Project Manager.`,
           )}
-          <Badge>{SDLC_LABEL[project.sdlcMethod]}</Badge>
-          {project.myRole && (
-            <Badge tone={project.myRole.code === 'PROJECT_MANAGER' ? 'brand' : 'blue'}>
-              {project.myRole.name}
-            </Badge>
+        </Alert>
+      )}
+      {isArchived && (
+        <Alert tone="warning">
+          {t(
+            'Dự án đã được lưu trữ: mọi tài liệu, issue và cấu hình đều chỉ đọc.',
+            'This project is archived: all documents, issues and settings are read-only.',
           )}
-          <div
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700 border border-blue-200 shrink-0"
-            title={user?.fullName || 'Current User'}
-          >
-            {(user?.fullName ?? 'U').slice(0, 1).toUpperCase()}
-          </div>
-        </div>
-      </header>
-
-      {/* =================================================================== */}
-      {/* ROW 2 & 3: DYNAMIC MODULE VIEWPORT                                  */}
-      {/* =================================================================== */}
-      {isFullCanvasTab ? (
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
-          <Outlet context={context} />
-        </div>
-      ) : (
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          {/* ROW 2: CONTEXTUAL SUB-TOOLBAR FOR OVERVIEW / WORKFLOW / MEMBERS / SETTINGS */}
-          <div className="h-10 bg-slate-100/90 border-b border-slate-200/80 px-6 flex items-center justify-between gap-4 text-xs text-slate-600 shrink-0">
-            <div className="flex items-center gap-2 min-w-0 truncate">
-              <span className="font-semibold text-slate-700">🏢 {project.workspaceName}</span>
-              {project.description && (
-                <>
-                  <span className="text-slate-300">·</span>
-                  <span className="truncate text-slate-500">{project.description}</span>
-                </>
-              )}
-            </div>
-            <div className="hidden sm:flex items-center gap-3 shrink-0 font-mono text-[11px] text-slate-500">
-              <span>📄 {docStats.data?.totalDocs ?? 0} Documents</span>
-              <span>·</span>
-              <span>📋 {issueStats.data?.open ?? 0} Open Issues</span>
-              <span>·</span>
-              <span>👥 {project.memberCount} Members</span>
-            </div>
-          </div>
-
-          {/* ROW 3: SCROLLABLE STANDARD PAGE BODY */}
-          <div className="flex-1 overflow-y-auto p-6">
-            <div className="mx-auto max-w-7xl space-y-4">
-              {justCreated && (
-                <Alert tone="success">
-                  Project <b>{project.name}</b> has been created with {project.phaseCount} phases and{' '}
-                  {project.memberCount} members. You are the Project Manager of this project.
-                </Alert>
-              )}
-              {isArchived && (
-                <Alert tone="warning">
-                  This project is archived — all documents, issues, and configurations are read-only.
-                </Alert>
-              )}
-              <Outlet context={context} />
-            </div>
-          </div>
-        </div>
+        </Alert>
       )}
     </div>
   )
+
+  const header = (
+    <EntityHeader
+      title={pageTitle || project.name}
+      titleHint={`${project.name} · ${project.myRole?.name ?? t('Chỉ xem', 'View only')}`}
+      badges={isArchived && <Badge tone="amber">{t('Đã lưu trữ', 'Archived')}</Badge>}
+      tabs={[]}
+      navLabel={t('Mục dự án', 'Project sections')}
+      trailing={
+        <>
+          {isDocs ? (
+            <IconButton
+              label={t('Toàn màn hình (F)', 'Full screen (F)')}
+              onClick={() => setFullscreen(true)}
+              className="border border-gray-200 text-gray-600"
+            >
+              <ExpandIcon />
+            </IconButton>
+          ) : (
+            section === 'my-work' && (
+              <span className="hidden text-[13px] text-gray-500 sm:inline">
+                {t('Sắp theo mức gấp', 'Sorted by urgency')}
+              </span>
+            )
+          )}
+          <HelpTips role={role} />
+        </>
+      }
+    />
+  )
+
+  const shortRole = ROLE_SHORT[role]
+
+  return (
+    <DashboardLayout
+      workspaceId={project.workspaceId}
+      fullscreen={context.fullscreen}
+      projectNav={<ProjectSidebar project={project} role={role} items={items} />}
+      accountHint={shortRole ? `${shortRole} · ${project.name}` : (project.myRole?.name ?? undefined)}
+      mobileTitle={project.name}
+    >
+      {!context.fullscreen && header}
+      {isDocs ? (
+        <div className="flex min-h-0 flex-1 flex-col">
+          {alerts && !context.fullscreen && <div className="shrink-0 px-4 pt-3 sm:px-5">{alerts}</div>}
+          <LazyOutlet context={context} />
+        </div>
+      ) : (
+        <div className={PROJECT_TAB_PAD}>
+          {alerts && <div className="mb-6">{alerts}</div>}
+          <LazyOutlet context={context} />
+        </div>
+      )}
+    </DashboardLayout>
+  )
+}
+
+function sectionTitle(section: string, t: (vi: string, en: string) => string): string {
+  switch (section) {
+    case 'my-work':
+      return t('Việc của tôi', 'My work')
+    case 'overview':
+      return t('Tổng quan dự án', 'Project overview')
+    case 'documents':
+      return t('Tài liệu', 'Documents')
+    case 'kanban':
+      return 'Kanban'
+    case 'tests':
+      return 'Test cases'
+    case 'workflow':
+      return 'Workflow'
+    case 'members':
+      return t('Thành viên', 'Members')
+    case 'settings':
+      return t('Cài đặt', 'Settings')
+    default:
+      return ''
+  }
 }

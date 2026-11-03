@@ -265,6 +265,7 @@ export function createSeed(): MockDb {
     { id: 6, fullName: 'Phạm Công Minh', email: 'minh@fintechcorp.com', password: MOCK_PASSWORD },
     { id: 7, fullName: 'Đặng Thu Trang', email: 'trang@fintechcorp.com', password: MOCK_PASSWORD },
     { id: 8, fullName: 'Hoàng Minh Quân', email: 'quan@fintechcorp.com', password: MOCK_PASSWORD },
+    { id: 9, fullName: 'Trần Thị C', email: 'tran.c@fintechcorp.com', password: MOCK_PASSWORD },
   ]
 
   // Role hệ thống theo §0.3 (id 1–10) + vài role tự tạo (11+).
@@ -317,7 +318,8 @@ export function createSeed(): MockDb {
     { companyId: 1, userId: 5, roleId: 2, status: 'ACTIVE', joinedAt: at('2026-09-13') },
     { companyId: 1, userId: 6, roleId: 2, status: 'ACTIVE', joinedAt: at('2026-09-15') },
     { companyId: 1, userId: 7, roleId: 2, status: 'ACTIVE', joinedAt: at('2026-09-16') },
-    { companyId: 1, userId: 8, roleId: 2, status: 'DEACTIVATED', joinedAt: at('2026-09-16') },
+    { companyId: 1, userId: 8, roleId: 2, status: 'ACTIVE', joinedAt: at('2026-09-16') },
+    { companyId: 1, userId: 9, roleId: 2, status: 'ACTIVE', joinedAt: at('2026-09-17') },
   ]
 
   const ws = (id: number, name: string, code: string, description: string, createdBy: number, created: string, updated: string, archived = false): MockWorkspace => ({
@@ -348,6 +350,7 @@ export function createSeed(): MockDb {
   })
 
   const workspaceMembers: MockWorkspaceMember[] = [
+    wm(10, 1, 3, '2026-09-12'), // Sarah — Workspace Admin
     wm(10, 2, 3, '2026-09-12'), // Khoa — Workspace Admin
     wm(10, 3, 4, '2026-09-13'), // Kỳ — Project Initiator
     wm(10, 4, 5, '2026-09-13'), // Lương — Workspace Member
@@ -406,9 +409,9 @@ export function createSeed(): MockDb {
     instantiateTemplate(db, id, sdlcMethod)
   }
 
-  project(20, 10, 'CORE', 'Lõi tài khoản & KYC', 'Mở tài khoản, eKYC và quản lý hồ sơ khách hàng', 'CUSTOM', 2, '2026-09-12', '2026-10-09', [[2, 6], [4, 9], [5, 10]])
-  project(21, 10, 'PAY', 'Thanh toán & QR', 'Thanh toán QR, chuyển khoản nhanh 24/7', 'KANBAN', 3, '2026-09-15', '2026-10-08', [[3, 6], [4, 9]])
-  project(22, 10, 'NOTIF', 'Thông báo đẩy', 'Push notification & in-app message', 'SCRUM', 2, '2026-09-18', '2026-10-07', [[2, 6], [5, 10]])
+  project(20, 10, 'CORE', 'Lõi tài khoản & KYC', 'Mở tài khoản, eKYC và quản lý hồ sơ khách hàng', 'CUSTOM', 2, '2026-09-12', '2026-10-09', [[1, 6], [2, 6], [4, 9], [5, 10]])
+  project(21, 10, 'PAY', 'Thanh toán & QR', 'Thanh toán QR, chuyển khoản nhanh 24/7', 'KANBAN', 3, '2026-09-15', '2026-10-08', [[1, 6], [3, 6], [4, 9]])
+  project(22, 10, 'NOTIF', 'Thông báo đẩy', 'Push notification & in-app message', 'SCRUM', 2, '2026-09-18', '2026-10-07', [[1, 6], [2, 6], [5, 10]])
   project(23, 10, 'RPT', 'Báo cáo & Đối soát', 'Báo cáo giao dịch và đối soát cuối ngày', 'CUSTOM', 3, '2026-09-13', '2026-10-02', [[3, 6]], true)
   project(24, 11, 'PORTAL', 'Cổng thông tin nội bộ', 'Tin tức, quy trình và biểu mẫu nội bộ', 'KANBAN', 1, '2026-09-14', '2026-10-08', [[1, 6], [7, 9]])
 

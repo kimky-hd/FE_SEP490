@@ -4,10 +4,20 @@ import { Avatar } from '@/components/ui/Avatar'
 import { roleApi } from '@/api/roleApi'
 import { useAsync } from '@/lib/useAsync'
 import { apiErrorMessage } from '@/lib/apiErrors'
+import { useI18n } from '@/i18n'
 import type { RoleDto, RoleMemberDto } from '@/types/rbac'
 
 // Danh sách người đang giữ role (link "N người" ở Figma C) — UC §II.4.7 nhánh "click vào 1 role".
-export function RoleMembersModal({ companyId, role, onClose }: { companyId: number; role: RoleDto | null; onClose: () => void }) {
+export function RoleMembersModal({
+  companyId,
+  role,
+  onClose,
+}: {
+  companyId: number
+  role: RoleDto | null
+  onClose: () => void
+}) {
+  const { t } = useI18n()
   const members = useAsync<RoleMemberDto[]>(
     () => (role ? roleApi.listMembers(companyId, role.roleId) : Promise.resolve([])),
     [companyId, role?.roleId],
@@ -17,25 +27,36 @@ export function RoleMembersModal({ companyId, role, onClose }: { companyId: numb
     <Modal
       open={role !== null}
       onClose={onClose}
-      title={role ? `Người giữ role “${role.name}”` : ''}
+      title={role ? t(`Người giữ role “${role.name}”`, `People with role “${role.name}”`) : ''}
       description={
         role?.scope === 'WORKSPACE'
-          ? 'Role cấp workspace — mỗi dòng là 1 lần gán trong 1 workspace.'
+          ? t(
+              'Role cấp workspace — mỗi dòng là 1 lần gán trong 1 workspace.',
+              'Workspace-level role — each row is one assignment in one workspace.',
+            )
           : role?.scope === 'PROJECT'
-            ? 'Role cấp dự án — mỗi dòng là 1 lần gán trong 1 dự án.'
+            ? t(
+                'Role cấp dự án — mỗi dòng là 1 lần gán trong 1 dự án.',
+                'Project-level role — each row is one assignment in one project.',
+              )
             : undefined
       }
     >
       {members.isLoading ? (
-        <p className="py-6 text-center text-sm text-gray-400">Đang tải…</p>
+        <p className="py-6 text-center text-sm text-gray-500">{t('Đang tải…', 'Loading…')}</p>
       ) : members.error ? (
-        <p className="py-6 text-center text-sm text-red-600">{apiErrorMessage(members.error)}</p>
+        <p className="py-6 text-center text-sm text-red-700">{apiErrorMessage(members.error)}</p>
       ) : (members.data ?? []).length === 0 ? (
-        <p className="py-6 text-center text-sm text-gray-400">Chưa có ai giữ role này.</p>
+        <p className="py-6 text-center text-sm text-gray-500">
+          {t('Chưa có ai giữ role này.', 'No one has this role yet.')}
+        </p>
       ) : (
         <ul className="divide-y divide-gray-100">
           {members.data!.map((m) => (
-            <li key={`${m.userId}-${m.workspace?.workspaceId ?? 0}-${m.project?.projectId ?? 0}`} className="flex items-center gap-3 py-2.5">
+            <li
+              key={`${m.userId}-${m.workspace?.workspaceId ?? 0}-${m.project?.projectId ?? 0}`}
+              className="flex items-center gap-3 py-2.5"
+            >
               <Avatar name={m.fullName} size="sm" />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-gray-900">{m.fullName}</p>

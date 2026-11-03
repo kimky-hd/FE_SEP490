@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { authApi } from '@/api/authApi'
-import { tokenStorage } from '@/lib/storage'
+import { clearCachedData, onDataChanged } from '@/lib/dataEvents'
+import { clearUserLocalData, tokenStorage } from '@/lib/storage'
+import { ApiError } from '@/lib/apiClient'
 import { companyPermissionSet, hasPermission } from '@/lib/permissions'
 import type { AuthSessionDto, CompanyMembershipDto, MeResponseDto, UserDto, WorkspaceSummaryDto } from '@/types/auth'
 
@@ -41,10 +43,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false
     const bootstrap = async () => {
       if (tokenStorage.getAccessToken()) {
-        try {
-          await loadMe()
-        } catch {
-          if (!cancelled) tokenStorage.clear()
+        // Chỉ đăng xuất khi phiên thật sự không còn hợp lệ (401/403). Lỗi tạm thời (429 bị giới hạn tần suất,
+        // mất mạng, 5xx) thì thử lại vài lần thay vì xoá token và đá người dùng về trang đăng nhập.
+        for (let attempt = 0; attempt < 3 && !cancelled; attempt++) {
+          try {
+            await loadMe()
+            break
+          } catch (err) {
+            // Tạm thời: mất mạng (status 0), bị giới hạn tần suất (429), lỗi máy chủ (5xx). Còn lại coi là phiên hỏng.
+            const transient = err instanceof ApiError && (err.status === 0 || err.status === 429 || err.status >= 500)
+            if (!transient || attempt === 2) {
+              if (!cancelled && !transient) tokenStorage.clear()
+              break
+            }
+            await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)))
+          }
         }
       }
       if (!cancelled) setIsBootstrapping(false)
@@ -54,6 +67,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelled = true
     }
   }, [])
+
+  // Sau mỗi thao tác ghi (tạo workspace / dự án, đổi role…) danh sách workspace, công ty và quyền trong
+  // /auth/me có thể đã đổi → tải lại ngầm, lỗi thì giữ dữ liệu cũ.
+  useEffect(
+    () =>
+      onDataChanged(() => {
+        if (tokenStorage.getAccessToken()) void loadMe().catch(() => undefined)
+      }),
+    // loadMe chỉ gọi setState (ổn định) nên không cần trong deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  )
 
   const applySession = (session: AuthSessionDto) => {
     tokenStorage.setTokens(session.accessToken, session.refreshToken)
@@ -65,8 +90,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     const accessToken = tokenStorage.getAccessToken()
     const refreshToken = tokenStorage.getRefreshToken()
-    // Đăng xuất cục bộ ngay lập tức, không chờ mạng.
+    // Đăng xuất cục bộ ngay lập tức, không chờ mạng. Xoá luôn dữ liệu cục bộ (trừ ngôn ngữ) và cache trong bộ nhớ
+    // để người dùng sau trên cùng máy không thấy nháp / mục gần đây / dữ liệu của người trước.
     tokenStorage.clear()
+    clearUserLocalData()
+    clearCachedData()
     setUser(null)
     setCompanies([])
     setWorkspaces([])

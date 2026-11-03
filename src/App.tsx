@@ -1,46 +1,65 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Suspense, type ReactNode } from 'react'
+import { BrowserRouter, Navigate, Routes, Route, useLocation } from 'react-router-dom'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import { AuthProvider, useAuth } from '@/context/AuthContext'
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute'
 import { GuestRoute } from '@/components/layout/GuestRoute'
-import { DevScreenFloatingWidget, ScreenDirectoryPage } from '@/components/layout/DevScreenNavigator'
+import { ErrorBoundary } from '@/components/layout/ErrorBoundary'
 import { FullPageSpinner } from '@/components/ui/Spinner'
+import { lazyPage } from '@/lib/lazyPage'
+// Không lazy: màn đầu tiên của khách.
 import { LandingPage } from '@/pages/LandingPage'
-import { RegisterPage } from '@/pages/auth/RegisterPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
-import { VerifyEmailPendingPage } from '@/pages/auth/VerifyEmailPendingPage'
-import { VerifyEmailPage } from '@/pages/auth/VerifyEmailPage'
-import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
-import { ForgotPasswordSentPage } from '@/pages/auth/ForgotPasswordSentPage'
-import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
-import { AcceptInvitePage } from '@/pages/invite/AcceptInvitePage'
-import { ChooseAccountTypePage } from '@/pages/onboarding/ChooseAccountTypePage'
-import { CompanySetupPage } from '@/pages/onboarding/CompanySetupPage'
-import { CreateWorkspacePage } from '@/pages/onboarding/CreateWorkspacePage'
-import { DomainMatchPage } from '@/pages/onboarding/DomainMatchPage'
-import { PendingApprovalPage } from '@/pages/onboarding/PendingApprovalPage'
-import { DashboardHomePage } from '@/pages/dashboard/DashboardHomePage'
-import { InviteMemberPage } from '@/pages/dashboard/InviteMemberPage'
-import { WorkspaceListPage } from '@/pages/workspaces/WorkspaceListPage'
-import { WorkspaceLayout } from '@/pages/workspaces/WorkspaceLayout'
-import { WorkspaceOverviewPage } from '@/pages/workspaces/WorkspaceOverviewPage'
-import { WorkspaceMembersPage } from '@/pages/workspaces/WorkspaceMembersPage'
-import { WorkspaceSettingsPage } from '@/pages/workspaces/WorkspaceSettingsPage'
-import { WorkspaceProjectsPage } from '@/pages/workspaces/WorkspaceProjectsPage'
-import { CreateProjectWizardPage } from '@/pages/projects/wizard/CreateProjectWizardPage'
-import { ProjectsPage } from '@/pages/projects/ProjectsPage'
-import { ProjectLayout } from '@/pages/projects/ProjectLayout'
-import { ProjectOverviewPage } from '@/pages/projects/ProjectOverviewPage'
-import { ProjectWorkflowPage } from '@/pages/projects/ProjectWorkflowPage'
-import { ProjectMembersPage } from '@/pages/projects/ProjectMembersPage'
-import { ProjectSettingsPage } from '@/pages/projects/ProjectSettingsPage'
-import { ProjectIssuesPage } from '@/pages/projects/ProjectIssuesPage'
-import { ConfluenceWorkspacePage } from '@/pages/projects/ConfluenceWorkspacePage'
-import { ProjectTestCasesPage } from '@/pages/projects/ProjectTestCasesPage'
-import { RoleListPage } from '@/pages/admin/RoleListPage'
-import { RoleEditorPage } from '@/pages/admin/RoleEditorPage'
-import { CompanyUsersPage } from '@/pages/admin/CompanyUsersPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+
+const RegisterPage = lazyPage(() => import('@/pages/auth/RegisterPage'), 'RegisterPage')
+const VerifyEmailPendingPage = lazyPage(() => import('@/pages/auth/VerifyEmailPendingPage'), 'VerifyEmailPendingPage')
+const VerifyEmailPage = lazyPage(() => import('@/pages/auth/VerifyEmailPage'), 'VerifyEmailPage')
+const ForgotPasswordPage = lazyPage(() => import('@/pages/auth/ForgotPasswordPage'), 'ForgotPasswordPage')
+const ForgotPasswordSentPage = lazyPage(() => import('@/pages/auth/ForgotPasswordSentPage'), 'ForgotPasswordSentPage')
+const ResetPasswordPage = lazyPage(() => import('@/pages/auth/ResetPasswordPage'), 'ResetPasswordPage')
+const ChooseAccountTypePage = lazyPage(
+  () => import('@/pages/onboarding/ChooseAccountTypePage'),
+  'ChooseAccountTypePage',
+)
+const CompanySetupPage = lazyPage(() => import('@/pages/onboarding/CompanySetupPage'), 'CompanySetupPage')
+const CreateWorkspacePage = lazyPage(() => import('@/pages/onboarding/CreateWorkspacePage'), 'CreateWorkspacePage')
+const DomainMatchPage = lazyPage(() => import('@/pages/onboarding/DomainMatchPage'), 'DomainMatchPage')
+const PendingApprovalPage = lazyPage(() => import('@/pages/onboarding/PendingApprovalPage'), 'PendingApprovalPage')
+const DashboardHomePage = lazyPage(() => import('@/pages/dashboard/DashboardHomePage'), 'DashboardHomePage')
+const InviteMemberPage = lazyPage(() => import('@/pages/dashboard/InviteMemberPage'), 'InviteMemberPage')
+const WorkspaceListPage = lazyPage(() => import('@/pages/workspaces/WorkspaceListPage'), 'WorkspaceListPage')
+const WorkspaceLayout = lazyPage(() => import('@/pages/workspaces/WorkspaceLayout'), 'WorkspaceLayout')
+const WorkspaceOverviewPage = lazyPage(
+  () => import('@/pages/workspaces/WorkspaceOverviewPage'),
+  'WorkspaceOverviewPage',
+)
+const WorkspaceMembersPage = lazyPage(() => import('@/pages/workspaces/WorkspaceMembersPage'), 'WorkspaceMembersPage')
+const WorkspaceSettingsPage = lazyPage(
+  () => import('@/pages/workspaces/WorkspaceSettingsPage'),
+  'WorkspaceSettingsPage',
+)
+const WorkspaceProjectsPage = lazyPage(
+  () => import('@/pages/workspaces/WorkspaceProjectsPage'),
+  'WorkspaceProjectsPage',
+)
+const CreateProjectWizardPage = lazyPage(
+  () => import('@/pages/projects/wizard/CreateProjectWizardPage'),
+  'CreateProjectWizardPage',
+)
+const ProjectsPage = lazyPage(() => import('@/pages/projects/ProjectsPage'), 'ProjectsPage')
+const ProjectLayout = lazyPage(() => import('@/pages/projects/ProjectLayout'), 'ProjectLayout')
+const ProjectOverviewPage = lazyPage(() => import('@/pages/projects/ProjectOverviewPage'), 'ProjectOverviewPage')
+const ProjectMyWorkPage = lazyPage(() => import('@/pages/projects/ProjectMyWorkPage'), 'ProjectMyWorkPage')
+const ProjectWorkflowPage = lazyPage(() => import('@/pages/projects/ProjectWorkflowPage'), 'ProjectWorkflowPage')
+const ProjectMembersPage = lazyPage(() => import('@/pages/projects/ProjectMembersPage'), 'ProjectMembersPage')
+const ProjectSettingsPage = lazyPage(() => import('@/pages/projects/ProjectSettingsPage'), 'ProjectSettingsPage')
+const ProjectDocumentsPage = lazyPage(() => import('@/pages/documents/ProjectDocumentsPage'), 'ProjectDocumentsPage')
+const KanbanPage = lazyPage(() => import('@/pages/kanban/KanbanPage'), 'KanbanPage')
+const TestsPage = lazyPage(() => import('@/pages/tests/TestsPage'), 'TestsPage')
+const RoleListPage = lazyPage(() => import('@/pages/admin/RoleListPage'), 'RoleListPage')
+const RoleEditorPage = lazyPage(() => import('@/pages/admin/RoleEditorPage'), 'RoleEditorPage')
+const CompanyUsersPage = lazyPage(() => import('@/pages/admin/CompanyUsersPage'), 'CompanyUsersPage')
 
 function RootRoute() {
   const { isAuthenticated, isBootstrapping } = useAuth()
@@ -54,20 +73,16 @@ function RootRoute() {
   )
 }
 
+/** Mở dự án (/projects/:id) là vào "Việc của tôi"; giữ state (vd `created` sau khi tạo dự án). */
+function ProjectIndexRedirect() {
+  const location = useLocation()
+  return <Navigate to="my-work" replace state={location.state} />
+}
+
 function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<RootRoute />} />
-      <Route path="/screens" element={<ScreenDirectoryPage />} />
-      <Route path="/landing" element={<LandingPage />} />
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <DashboardHomePage />
-          </ProtectedRoute>
-        }
-      />
 
       <Route
         path="/register"
@@ -90,170 +105,80 @@ function AppRoutes() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/forgot-password/sent" element={<ForgotPasswordSentPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route path="/invite" element={<AcceptInvitePage />} />
-      <Route path="/invite/:token" element={<AcceptInvitePage />} />
 
-      <Route
-        path="/onboarding/account-type"
-        element={
-          <ProtectedRoute>
-            <ChooseAccountTypePage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/onboarding/company-setup"
-        element={
-          <ProtectedRoute>
-            <CompanySetupPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/onboarding/domain-match"
-        element={
-          <ProtectedRoute>
-            <DomainMatchPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/onboarding/pending-approval"
-        element={
-          <ProtectedRoute>
-            <PendingApprovalPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/onboarding/create-workspace"
-        element={
-          <ProtectedRoute>
-            <CreateWorkspacePage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/members/invite"
-        element={
-          <ProtectedRoute>
-            <InviteMemberPage />
-          </ProtectedRoute>
-        }
-      />
+      <Route element={<ProtectedRoute />}>
+        <Route path="/onboarding/account-type" element={<ChooseAccountTypePage />} />
+        <Route path="/onboarding/company-setup" element={<CompanySetupPage />} />
+        <Route path="/onboarding/domain-match" element={<DomainMatchPage />} />
+        <Route path="/onboarding/pending-approval" element={<PendingApprovalPage />} />
+        <Route path="/onboarding/create-workspace" element={<CreateWorkspacePage />} />
+        <Route path="/members/invite" element={<InviteMemberPage />} />
 
-      {/* Workspace — doc/Workspace-RBAC-API-Contract.md §4, §5 */}
-      <Route
-        path="/workspaces"
-        element={
-          <ProtectedRoute>
-            <WorkspaceListPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/workspaces/:workspaceId"
-        element={
-          <ProtectedRoute>
-            <WorkspaceLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<WorkspaceOverviewPage />} />
-        <Route path="projects" element={<WorkspaceProjectsPage />} />
-        <Route path="members" element={<WorkspaceMembersPage />} />
-        <Route path="settings" element={<WorkspaceSettingsPage />} />
+        {/* Workspace — doc/Workspace-RBAC-API-Contract.md §4, §5 */}
+        <Route path="/workspaces" element={<WorkspaceListPage />} />
+        <Route path="/workspaces/:workspaceId" element={<WorkspaceLayout />}>
+          <Route index element={<WorkspaceOverviewPage />} />
+          <Route path="projects" element={<WorkspaceProjectsPage />} />
+          <Route path="members" element={<WorkspaceMembersPage />} />
+          <Route path="settings" element={<WorkspaceSettingsPage />} />
+        </Route>
+
+        {/* Dự án & Workflow — §9–§12 */}
+        <Route path="/workspaces/:workspaceId/projects/new" element={<CreateProjectWizardPage />} />
+        <Route path="/projects" element={<ProjectsPage />} />
+        <Route path="/projects/:projectId" element={<ProjectLayout />}>
+          <Route index element={<ProjectIndexRedirect />} />
+          <Route path="my-work" element={<ProjectMyWorkPage />} />
+          <Route path="overview" element={<ProjectOverviewPage />} />
+          {/* Tài liệu — doc/Documents-API-Contract.md */}
+          <Route path="documents" element={<ProjectDocumentsPage />} />
+          <Route path="documents/:documentId" element={<ProjectDocumentsPage />} />
+          {/* Kanban & Test cases — doc/Issues-Testcases-API-Contract.md */}
+          <Route path="kanban" element={<KanbanPage />} />
+          <Route path="kanban/backlog" element={<KanbanPage />} />
+          <Route path="tests" element={<TestsPage />} />
+          <Route path="tests/cycles/:cycleId?" element={<TestsPage />} />
+          <Route path="testcases" element={<Navigate to="../tests" replace />} />
+          <Route path="workflow" element={<ProjectWorkflowPage />} />
+          <Route path="members" element={<ProjectMembersPage />} />
+          <Route path="settings" element={<ProjectSettingsPage />} />
+        </Route>
+
+        {/* Quản trị công ty — §2, §3, §6 */}
+        <Route path="/admin/roles" element={<RoleListPage />} />
+        <Route path="/admin/roles/new" element={<RoleEditorPage />} />
+        <Route path="/admin/roles/:roleId" element={<RoleEditorPage />} />
+        <Route path="/admin/users" element={<CompanyUsersPage />} />
       </Route>
 
-      {/* Dự án & Workflow — §9–§12 */}
-      <Route
-        path="/workspaces/:workspaceId/projects/new"
-        element={
-          <ProtectedRoute>
-            <CreateProjectWizardPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/projects"
-        element={
-          <ProtectedRoute>
-            <ProjectsPage />
-          </ProtectedRoute>
-        }
-      />
-      {/* Redirect root-level module shortcuts to default project space */}
-      <Route path="/documents" element={<Navigate to="/projects/20/documents" replace />} />
-      <Route path="/testcases" element={<Navigate to="/projects/20/testcases" replace />} />
-
-      {/* Unified Full-Screen Project Workspace Shell (100vw x 100vh) */}
-      <Route
-        path="/projects/:projectId"
-        element={
-          <ProtectedRoute>
-            <ProjectLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<ProjectOverviewPage />} />
-        <Route path="documents" element={<ConfluenceWorkspacePage />} />
-        <Route path="documents/:docId" element={<ConfluenceWorkspacePage />} />
-        <Route path="issues" element={<ProjectIssuesPage />} />
-        <Route path="kanban" element={<ProjectIssuesPage />} />
-        <Route path="testcases" element={<ProjectTestCasesPage />} />
-        <Route path="workflow" element={<ProjectWorkflowPage />} />
-        <Route path="members" element={<ProjectMembersPage />} />
-        <Route path="settings" element={<ProjectSettingsPage />} />
-      </Route>
-
-      {/* Quản trị công ty — §2, §3, §6 */}
-      <Route
-        path="/admin/roles"
-        element={
-          <ProtectedRoute>
-            <RoleListPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/roles/new"
-        element={
-          <ProtectedRoute>
-            <RoleEditorPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/roles/:roleId"
-        element={
-          <ProtectedRoute>
-            <RoleEditorPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/users"
-        element={
-          <ProtectedRoute>
-            <CompanyUsersPage />
-          </ProtectedRoute>
-        }
-      />
+      {/* Mục "Tài liệu" trên sidebar đã bỏ: tài liệu chỉ nằm trong tab Tài liệu của từng dự án. */}
+      <Route path="/documents" element={<Navigate to="/" replace />} />
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
 }
 
+function RouteErrorBoundary({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation()
+  return <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>
+}
+
 export function App() {
   return (
-    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || 'mock-google-client-id'}>
-      <BrowserRouter>
-        <AuthProvider>
-          <AppRoutes />
-          <DevScreenFloatingWidget />
-        </AuthProvider>
-      </BrowserRouter>
-    </GoogleOAuthProvider>
+    <ErrorBoundary>
+      <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+        {/* Giữ trang cũ trong lúc tải chunk trang mới, thay vì nháy về spinner toàn màn hình. */}
+        <BrowserRouter future={{ v7_startTransition: true }}>
+          <AuthProvider>
+            <RouteErrorBoundary>
+              <Suspense fallback={<FullPageSpinner />}>
+                <AppRoutes />
+              </Suspense>
+            </RouteErrorBoundary>
+          </AuthProvider>
+        </BrowserRouter>
+      </GoogleOAuthProvider>
+    </ErrorBoundary>
   )
 }

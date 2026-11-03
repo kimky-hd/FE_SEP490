@@ -9,15 +9,16 @@ export const invitationApi = {
     api.get<InvitationPreviewDto>(invitationPath(token), { skipAuth: true }).then((r) => r.data),
 
   acceptAsNewUser: (token: string, body: { fullName: string; password: string }) =>
-    api.post<AuthSessionDto & { companyId: number; workspaceId: number | null }>(
-      invitationPath(token, '/accept'),
-      body,
-      { skipAuth: true },
-    ).then((r) => r.data),
+    api
+      .post<AuthSessionDto & { companyId: number; workspaceId: number | null }>(
+        invitationPath(token, '/accept'),
+        body,
+        { skipAuth: true },
+      )
+      .then((r) => r.data),
 
   acceptAsExistingUser: (token: string) =>
-    api.post<{ companyId: number; workspaceId: number | null }>(
-      invitationPath(token, '/accept'),
-      {},
-    ).then((r) => r.data),
+    api
+      .post<{ companyId: number; workspaceId: number | null }>(invitationPath(token, '/accept'), {})
+      .then((r) => r.data),
 }

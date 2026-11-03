@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type DependencyList } from 'react'
+import { onDataChanged } from './dataEvents'
 
 interface AsyncState<T> {
   data: T | undefined
@@ -38,9 +39,14 @@ export function useAsync<T>(fn: () => Promise<T>, deps: DependencyList): AsyncSt
   useEffect(() => {
     void load()
     return () => {
+      // Cố ý đọc giá trị mới nhất lúc cleanup: tăng bộ đếm để response đang bay bị bỏ qua (không phải ref DOM).
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       requestId.current++
     }
   }, [load])
+
+  // Dữ liệu vừa đổi ở đâu đó (tạo / sửa / xoá thành công) → tải lại, giữ dữ liệu cũ trong lúc tải nên không nháy.
+  useEffect(() => onDataChanged(() => void load()), [load])
 
   const setData = useCallback((updater: (prev: T | undefined) => T | undefined) => setDataState(updater), [])
 

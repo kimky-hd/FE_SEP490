@@ -1,118 +1,183 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Card, SectionTitle } from '@/components/layout/PageParts'
-import { Badge } from '@/components/ui/Badge'
-import { DocumentIcon, FolderIcon, ListChecksIcon, UsersIcon } from '@/components/ui/icons'
+import { Card, ErrorState, LoadingBlock } from '@/components/layout/PageParts'
 import { permissionApi } from '@/api/roleApi'
+import { projectApi } from '@/api/projectApi'
 import { useAsync } from '@/lib/useAsync'
+import { apiErrorMessage } from '@/lib/apiErrors'
 import { formatDate } from '@/lib/format'
 import { PERMISSIONS } from '@/types/rbac'
 import { useWorkspaceContext } from './WorkspaceLayout'
+import { useI18n } from '@/i18n'
+import { permissionLabel } from '@/i18n/permissions'
+import { InfoRow, StatBox } from '@/components/ui/listControls'
+import { ProjectTable } from '../projects/ProjectTable'
+import { TabBody, TabSection } from '@/components/layout/tabParts'
 
-// Tab Tổng quan (FR §III.4.4 / UC-22). Số tài liệu & testcase thuộc module sau nên để "Sớm".
+const RECENT_PROJECTS = 5
+
+// Tab Tổng quan workspace: 3 ô số liệu, rồi "Dự án trong workspace" (bảng như trang Dự án) + "Thông tin".
+// Danh sách quyền không chiếm cả một thẻ: mở bằng "Xem n quyền" trong ô Role của bạn.
 export function WorkspaceOverviewPage() {
   const { workspace, can, isPersonal } = useWorkspaceContext()
-  const catalog = useAsync(() => permissionApi.list('WORKSPACE'), [])
-  const myPermissions = (catalog.data ?? []).filter((p) => workspace.myPermissions.includes(p.key))
+  const { t } = useI18n()
+  const linkClass = 'font-medium text-brand-700 hover:underline'
+  const projects = useAsync(
+    () => (isPersonal ? Promise.resolve([]) : projectApi.listByWorkspace(workspace.workspaceId)),
+    [workspace.workspaceId, isPersonal],
+  )
+  const recent = (projects.data ?? [])
+    .filter((p) => p.status === 'ACTIVE')
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, RECENT_PROJECTS)
+
+  const info = (
+    <TabSection title={t('Thông tin', 'Details')}>
+      <Card className="p-5">
+        {workspace.description && <p className="mb-3 text-sm text-gray-700">{workspace.description}</p>}
+        <dl className="-my-2.5 divide-y divide-gray-200 text-sm">
+          <InfoRow label={t('Người tạo', 'Created by')}>{workspace.createdBy.fullName}</InfoRow>
+          <InfoRow label={t('Ngày tạo', 'Created')}>{formatDate(workspace.createdAt)}</InfoRow>
+          <InfoRow label={t('Cập nhật lần cuối', 'Last updated')}>{formatDate(workspace.updatedAt)}</InfoRow>
+          {workspace.archivedAt && (
+            <InfoRow label={t('Lưu trữ lúc', 'Archived on')}>{formatDate(workspace.archivedAt)}</InfoRow>
+          )}
+        </dl>
+      </Card>
+    </TabSection>
+  )
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatTile icon={<FolderIcon className="h-4 w-4" />} label="Projects" value={workspace.projectCount} to={isPersonal ? undefined : 'projects'} />
-        <StatTile
-          icon={<UsersIcon className="h-4 w-4" />}
-          label="Members"
-          value={workspace.memberCount}
-          to={!isPersonal && can(PERMISSIONS.workspaceMemberView) ? 'members' : undefined}
+    <TabBody>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatBox
+          label={t('Dự án', 'Projects')}
+          value={workspace.projectCount}
+          sub={
+            !isPersonal && (
+              <Link to="projects" className={linkClass}>
+                {t('Xem dự án', 'View projects')}
+              </Link>
+            )
+          }
         />
-        <StatTile icon={<DocumentIcon className="h-4 w-4" />} label="Requirements" value="—" soon />
-        <StatTile icon={<ListChecksIcon className="h-4 w-4" />} label="Test Cases" value="—" soon />
+        <StatBox
+          label={t('Thành viên', 'Members')}
+          value={workspace.memberCount}
+          sub={
+            !isPersonal &&
+            can(PERMISSIONS.workspaceMemberView) && (
+              <Link to="members" className={linkClass}>
+                {t('Xem thành viên', 'View members')}
+              </Link>
+            )
+          }
+        />
+        <RoleStat />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-        <Card className="p-4 lg:col-span-3">
-          <SectionTitle>Workspace Information</SectionTitle>
-          <dl className="mt-3 divide-y divide-gray-100 text-sm">
-            <InfoRow label="Code">
-              <span className="font-mono text-gray-800">{workspace.code}</span>
-            </InfoRow>
-            <InfoRow label="Created By">{workspace.createdBy.fullName}</InfoRow>
-            <InfoRow label="Created At">{formatDate(workspace.createdAt)}</InfoRow>
-            <InfoRow label="Last Updated">{formatDate(workspace.updatedAt)}</InfoRow>
-            <InfoRow label="Status">
-              {workspace.status === 'ACTIVE' ? (
-                <Badge tone="brand" dot>
-                  Active
-                </Badge>
-              ) : (
-                <Badge tone="amber" dot>
-                  Archived {formatDate(workspace.archivedAt)}
-                </Badge>
-              )}
-            </InfoRow>
-          </dl>
-        </Card>
+      {isPersonal ? (
+        info
+      ) : (
+        <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-3">
+          <TabSection
+            className="xl:col-span-2"
+            title={t('Dự án trong workspace', 'Projects in this workspace')}
+            actions={
+              <Link to="projects" className={`text-sm ${linkClass}`}>
+                {t('Tất cả dự án', 'All projects')} →
+              </Link>
+            }
+          >
+            {projects.isLoading && !projects.data ? (
+              <LoadingBlock />
+            ) : projects.error ? (
+              <ErrorState message={apiErrorMessage(projects.error)} onRetry={projects.reload} />
+            ) : (
+              <ProjectTable projects={recent} emptyText={t('Chưa có dự án nào.', 'No projects yet.')} />
+            )}
+          </TabSection>
+          {info}
+        </div>
+      )}
+    </TabBody>
+  )
+}
 
-        <Card className="p-4 lg:col-span-2">
-          <SectionTitle description="Effective permissions determined by your role in this workspace.">
-            Your Permissions {workspace.myRole && <span className="font-normal text-gray-500">· {workspace.myRole.name}</span>}
-          </SectionTitle>
-          {myPermissions.length === 0 ? (
-            <p className="mt-3 text-sm text-gray-400">{catalog.isLoading ? 'Loading…' : 'You have view-only access.'}</p>
+/** Ô "Role của bạn": số quyền mở một popover nhỏ liệt kê quyền (thay cho thẻ danh sách dài). */
+function RoleStat() {
+  const { workspace, isPersonal } = useWorkspaceContext()
+  const { t } = useI18n()
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const catalog = useAsync(() => permissionApi.list('WORKSPACE'), [])
+  const myPermissions = (catalog.data ?? []).filter((p) => workspace.myPermissions.includes(p.key))
+  const count = workspace.myPermissions.length
+
+  useEffect(() => {
+    if (!open) return
+    const onClick = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpen(false)
+        buttonRef.current?.focus()
+      }
+    }
+    document.addEventListener('mousedown', onClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <StatBox
+        label={t('Role của bạn', 'Your role')}
+        value={
+          <span className="text-xl">
+            {workspace.myRole?.name ?? (isPersonal ? t('Cá nhân', 'Personal') : t('Chỉ xem', 'View only'))}
+          </span>
+        }
+        sub={
+          count === 0 ? (
+            t('Chỉ có quyền xem', 'View-only access')
           ) : (
-            <ul className="mt-3 space-y-1.5">
+            <button
+              ref={buttonRef}
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              aria-expanded={open}
+              aria-controls="my-permissions-popover"
+              className="font-medium text-brand-700 hover:underline"
+            >
+              {t(`Xem ${count} quyền`, `View ${count} ${count === 1 ? 'permission' : 'permissions'}`)}
+            </button>
+          )
+        }
+      />
+      {open && (
+        <div
+          id="my-permissions-popover"
+          className="absolute right-0 top-full z-20 mt-1 max-h-80 w-72 overflow-y-auto rounded-card border border-gray-200 bg-white p-3 shadow-pop"
+        >
+          {catalog.isLoading && !catalog.data ? (
+            <p className="text-sm text-gray-500">{t('Đang tải…', 'Loading…')}</p>
+          ) : (
+            <ul className="space-y-1.5">
               {myPermissions.map((p) => (
-                <li key={p.key} className="flex items-start justify-between gap-3 text-sm">
-                  <span className="text-gray-700">{p.name}</span>
-                  <span className="shrink-0 font-mono text-[10px] text-gray-400">{p.key}</span>
+                <li key={p.key} className="text-sm text-gray-800" title={p.key}>
+                  {permissionLabel(p.key, p.name)}
                 </li>
               ))}
             </ul>
           )}
-        </Card>
-      </div>
-    </div>
-  )
-}
-
-function StatTile({
-  icon,
-  label,
-  value,
-  to,
-  soon,
-}: {
-  icon: ReactNode
-  label: string
-  value: ReactNode
-  to?: string
-  soon?: boolean
-}) {
-  const content = (
-    <>
-      <div className="flex items-center justify-between text-gray-400">
-        <span className="font-mono text-[10px] uppercase tracking-[0.14em]">{label}</span>
-        {icon}
-      </div>
-      <p className="mt-2 text-2xl font-semibold text-gray-950">{value}</p>
-      {soon && <p className="mt-0.5 text-[11px] text-gray-400">Coming soon</p>}
-    </>
-  )
-  const className = 'block rounded-md border border-gray-200 bg-white p-4'
-  return to ? (
-    <Link to={to} className={`${className} transition-colors hover:border-brand-300`}>
-      {content}
-    </Link>
-  ) : (
-    <div className={className}>{content}</div>
-  )
-}
-
-function InfoRow({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-4 py-2">
-      <dt className="text-gray-500">{label}</dt>
-      <dd className="text-right font-medium text-gray-800">{children}</dd>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,18 +1,24 @@
 import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { AuthCard, AuthCardEyebrow } from '@/components/layout/AuthCard'
+import { Link } from 'react-router-dom'
+import { AuthCard } from '@/components/layout/AuthCard'
 import { Button, buttonClasses } from '@/components/ui/Button'
 import { Alert } from '@/components/ui/Alert'
+import { CheckIcon, MailIcon } from '@/components/ui/icons'
 import { authApi } from '@/api/authApi'
 import { ApiError } from '@/lib/apiClient'
+import { useUrlToken } from '@/lib/useUrlToken'
+import { useI18n, tr } from '@/i18n'
 
 type Status = 'idle' | 'verifying' | 'success' | 'error'
 
 export function VerifyEmailPage() {
-  const [searchParams] = useSearchParams()
-  const token = searchParams.get('token') ?? 'demo-token'
+  // Token đọc một lần rồi gỡ khỏi URL (xem useUrlToken).
+  const token = useUrlToken()
   const [status, setStatus] = useState<Status>(token ? 'idle' : 'error')
-  const [errorMessage, setErrorMessage] = useState('Link xác thực không hợp lệ.')
+  const { t } = useI18n()
+  const [errorMessage, setErrorMessage] = useState(() =>
+    tr('Link xác thực không hợp lệ.', 'Invalid verification link.'),
+  )
 
   // Cố ý KHÔNG tự gọi API lúc trang vừa mở: nhiều email client (Gmail, Outlook...) tự quét link
   // trong mail để chống phishing bằng cách tải trước trang đích — nếu xác thực tự chạy ngay khi
@@ -28,58 +34,54 @@ export function VerifyEmailPage() {
       setStatus('error')
       setErrorMessage(
         err instanceof ApiError && err.code === 'TOKEN_EXPIRED'
-          ? 'Link xác thực đã hết hạn.'
-          : 'Link này không hợp lệ hoặc đã được dùng trước đó — có thể do email client tự quét link, hoặc bạn đã xác thực rồi.',
+          ? t('Link xác thực đã hết hạn.', 'This verification link has expired.')
+          : t(
+              'Link không hợp lệ hoặc đã được dùng. Có thể bạn đã xác thực rồi, hãy thử đăng nhập.',
+              'This link is invalid or was already used. You may already be verified, so try signing in.',
+            ),
       )
     }
   }
 
+  if (status === 'success') {
+    return (
+      <AuthCard
+        icon={<CheckIcon className="h-5 w-5" />}
+        title={t('Xác thực email thành công', 'Email verified')}
+        description={t('Bạn có thể đăng nhập ngay bây giờ.', 'You can sign in now.')}
+      >
+        <Link to="/login" className={buttonClasses()}>
+          {t('Đăng nhập', 'Sign in')}
+        </Link>
+      </AuthCard>
+    )
+  }
+
+  if (status === 'error') {
+    return (
+      <AuthCard title={t('Không xác thực được', 'Verification failed')}>
+        <Alert tone="error">{errorMessage}</Alert>
+        <div className="mt-6 space-y-3">
+          <Link to="/login" className={buttonClasses()}>
+            {t('Thử đăng nhập luôn', 'Try signing in')}
+          </Link>
+          <Link to="/verify-email/pending" className={buttonClasses({ variant: 'secondary' })}>
+            {t('Gửi lại email xác thực', 'Resend verification email')}
+          </Link>
+        </div>
+      </AuthCard>
+    )
+  }
+
   return (
-    <AuthCard>
-      <AuthCardEyebrow>// Xác thực email</AuthCardEyebrow>
-
-      {(status === 'idle' || status === 'verifying') && (
-        <>
-          <h1 className="mt-3 text-3xl font-bold tracking-tight text-gray-950">Xác thực địa chỉ email</h1>
-          <p className="mt-2 text-sm text-gray-500">
-            Bấm nút bên dưới để hoàn tất xác thực và kích hoạt tài khoản SSAM của bạn.
-          </p>
-          <div className="mt-6">
-            <Button onClick={handleVerify} isLoading={status === 'verifying'}>
-              Xác thực email →
-            </Button>
-          </div>
-        </>
-      )}
-
-      {status === 'success' && (
-        <>
-          <h1 className="mt-3 text-3xl font-bold tracking-tight text-gray-950">Xác thực email thành công</h1>
-          <p className="mt-2 text-sm text-gray-500">Bạn có thể đăng nhập ngay bây giờ.</p>
-          <div className="mt-6">
-            <Link to="/login" className={buttonClasses()}>
-              Đăng nhập →
-            </Link>
-          </div>
-        </>
-      )}
-
-      {status === 'error' && (
-        <>
-          <h1 className="mt-3 text-3xl font-bold tracking-tight text-gray-950">Không xác thực được</h1>
-          <div className="mt-4">
-            <Alert tone="error">{errorMessage}</Alert>
-          </div>
-          <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-            <Link to="/login" className={buttonClasses({ inline: true })}>
-              Thử đăng nhập luôn →
-            </Link>
-            <Link to="/verify-email/pending" className={buttonClasses({ variant: 'secondary', inline: true })}>
-              Gửi lại email xác thực
-            </Link>
-          </div>
-        </>
-      )}
+    <AuthCard
+      icon={<MailIcon className="h-5 w-5" />}
+      title={t('Xác thực địa chỉ email', 'Verify your email address')}
+      description={t('Bấm nút bên dưới để kích hoạt tài khoản.', 'Click the button below to activate your account.')}
+    >
+      <Button onClick={handleVerify} isLoading={status === 'verifying'}>
+        {t('Xác thực email', 'Verify email')}
+      </Button>
     </AuthCard>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { GoogleLogin, type CredentialResponse } from '@react-oauth/google'
+import { useI18n } from '@/i18n'
 
 // GoogleLogin chỉ nhận width dạng số pixel cố định (không nhận "100%"), nên tự đo
 // chiều rộng thật của container (w-full trong AuthCard) rồi truyền vào — tránh hardcode
@@ -13,6 +14,7 @@ export function GoogleAuthButton({
   onError: () => void
   text: 'signup_with' | 'continue_with'
 }) {
+  const { lang } = useI18n()
   const containerRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState<number>()
 
@@ -32,7 +34,8 @@ export function GoogleAuthButton({
           onSuccess={onSuccess}
           onError={onError}
           text={text}
-          locale="vi"
+          locale={lang}
+          key={lang}
           width={width}
           shape="rectangular"
           theme="outline"

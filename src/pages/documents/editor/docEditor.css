@@ -1,0 +1,621 @@
+/* Typography & dấu hiệu trên nội dung cho editor Tài liệu (TipTap). Màu lấy từ token Tailwind. */
+
+.doc-prose {
+  outline: none;
+  font-size: 16px;
+  line-height: 1.75;
+  color: theme('colors.gray.800');
+  word-break: break-word;
+}
+.doc-prose > * + * {
+  margin-top: 0.6em;
+}
+/* Gợi ý của khối trống (Placeholder): chỉ khối có data-placeholder khác rỗng, kể cả khi editor chưa focus. */
+.doc-prose .is-empty[data-placeholder]:not([data-placeholder=''])::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: theme('colors.gray.400');
+}
+.doc-prose p.is-editor-empty:first-child::before {
+  color: theme('colors.gray.500');
+}
+.doc-prose h1,
+.doc-prose h2,
+.doc-prose h3 {
+  color: theme('colors.gray.950');
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  text-wrap: pretty;
+}
+.doc-prose h1 {
+  font-size: 1.375rem;
+  margin-top: 1.6em;
+}
+.doc-prose h2 {
+  font-size: 1.125rem;
+  margin-top: 1.4em;
+}
+.doc-prose h3 {
+  font-size: 1rem;
+  margin-top: 1.2em;
+}
+.doc-prose > :first-child {
+  margin-top: 0;
+}
+.doc-prose a {
+  color: theme('colors.brand.700');
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.doc-prose code {
+  border-radius: 4px;
+  background: theme('colors.gray.100');
+  padding: 0.1em 0.3em;
+  font-size: 0.9em;
+}
+.doc-prose ul,
+.doc-prose ol {
+  padding-left: 1.4em;
+}
+.doc-prose ul {
+  list-style: disc;
+}
+.doc-prose ol {
+  list-style: decimal;
+}
+.doc-prose li > p {
+  margin: 0;
+}
+.doc-prose li + li {
+  margin-top: 0.2em;
+}
+.doc-prose hr {
+  border: 0;
+  border-top: 1px solid theme('colors.gray.200');
+  margin: 1.5em 0;
+}
+
+/* Checklist */
+.doc-prose ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0.1em;
+}
+.doc-prose ul[data-type='taskList'] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6em;
+}
+.doc-prose ul[data-type='taskList'] li > label {
+  flex: none;
+  margin-top: 0.3em;
+  user-select: none;
+}
+.doc-prose ul[data-type='taskList'] li > div {
+  flex: 1;
+  min-width: 0;
+}
+.doc-prose ul[data-type='taskList'] input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  accent-color: theme('colors.brand.600');
+  cursor: pointer;
+}
+.doc-prose ul[data-type='taskList'] li[data-checked='true'] > div {
+  color: theme('colors.gray.500');
+}
+
+/* Bảng */
+.doc-prose .tableWrapper {
+  overflow-x: auto;
+  margin: 0.9em 0;
+}
+.doc-prose table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid theme('colors.gray.200');
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 14px;
+  table-layout: fixed;
+}
+.doc-prose th,
+.doc-prose td {
+  border-bottom: 1px solid theme('colors.gray.200');
+  border-right: 1px solid theme('colors.gray.100');
+  padding: 7px 12px;
+  text-align: left;
+  vertical-align: top;
+  min-width: 80px;
+}
+.doc-prose th {
+  background: theme('colors.gray.50');
+  font-weight: 500;
+  color: theme('colors.gray.600');
+  font-size: 13px;
+}
+.doc-prose tr:last-child td {
+  border-bottom: 0;
+}
+.doc-prose th:last-child,
+.doc-prose td:last-child {
+  border-right: 0;
+}
+.doc-prose .selectedCell {
+  background: theme('colors.brand.50');
+}
+
+/* Callout */
+.doc-callout {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  border-radius: 10px;
+  border: 1px solid;
+  padding: 10px 14px;
+}
+.doc-callout-icon {
+  flex: none;
+  display: flex;
+  height: 1.7em;
+  align-items: center;
+}
+.doc-callout-body {
+  flex: 1;
+  min-width: 0;
+}
+.doc-callout-body > * + * {
+  margin-top: 0.4em;
+}
+.doc-callout.tone-info {
+  background: theme('colors.brand.50');
+  border-color: theme('colors.brand.100');
+  color: theme('colors.brand.900');
+}
+.doc-callout.tone-warning {
+  background: theme('colors.amber.50');
+  border-color: theme('colors.amber.200');
+  color: theme('colors.amber.900');
+}
+.doc-callout.tone-rule {
+  background: theme('colors.violet.50');
+  border-color: theme('colors.violet.200');
+  color: theme('colors.violet.900');
+}
+.doc-callout.tone-success {
+  background: theme('colors.success.50');
+  border-color: theme('colors.success.200');
+  color: theme('colors.success.800');
+}
+
+/* Code + Mermaid */
+.doc-code {
+  border-radius: 10px;
+  border: 1px solid theme('colors.gray.200');
+  background: theme('colors.gray.50');
+}
+.doc-code pre {
+  margin: 0;
+  overflow-x: auto;
+  padding: 10px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  color: theme('colors.gray.800');
+}
+.doc-code pre code {
+  background: none;
+  padding: 0;
+}
+.doc-code.is-mermaid {
+  background: #fff;
+}
+.doc-code.is-mermaid pre {
+  border-top: 1px solid theme('colors.gray.100');
+  background: theme('colors.gray.50');
+}
+.doc-mermaid-svg {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+}
+.doc-mermaid-svg svg {
+  max-width: 100%;
+  height: auto;
+}
+.doc-code.is-mermaid.view-code pre {
+  margin-top: 8px;
+}
+
+/* Nút chuyển Sơ đồ / Mã nguồn */
+.doc-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 7px;
+  background: theme('colors.gray.100');
+}
+.doc-seg-btn {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: theme('colors.gray.500');
+  transition:
+    color 0.12s,
+    background-color 0.12s;
+}
+.doc-seg-btn:hover {
+  color: theme('colors.gray.900');
+}
+.doc-seg-btn.is-on {
+  background: #fff;
+  color: theme('colors.gray.900');
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+}
+.doc-seg[data-tone='ai'] {
+  background: rgba(105, 65, 198, 0.08);
+}
+.doc-seg[data-tone='ai'] .doc-seg-btn.is-on {
+  color: var(--doc-ai);
+}
+
+/* ---------- AI (tím, theo doc/mockups/mock-ai.html) ---------- */
+.doc-editor {
+  --doc-ai: #2f5bea;
+  --doc-ai-soft: #eef2ff;
+  --doc-ai-line: #c7d4fe;
+}
+.doc-ai-link {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--doc-ai);
+}
+.doc-ai-link:hover {
+  background: var(--doc-ai-soft);
+}
+.doc-ai-prop {
+  border: 1px solid var(--doc-ai-line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow:
+    0 12px 16px -4px rgba(16, 24, 40, 0.08),
+    0 4px 6px -2px rgba(16, 24, 40, 0.03);
+  overflow: hidden;
+}
+.doc-ai-prop-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px 7px 12px;
+  background: var(--doc-ai-soft);
+  color: var(--doc-ai);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.doc-ai-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--doc-ai);
+  color: #fff;
+}
+.doc-ai-btn:hover {
+  background: #2549c7;
+}
+.doc-ai-btn:focus-visible,
+.doc-ai-ghost:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--doc-ai-soft);
+}
+.doc-ai-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: theme('colors.gray.600');
+}
+.doc-ai-ghost:hover {
+  background: theme('colors.gray.100');
+  color: theme('colors.gray.900');
+}
+.doc-ai-kbd {
+  font-size: 11px;
+  opacity: 0.7;
+}
+.doc-ai-shimmer {
+  border-radius: 6px;
+  background: linear-gradient(90deg, #eef2ff 0%, #dfe6ff 40%, #eef2ff 80%);
+  background-size: 200% 100%;
+  animation: doc-ai-shimmer 1.2s ease-in-out infinite;
+}
+@keyframes doc-ai-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .doc-ai-shimmer {
+    animation: none;
+  }
+}
+
+/* Figma */
+.doc-figma {
+  border-radius: 10px;
+  border: 1px solid theme('colors.gray.200');
+  background: theme('colors.gray.50');
+  padding: 10px 12px;
+}
+.doc-figma.is-selected {
+  border-color: theme('colors.brand.300');
+  box-shadow: 0 0 0 3px theme('colors.brand.100');
+}
+.doc-inline-input {
+  height: 32px;
+  width: 100%;
+  border-radius: 6px;
+  border: 1px solid theme('colors.gray.300');
+  background: #fff;
+  padding: 0 8px;
+  font-size: 13px;
+}
+.doc-inline-input:focus {
+  outline: none;
+  border-color: theme('colors.brand.400');
+  box-shadow: 0 0 0 3px theme('colors.brand.100');
+}
+
+/* ---------- Dấu hiệu ---------- */
+
+/* Chip REQ trước heading */
+.doc-req-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-right: 8px;
+  vertical-align: 0.15em;
+  border-radius: 5px;
+  border: 1px solid theme('colors.gray.200');
+  background: theme('colors.gray.50');
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 18px;
+  letter-spacing: 0;
+  color: theme('colors.gray.600');
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+.doc-req-chip.is-changed {
+  border-color: theme('colors.brand.400');
+  background: #fff;
+  color: theme('colors.brand.700');
+  box-shadow: 0 0 0 2px theme('colors.brand.100');
+}
+.doc-req-chip.is-stale::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: theme('colors.amber.500');
+  box-shadow: 0 0 0 2px #fff;
+}
+
+/* Chế độ so sánh */
+.doc-chg.in-compare.is-added {
+  background: theme('colors.success.50');
+  border-radius: 6px;
+}
+.doc-ins {
+  background: theme('colors.success.100');
+  border-radius: 3px;
+  box-shadow: 0 1px 0 theme('colors.success.500');
+}
+.doc-del-inline {
+  color: theme('colors.red.700');
+  text-decoration: line-through;
+  text-decoration-color: theme('colors.red.400');
+  background: theme('colors.red.50');
+  border-radius: 3px;
+  padding: 0 1px;
+}
+.doc-del-inline.is-block {
+  display: block;
+  margin-top: 0.3em;
+}
+.doc-cell-chg {
+  background: theme('colors.brand.50');
+  box-shadow: inset 2px 0 0 theme('colors.brand.400');
+}
+.doc-item-add {
+  background: theme('colors.success.50');
+  border-radius: 4px;
+}
+.doc-item-chk {
+  background: theme('colors.brand.50');
+  border-radius: 4px;
+}
+.doc-item-del {
+  list-style: none;
+  color: theme('colors.red.700');
+  text-decoration: line-through;
+  font-size: 14px;
+  padding-left: 1.6em;
+}
+.doc-chg-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+  border-radius: 999px;
+  border: 1px solid theme('colors.brand.200');
+  background: theme('colors.brand.50');
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: theme('colors.brand.800');
+  cursor: pointer;
+}
+.doc-chg-badge:hover {
+  background: theme('colors.brand.100');
+}
+.doc-fmt {
+  text-decoration-skip-ink: auto;
+}
+
+/* Khối bị xoá */
+.doc-del {
+  position: relative;
+  margin: 0.4em 0;
+  font-size: 13px;
+}
+.doc-del::before {
+  content: '';
+  position: absolute;
+  left: -24px;
+  top: 2px;
+  bottom: 2px;
+  width: 3px;
+  border-radius: 999px;
+  background: theme('colors.red.500');
+}
+.doc-del-toggle {
+  color: theme('colors.red.700');
+  border-bottom: 1px dashed theme('colors.red.300');
+  line-height: 1.4;
+}
+.doc-del-toggle:hover {
+  color: theme('colors.red.800');
+}
+.doc-del-body {
+  display: none;
+  margin-top: 4px;
+  color: theme('colors.red.700');
+  text-decoration: line-through;
+  text-decoration-color: theme('colors.red.300');
+  font-size: 14px;
+}
+.doc-del.is-open .doc-del-body {
+  display: block;
+}
+
+/* Bình luận */
+.doc-cmt {
+  background: #fef3c7;
+  border-bottom: 2px solid #fcd34d;
+  cursor: pointer;
+}
+.doc-cmt.is-active {
+  background: #fde68a;
+}
+
+/* Nhấp nháy khi cuộn tới */
+.doc-flash {
+  animation: doc-flash 1.6s ease-out;
+  border-radius: 6px;
+}
+@keyframes doc-flash {
+  0%,
+  40% {
+    background: theme('colors.brand.50');
+    box-shadow: 0 0 0 6px theme('colors.brand.50');
+  }
+  100% {
+    background: transparent;
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .doc-flash {
+    animation: none;
+  }
+}
+
+/* ---------- In / PDF: bản tĩnh dựng vào body (DocumentView > PrintView), ẩn toàn bộ app ---------- */
+.doc-print-portal {
+  display: none;
+}
+@media print {
+  @page {
+    margin: 16mm 14mm;
+  }
+  body {
+    background: #fff !important;
+  }
+  #root {
+    display: none !important;
+  }
+  .doc-print-portal {
+    display: block;
+    color: #101828;
+    font-family: Roboto, sans-serif;
+  }
+  .doc-print-portal .doc-prose {
+    font-size: 11pt;
+  }
+  .doc-print-portal table,
+  .doc-print-portal .doc-callout,
+  .doc-print-portal .doc-code,
+  .doc-print-portal .doc-figma {
+    break-inside: avoid;
+  }
+  .doc-print-portal .doc-del,
+  .doc-print-portal .doc-chg-badge,
+  .doc-print-portal .doc-del-inline,
+  .doc-print-portal .doc-code.is-mermaid pre,
+  .doc-print-portal .doc-mermaid-head {
+    display: none !important;
+  }
+  .doc-print-portal .doc-cmt,
+  .doc-print-portal .doc-ins,
+  .doc-print-portal .doc-chg {
+    background: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+  .doc-print-portal h1,
+  .doc-print-portal h2,
+  .doc-print-portal h3 {
+    break-after: avoid;
+  }
+}
+
+.doc-figma a {
+  text-decoration: none;
+  color: theme('colors.gray.700');
+}
+
+/* Vùng soạn thảo không cần viền focus toàn khối (con trỏ đã đủ rõ). */
+.doc-prose:focus,
+.doc-prose:focus-visible {
+  outline: none !important;
+}
+
+@media (max-width: 639px) {
+  .doc-del::before {
+    left: -12px;
+  }
+}

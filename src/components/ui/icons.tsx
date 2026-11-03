@@ -4,7 +4,17 @@
 import type { SVGProps } from 'react'
 
 function base(props: SVGProps<SVGSVGElement>) {
-  return { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, ...props }
+  return {
+    width: 20,
+    height: 20,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    ...props,
+  }
 }
 
 export function UserIcon(props: SVGProps<SVGSVGElement>) {
