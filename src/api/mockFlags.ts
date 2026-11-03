@@ -10,13 +10,18 @@ export type MockModule = 'documents' | 'kanban' | 'tests' | 'work'
 
 type Env = Partial<
   Record<
-    'VITE_DOCUMENTS_MOCK' | 'VITE_MOCK_DOCUMENTS' | 'VITE_MOCK_KANBAN' | 'VITE_MOCK_TESTS' | 'VITE_MOCK_WORK',
+    | 'VITE_DOCUMENTS_MOCK'
+    | 'VITE_MOCK_DOCUMENTS'
+    | 'VITE_MOCK_KANBAN'
+    | 'VITE_MOCK_TESTS'
+    | 'VITE_MOCK_WORK'
+    | 'VITE_USE_MOCK',
     string
   >
 >
 
 export function resolveMockFlags(env: Env): Record<MockModule, boolean> {
-  const legacy = env.VITE_DOCUMENTS_MOCK === 'true'
+  const legacy = env.VITE_DOCUMENTS_MOCK === 'true' || env.VITE_USE_MOCK !== 'false'
   const pick = (v: string | undefined) => (v === undefined || v.trim() === '' ? legacy : v.trim() === 'true')
   return {
     documents: pick(env.VITE_MOCK_DOCUMENTS),

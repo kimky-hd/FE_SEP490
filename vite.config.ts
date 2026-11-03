@@ -88,6 +88,8 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
+      outDir: "src/main/webapp",
+      emptyOutDir: false,
       rollupOptions: {
         output: { manualChunks: vendorChunk },
       },
