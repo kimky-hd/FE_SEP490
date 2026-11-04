@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import clsx from 'clsx'
 import { Button } from '@/components/ui/Button'
-import { CloseIcon, PlusIcon, TrashIcon, WorkflowIcon, BoltIcon } from '@/components/ui/icons'
+import { CloseIcon, PlusIcon, TrashIcon, WorkflowIcon, BoltIcon, PencilIcon } from '@/components/ui/icons'
 import { Card } from '@/components/layout/PageParts'
 import { blankPhase, newStatus, newTransition, type DraftPhase } from '@/lib/workflowDraft'
 import type { SdlcMethod, SdlcTemplateDto } from '@/types/project'
@@ -9,6 +9,7 @@ import type { RoleDto } from '@/types/rbac'
 import { useI18n } from '@/i18n'
 import { templateDescription, templateName } from '@/i18n/sdlc'
 import { DESCRIPTION_MAX, MAX_PHASES, NAME_MAX, type WizardState } from './wizardState'
+import { ExitCriteriaChips } from '@/components/projects/ExitCriteriaChips'
 
 // Bước 1: thông tin dự án + cách đội làm việc (SDLC) + các giai đoạn. Mã dự án (tiền tố issue) không đổi được sau khi tạo.
 
@@ -42,7 +43,7 @@ export function StepProjectInfo({
   onChooseMethod,
 }: Props) {
   const { t } = useI18n()
-  const editable = true
+  const editable = state.sdlcMethod === 'CUSTOM'
 
   const setPhases = (phases: DraftPhase[]) => update({ phases, phasesTouched: true })
   const updatePhase = (key: string, patch: Partial<DraftPhase>) =>
@@ -245,13 +246,28 @@ export function StepProjectInfo({
                 <span className="mt-2 flex-1 text-sm text-gray-600">
                   {templateDescription(tpl.method, tpl.description)}
                 </span>
-                <span className="mt-3 inline-flex items-center gap-1.5 text-xs text-gray-500">
-                  {tpl.phasesEditable ? <WorkflowIcon className="h-3.5 w-3.5" /> : <BoltIcon className="h-3.5 w-3.5" />}
-                  {t(
-                    `${tpl.phases.length} giai đoạn có sẵn${tpl.phasesEditable ? ', sửa được' : ''}`,
-                    `${tpl.phases.length} built-in ${tpl.phases.length === 1 ? 'phase' : 'phases'}${tpl.phasesEditable ? ', editable' : ''}`,
+                <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-2 text-xs">
+                  <span className="inline-flex items-center gap-1.5 text-gray-500">
+                    {tpl.phasesEditable ? <WorkflowIcon className="h-3.5 w-3.5" /> : <BoltIcon className="h-3.5 w-3.5" />}
+                    {t(
+                      `${tpl.phases.length} giai đoạn có sẵn${tpl.phasesEditable ? ', sửa được' : ''}`,
+                      `${tpl.phases.length} built-in ${tpl.phases.length === 1 ? 'phase' : 'phases'}${tpl.phasesEditable ? ', editable' : ''}`,
+                    )}
+                  </span>
+                  {selected && tpl.method !== 'CUSTOM' && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        update({ sdlcMethod: 'CUSTOM', phasesTouched: true })
+                      }}
+                      className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-brand-900 hover:underline"
+                    >
+                      <PencilIcon className="h-3 w-3" />
+                      {t('Sửa mẫu', 'Edit')}
+                    </button>
                   )}
-                </span>
+                </div>
               </button>
             )
           })}
@@ -267,14 +283,41 @@ export function StepProjectInfo({
           'Issues move through phases top to bottom. Statuses and transitions are set in step 2.',
         )}
       >
+        {!editable && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-blue-50/50 px-5 py-2.5 sm:px-6">
+            <div className="flex items-center gap-2 text-xs text-brand-900">
+              <WorkflowIcon className="h-4 w-4 shrink-0 text-brand-600" />
+              <span>
+                {t(
+                  `Đang xem mô hình chuẩn ${templateName(state.sdlcMethod, state.sdlcMethod)}. Bấm Chỉnh sửa để thêm/bớt điều kiện cổng nghiệm thu.`,
+                  `Using standard ${templateName(state.sdlcMethod, state.sdlcMethod)}. Click Edit to customize gates.`,
+                )}
+              </span>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              inline
+              className="!h-7 !px-2.5 !text-xs font-medium"
+              onClick={() => update({ sdlcMethod: 'CUSTOM', phasesTouched: true })}
+            >
+              <PencilIcon className="mr-1 h-3 w-3" />
+              {t('Chỉnh sửa mô hình (Custom)', 'Edit as Custom')}
+            </Button>
+          </div>
+        )}
+
         <div className="md:overflow-x-auto">
-          <table className="w-full text-sm md:min-w-[760px]">
+          <table className="w-full text-sm md:min-w-[860px]">
             <thead className="hidden md:table-header-group">
               <tr className="border-y border-gray-200 bg-gray-50 text-left text-xs font-medium text-gray-500">
-                <th className="w-32 py-2.5 pl-6 pr-3 font-medium">{t('Thứ tự', 'Order')}</th>
-                <th className="w-56 px-3 py-2.5 font-medium">{t('Tên giai đoạn', 'Phase name')}</th>
+                <th className="w-24 py-2.5 pl-6 pr-3 font-medium">{t('Thứ tự', 'Order')}</th>
+                <th className="w-52 px-3 py-2.5 font-medium">{t('Tên giai đoạn', 'Phase name')}</th>
                 <th className="px-3 py-2.5 font-medium">{t('Mô tả', 'Description')}</th>
-                <th className="px-3 py-2.5 font-medium">{t('Trạng thái', 'Statuses')}</th>
+                <th className="w-80 px-3 py-2.5 font-medium">
+                  {t('Cổng nghiệm thu (Exit Criteria / Gate Rules)', 'Exit Criteria / Gate Rules')}
+                </th>
+                <th className="w-44 px-3 py-2.5 font-medium">{t('Trạng thái', 'Statuses')}</th>
                 {editable && <th className="w-14 px-3 py-2.5" />}
               </tr>
             </thead>
@@ -383,6 +426,13 @@ export function StepProjectInfo({
                         <span className="text-gray-500">{phase.description}</span>
                       )}
                     </td>
+                    <td className="w-full md:w-80 md:px-3 md:py-3.5">
+                      <ExitCriteriaChips
+                        criteria={phase.exitCriteria}
+                        editable={editable}
+                        onChange={(exitCriteria) => updatePhase(phase.key, { exitCriteria })}
+                      />
+                    </td>
                     <td className="min-w-0 flex-1 md:w-auto md:px-3 md:py-3.5">
                       <StatusChips
                         phase={phase}
@@ -416,7 +466,8 @@ export function StepProjectInfo({
             variant="secondary"
             inline
             className="lg:!h-8"
-            disabled={state.phases.length >= MAX_PHASES}
+            disabled={!editable || state.phases.length >= MAX_PHASES}
+            title={!editable ? t('Chuyển sang SDLC tuỳ chỉnh để thêm giai đoạn', 'Switch to Custom to add phases') : undefined}
             onClick={() =>
               setPhases([
                 ...state.phases,

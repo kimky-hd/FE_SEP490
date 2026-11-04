@@ -2,9 +2,28 @@
 
 import type { RoleRefDto, UserRefDto } from './rbac'
 
-export type SdlcMethod = 'SCRUM' | 'KANBAN' | 'CUSTOM'
+export type SdlcMethod =
+  | 'SCRUM'
+  | 'KANBAN'
+  | 'WATERFALL'
+  | 'ITERATIVE'
+  | 'V_MODEL'
+  | 'SPIRAL'
+  | 'RAD'
+  | 'CUSTOM'
+
 export type ProjectStatus = 'ACTIVE' | 'ARCHIVED'
 export type StatusCategory = 'TODO' | 'IN_PROGRESS' | 'DONE'
+
+export type PhaseExitCriterionKey =
+  | 'ISSUES_DONE'
+  | 'DOC_APPROVED'
+  | 'REQ_SEGMENTED'
+  | 'REQ_LINKED_ISSUES'
+  | 'TESTS_APPROVED'
+  | 'RTM_ZERO_STALE'
+
+export type PhaseLifecycleStatus = 'completed' | 'active' | 'upcoming'
 
 export interface ProjectDto {
   projectId: number
@@ -71,6 +90,10 @@ export interface PhaseDto {
   isActive: boolean
   statuses: WorkflowStatusDto[]
   transitions: WorkflowTransitionDto[]
+  exitCriteria?: PhaseExitCriterionKey[]
+  lifecycleStatus?: PhaseLifecycleStatus
+  completedAt?: string | null
+  completionNote?: string | null
 }
 
 export interface WorkflowDto {
@@ -105,6 +128,7 @@ export interface TemplatePhase {
   description: string | null
   statuses: TemplateStatus[]
   transitions: TemplateTransition[]
+  exitCriteria?: PhaseExitCriterionKey[]
 }
 
 export interface SdlcTemplateDto {
@@ -146,7 +170,13 @@ export interface CreateProjectBody {
   description?: string
   sdlcMethod: SdlcMethod
   aiEnabled: boolean
-  phases: { name: string; description: string | null; statuses: StatusInput[]; transitions: TransitionInput[] }[]
+  phases: {
+    name: string
+    description: string | null
+    statuses: StatusInput[]
+    transitions: TransitionInput[]
+    exitCriteria?: PhaseExitCriterionKey[]
+  }[]
   members: { userId: number; roleId: number }[]
 }
 

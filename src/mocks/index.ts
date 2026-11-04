@@ -17,6 +17,7 @@ import type {
 import type {
   CreateProjectBody,
   PhaseDto,
+  PhaseExitCriterionKey,
   ProjectDto,
   ProjectMemberDto,
   SdlcMethod,
@@ -1065,6 +1066,10 @@ function toPhaseDto(phaseId: number): PhaseDto {
         commentHint: t.commentHint,
         condition: t.condition,
       })),
+    exitCriteria: phase.exitCriteria ?? ['ISSUES_DONE'],
+    lifecycleStatus: phase.lifecycleStatus ?? (phase.position === 1 ? 'active' : 'upcoming'),
+    completedAt: phase.completedAt ?? null,
+    completionNote: phase.completionNote ?? null,
   }
 }
 
@@ -1251,7 +1256,16 @@ on('post', '/workspaces/(\\d+)/projects', ({ match, body, userId }) => {
   db.projects.push(project)
   phases.forEach((ph, i) => {
     const phaseId = nextId()
-    db.phases.push({ id: phaseId, projectId: project.id, name: ph.name.trim(), description: ph.description?.trim() || null, position: i + 1, isActive: true })
+    db.phases.push({
+      id: phaseId,
+      projectId: project.id,
+      name: ph.name.trim(),
+      description: ph.description?.trim() || null,
+      position: i + 1,
+      isActive: true,
+      exitCriteria: ph.exitCriteria ? [...ph.exitCriteria] : ['ISSUES_DONE'],
+      lifecycleStatus: i === 0 ? 'active' : 'upcoming',
+    })
     writePhaseWorkflow(project.id, phaseId, { statuses: ph.statuses, transitions: ph.transitions })
   })
   const pmRoleId = systemRole(companyId, 'PROJECT_MANAGER').id
@@ -1440,6 +1454,7 @@ on('patch', '/projects/(\\d+)/phases/(\\d+)', ({ match, body, userId }) => {
     phase.name = name
   }
   if (body.description !== undefined) phase.description = str(body.description)?.trim() || null
+  if (Array.isArray(body.exitCriteria)) phase.exitCriteria = body.exitCriteria as PhaseExitCriterionKey[]
   if (body.isActive !== undefined) {
     const isActive = body.isActive === true
     if (!isActive && siblings.filter((ph) => ph.isActive && ph.id !== phase.id).length === 0) {
@@ -1470,6 +1485,7 @@ on('put', '/projects/(\\d+)/phases/(\\d+)/workflow', ({ match, body, userId }) =
   }
   const issues = checkPhaseBody({ statuses, transitions }, 0, companyIdOfProject(project))
   if (issues.length) workflowInvalid(issues)
+  if (Array.isArray(body.exitCriteria)) phase.exitCriteria = body.exitCriteria as PhaseExitCriterionKey[]
   writePhaseWorkflow(project.id, phase.id, { statuses, transitions })
   project.updatedAt = now()
   save()

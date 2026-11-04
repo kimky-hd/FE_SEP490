@@ -2,7 +2,7 @@
 // tạo role / đổi quyền / tạo dự án xong reload vẫn còn, và để test được ẩn/hiện + 403 theo từng người dùng.
 
 import type { PermissionDto, RoleScope, WorkspaceStatus, MemberStatus } from '@/types/rbac'
-import type { ProjectStatus, SdlcMethod, StatusCategory } from '@/types/project'
+import type { PhaseExitCriterionKey, PhaseLifecycleStatus, ProjectStatus, SdlcMethod, StatusCategory } from '@/types/project'
 import { SDLC_TEMPLATES } from './sdlcTemplates'
 
 // Bảng §0.2 của doc/Workspace-RBAC-API-Contract.md — giữ đúng thứ tự hiển thị.
@@ -142,6 +142,10 @@ export interface MockPhase {
   description: string | null
   position: number
   isActive: boolean
+  exitCriteria?: PhaseExitCriterionKey[]
+  lifecycleStatus?: PhaseLifecycleStatus
+  completedAt?: string | null
+  completionNote?: string | null
 }
 
 export interface MockStatus {
@@ -219,7 +223,16 @@ export function instantiateTemplate(db: MockDb, projectId: number, method: SdlcM
   const roleIdOf = (code: string) => db.roles.find((r) => r.companyId === 1 && r.code === code)?.id
   template.phases.forEach((tp, phaseIndex) => {
     const phaseId = ++db.seq
-    db.phases.push({ id: phaseId, projectId, name: tp.name, description: tp.description, position: phaseIndex + 1, isActive: true })
+    db.phases.push({
+      id: phaseId,
+      projectId,
+      name: tp.name,
+      description: tp.description,
+      position: phaseIndex + 1,
+      isActive: true,
+      exitCriteria: tp.exitCriteria ? [...tp.exitCriteria] : ['ISSUES_DONE'],
+      lifecycleStatus: phaseIndex === 0 ? 'active' : 'upcoming',
+    })
     const idOfKey = new Map<string, number>()
     tp.statuses.forEach((ts, i) => {
       const id = ++db.seq

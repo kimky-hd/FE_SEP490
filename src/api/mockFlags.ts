@@ -21,7 +21,7 @@ type Env = Partial<
 >
 
 export function resolveMockFlags(env: Env): Record<MockModule, boolean> {
-  const legacy = env.VITE_DOCUMENTS_MOCK === 'true' || env.VITE_USE_MOCK !== 'false'
+  const legacy = env.VITE_DOCUMENTS_MOCK === 'true' || env.VITE_USE_MOCK === 'true'
   const pick = (v: string | undefined) => (v === undefined || v.trim() === '' ? legacy : v.trim() === 'true')
   return {
     documents: pick(env.VITE_MOCK_DOCUMENTS),

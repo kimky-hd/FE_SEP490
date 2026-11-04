@@ -3,6 +3,7 @@ import type { ItemsDto } from '@/types/rbac'
 import type {
   CreateProjectBody,
   PhaseDto,
+  PhaseExitCriterionKey,
   ProjectDto,
   ProjectMemberCandidateDto,
   ProjectMemberDto,
@@ -73,12 +74,18 @@ export const projectApi = {
   updatePhase: (
     projectId: number,
     phaseId: number,
-    body: { name?: string; description?: string; position?: number; isActive?: boolean },
+    body: {
+      name?: string
+      description?: string
+      position?: number
+      isActive?: boolean
+      exitCriteria?: PhaseExitCriterionKey[]
+    },
   ) => api.patch<WorkflowDto>(`/projects/${projectId}/phases/${phaseId}`, body).then((r) => r.data),
 
   savePhaseWorkflow: (
     projectId: number,
     phaseId: number,
-    body: { statuses: StatusInput[]; transitions: TransitionInput[] },
+    body: { statuses: StatusInput[]; transitions: TransitionInput[]; exitCriteria?: PhaseExitCriterionKey[] },
   ) => api.put<PhaseDto>(`/projects/${projectId}/phases/${phaseId}/workflow`, body).then((r) => r.data),
 }

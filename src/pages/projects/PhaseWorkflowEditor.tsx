@@ -8,6 +8,7 @@ import type { StatusCategory, WorkflowIssue } from '@/types/project'
 import type { RoleDto } from '@/types/rbac'
 import { useI18n } from '@/i18n'
 import { WorkflowBpmnViewer } from './WorkflowBpmnViewer'
+import { ExitCriteriaChips } from '@/components/projects/ExitCriteriaChips'
 
 // Figma hàng 2 frame 03 "Configure Issue Status & Transitions": khối 1 Status Definition, khối 2 Transition Rules
 // (From → To · Allowed roles (RBAC) · Require comment), dòng "Matrix Validation" cuối bảng. UC §II.5.10/5.12/5.13.
@@ -96,6 +97,30 @@ export function PhaseWorkflowEditor({ phase, onChange, roles, issues, readOnly }
 
   return (
     <div className="space-y-8">
+      {/* 0. Exit Criteria / Gate Rules */}
+      <section>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-950">
+              {t('Điều kiện hoàn thành giai đoạn (Exit Criteria / Gate Rules)', 'Phase Exit Criteria / Gate Rules')}
+            </h3>
+            <p className="mt-0.5 text-sm text-gray-500">
+              {t(
+                'Các tiêu chí bắt buộc cần đạt trước khi chuyển sang giai đoạn kế tiếp trong quy trình.',
+                'Mandatory conditions that must be fulfilled before this phase can be completed and advanced.',
+              )}
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 rounded-card border border-gray-200 bg-white p-3.5 shadow-xs">
+          <ExitCriteriaChips
+            criteria={phase.exitCriteria}
+            editable={!readOnly}
+            onChange={(nextCriteria) => onChange({ ...phase, exitCriteria: nextCriteria })}
+          />
+        </div>
+      </section>
+
       {/* 1. Status Definition */}
       <section>
         <div className="flex flex-wrap items-end justify-between gap-3">

@@ -22,6 +22,7 @@ import { IssueCreateModal, type IssueDefaults } from './IssueCreateModal'
 import { IssueDrawer } from './IssueDrawer'
 import { boardDefaults, kanbanDefaultView, type BoardChip, type BoardPrefs, type GroupBy } from './roleDefaults'
 import { CompleteSprintModal, CreateSprintModal, FromReqModal } from './SprintDialogs'
+import { PhasePipelineTracker } from '@/components/projects/PhasePipelineTracker'
 import {
   FilterChip,
   PersonDot,
@@ -490,6 +491,8 @@ function BoardView({
 
   return (
     <div className="space-y-3">
+      <PhasePipelineTracker projectId={projectId} sdlcMethod={project.sdlcMethod} />
+
       {phaseSlot &&
         createPortal(
           phases.length > 1 && (

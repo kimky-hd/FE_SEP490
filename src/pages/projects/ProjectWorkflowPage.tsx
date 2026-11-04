@@ -20,6 +20,7 @@ import { PhaseWorkflowEditor } from './PhaseWorkflowEditor'
 import { useI18n } from '@/i18n'
 import { useProjectContext } from './ProjectLayout'
 import { SectionBar, TabBody } from '@/components/layout/tabParts'
+import { PhasePipelineTracker } from '@/components/projects/PhasePipelineTracker'
 
 // Tab Workflow — mockup "Cấu hình Workflow" (card "Phase & trạng thái" + bảng "Luật chuyển trạng thái" Từ → Đến · Role
 // được phép · Điều kiện) · UC §II.5.8–5.13 · FR §III.6.1 (dạng bảng, không BPMN kéo-thả — LI-05).
@@ -80,6 +81,8 @@ export function ProjectWorkflowPage() {
   return (
     <TabBody>
       {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
+
+      <PhasePipelineTracker projectId={project.projectId} phases={phases} sdlcMethod={wf.sdlcMethod} />
 
       {/* Phase & trạng thái */}
       <section className="space-y-3">

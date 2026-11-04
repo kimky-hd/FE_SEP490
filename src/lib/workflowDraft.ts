@@ -1,7 +1,15 @@
 // Mô hình "bản nháp" workflow dùng ở wizard tạo dự án (bước 1–2) và màn Cấu hình Workflow, cùng các hàm chuyển
 // qua lại giữa mẫu SDLC (§9.1), dữ liệu đã lưu (§12.1) và body gửi BE (§10.4 / §12.4).
 
-import type { PhaseDto, StatusCategory, StatusInput, TemplatePhase, TransitionInput } from '@/types/project'
+import type {
+  PhaseDto,
+  PhaseExitCriterionKey,
+  PhaseLifecycleStatus,
+  StatusCategory,
+  StatusInput,
+  TemplatePhase,
+  TransitionInput,
+} from '@/types/project'
 import type { RoleDto } from '@/types/rbac'
 import { DEFAULT_CATEGORY_COLOR, validatePhaseWorkflow } from './workflowValidation'
 import type { WorkflowIssue } from '@/types/project'
@@ -34,6 +42,10 @@ export interface DraftPhase {
   description: string | null
   statuses: DraftStatus[]
   transitions: DraftTransition[]
+  exitCriteria?: PhaseExitCriterionKey[]
+  lifecycleStatus?: PhaseLifecycleStatus
+  completedAt?: string | null
+  completionNote?: string | null
 }
 
 let counter = 0
@@ -52,6 +64,8 @@ export function blankPhase(name: string, projectRoles: RoleDto[]): DraftPhase {
     description: null,
     statuses: [todo, doing, done],
     transitions: [newTransition(todo.key, doing.key, roleIds), newTransition(doing.key, done.key, roleIds)],
+    exitCriteria: ['ISSUES_DONE'],
+    lifecycleStatus: 'upcoming',
   }
 }
 
@@ -100,7 +114,15 @@ export function templateToDraft(phases: TemplatePhase[], projectRoles: RoleDto[]
       commentHint: t.commentHint,
       condition: t.condition,
     }))
-    return { key: uid('ph'), name: phase.name, description: phase.description, statuses, transitions }
+    return {
+      key: uid('ph'),
+      name: phase.name,
+      description: phase.description,
+      statuses,
+      transitions,
+      exitCriteria: phase.exitCriteria ? [...phase.exitCriteria] : ['ISSUES_DONE'],
+      lifecycleStatus: 'upcoming',
+    }
   })
 }
 
@@ -130,11 +152,19 @@ export function phaseToDraft(phase: PhaseDto): DraftPhase {
       commentHint: t.commentHint,
       condition: t.condition,
     })),
+    exitCriteria: phase.exitCriteria ? [...phase.exitCriteria] : ['ISSUES_DONE'],
+    lifecycleStatus: phase.lifecycleStatus,
+    completedAt: phase.completedAt,
+    completionNote: phase.completionNote,
   }
 }
 
 /** Nháp → body phase (§10.4 / §12.4): trạng thái cũ gửi `statusId`, mới gửi `key`; transition tham chiếu tương ứng. */
-export function draftToPhaseBody(phase: DraftPhase): { statuses: StatusInput[]; transitions: TransitionInput[] } {
+export function draftToPhaseBody(phase: DraftPhase): {
+  statuses: StatusInput[]
+  transitions: TransitionInput[]
+  exitCriteria?: PhaseExitCriterionKey[]
+} {
   const ref = new Map<string, number | string>(phase.statuses.map((s) => [s.key, s.statusId ?? s.key]))
   return {
     statuses: phase.statuses.map((s) => ({
@@ -154,6 +184,7 @@ export function draftToPhaseBody(phase: DraftPhase): { statuses: StatusInput[]; 
       commentHint: t.requireComment ? t.commentHint?.trim() || null : null,
       condition: t.condition?.trim() || null,
     })),
+    exitCriteria: phase.exitCriteria,
   }
 }
 
