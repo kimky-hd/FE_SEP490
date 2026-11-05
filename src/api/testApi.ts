@@ -33,6 +33,9 @@ export interface TestApi {
   // 5.2 Testcase
   list: (projectId: number, query?: TestCaseQuery) => Promise<TestCaseSummaryDto[]>
   create: (projectId: number, body: CreateTestCaseBody) => Promise<TestCaseDetailDto>
+  bulkCreate: (projectId: number, items: CreateTestCaseBody[]) => Promise<TestCaseDetailDto[]>
+  bulkApprove: (projectId: number, testCaseIds: number[]) => Promise<{ updatedCount: number }>
+  aiRefreshStale: (projectId: number, testCaseId: number) => Promise<TestCaseDetailDto>
   get: (testCaseId: number) => Promise<TestCaseDetailDto>
   update: (testCaseId: number, body: UpdateTestCaseBody) => Promise<TestCaseDetailDto>
   remove: (testCaseId: number) => Promise<void>
@@ -60,6 +63,23 @@ export const httpTestApi: TestApi = {
       .then((r) => r.data.items),
   create: (projectId, body) =>
     api.post<TestCaseDetailDto>(`/projects/${projectId}/testcases`, body).then((r) => r.data),
+  bulkCreate: async (projectId, items) => {
+    const out: TestCaseDetailDto[] = []
+    for (const item of items) {
+      out.push(await api.post<TestCaseDetailDto>(`/projects/${projectId}/testcases`, item).then((r) => r.data))
+    }
+    return out
+  },
+  bulkApprove: async (_projectId, testCaseIds) => {
+    for (const id of testCaseIds) {
+      await api.patch<TestCaseDetailDto>(`/testcases/${id}`, { approvalStatus: 'APPROVED', needsReview: false })
+    }
+    return { updatedCount: testCaseIds.length }
+  },
+  aiRefreshStale: (_projectId, testCaseId) =>
+    api
+      .patch<TestCaseDetailDto>(`/testcases/${testCaseId}`, { approvalStatus: 'APPROVED', needsReview: false })
+      .then((r) => r.data),
   get: (testCaseId) => api.get<TestCaseDetailDto>(`/testcases/${testCaseId}`).then((r) => r.data),
   update: (testCaseId, body) => api.patch<TestCaseDetailDto>(`/testcases/${testCaseId}`, body).then((r) => r.data),
   remove: (testCaseId) => api.delete(`/testcases/${testCaseId}`).then(() => undefined),
@@ -86,6 +106,9 @@ function createMockTestApi(store: TestMockStore): TestApi {
     createFolder: (projectId, body) => store.createFolder(projectId, body),
     list: (projectId, query) => store.listTestCases(projectId, query).then((r) => r.items),
     create: (projectId, body) => store.createTestCase(projectId, body),
+    bulkCreate: (projectId, items) => store.bulkCreateTestCases(projectId, items),
+    bulkApprove: (projectId, testCaseIds) => store.bulkApproveTestCases(projectId, testCaseIds),
+    aiRefreshStale: (projectId, testCaseId) => store.aiRefreshStaleTestCase(projectId, testCaseId),
     get: (testCaseId) => store.getTestCase(testCaseId),
     update: (testCaseId, body) => store.updateTestCase(testCaseId, body),
     remove: (testCaseId) => store.deleteTestCase(testCaseId),
@@ -102,6 +125,9 @@ function createMockTestApi(store: TestMockStore): TestApi {
 const MOCK_MUTATIONS = [
   'createFolder',
   'create',
+  'bulkCreate',
+  'bulkApprove',
+  'aiRefreshStale',
   'update',
   'remove',
   'createCycle',

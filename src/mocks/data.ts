@@ -268,6 +268,108 @@ export function instantiateTemplate(db: MockDb, projectId: number, method: SdlcM
 
 const PROJECT_VIEW = ['project.view', 'project.workflow.view']
 
+const TECH_LEAD_PERMS = [
+  ...PROJECT_VIEW,
+  'project.workflow.manage',
+  'project.workflow.transition.manage',
+  'issue.view',
+  'issue.create',
+  'issue.update',
+  'issue.assign',
+  'issue.change_status',
+  'issue.delete',
+  'document.view',
+  'document.edit',
+  'document.approve',
+  'document.revise',
+  'figma.create',
+  'figma.update',
+  'testcase.view',
+  'testcase.manage',
+  'comment.view',
+  'comment.write',
+  'activity.view',
+  'ai.use',
+]
+
+const BA_PERMS = [
+  ...PROJECT_VIEW,
+  'document.view',
+  'document.edit',
+  'document.approve',
+  'document.revise',
+  'issue.view',
+  'issue.create',
+  'issue.update',
+  'issue.assign',
+  'issue.change_status',
+  'figma.create',
+  'figma.update',
+  'testcase.view',
+  'testcase.manage',
+  'comment.view',
+  'comment.write',
+  'activity.view',
+  'ai.use',
+]
+
+const DEV_PERMS = [
+  ...PROJECT_VIEW,
+  'document.view',
+  'issue.view',
+  'issue.create',
+  'issue.update',
+  'issue.change_status',
+  'figma.update',
+  'testcase.view',
+  'comment.view',
+  'comment.write',
+  'activity.view',
+  'ai.use',
+]
+
+const QA_PERMS = [
+  ...PROJECT_VIEW,
+  'document.view',
+  'issue.view',
+  'issue.create',
+  'issue.update',
+  'issue.change_status',
+  'testcase.view',
+  'testcase.manage',
+  'comment.view',
+  'comment.write',
+  'activity.view',
+  'ai.use',
+]
+
+const DESIGNER_PERMS = [
+  ...PROJECT_VIEW,
+  'document.view',
+  'issue.view',
+  'issue.create',
+  'issue.update',
+  'issue.change_status',
+  'figma.create',
+  'figma.update',
+  'figma.archive',
+  'testcase.view',
+  'comment.view',
+  'comment.write',
+  'activity.view',
+  'ai.use',
+]
+
+const REVIEWER_PERMS = [
+  ...PROJECT_VIEW,
+  'document.view',
+  'issue.view',
+  'testcase.view',
+  'comment.view',
+  'comment.write',
+  'activity.view',
+]
+
 export function createSeed(): MockDb {
   const users: MockUser[] = [
     { id: 1, fullName: 'Sarah Lin', email: 'sarah@fintechcorp.com', password: MOCK_PASSWORD },
@@ -307,32 +409,47 @@ export function createSeed(): MockDb {
       isLocked: true,
       description: 'Khởi tạo Sprint, cấu hình Phase SDLC, duyệt thành viên dự án. Gán cho người tạo dự án.',
     }),
-    role(7, 'TECH_LEAD', 'Tech Lead', 'PROJECT', PROJECT_VIEW, { isSystem: true, description: 'Dẫn dắt kỹ thuật, duyệt code review.' }),
-    role(8, 'BA', 'Business Analyst', 'PROJECT', PROJECT_VIEW, { isSystem: true, description: 'Soạn thảo đặc tả SRS, quản lý khối yêu cầu và backlog.' }),
-    role(9, 'DEVELOPER', 'Developer', 'PROJECT', PROJECT_VIEW, { isSystem: true, description: 'Lập trình, nhận issue, chuyển trạng thái theo luồng kỹ thuật.' }),
-    role(10, 'QA', 'QA / Tester', 'PROJECT', PROJECT_VIEW, { isSystem: true, description: 'Kiểm thử, xác nhận Definition of Done.' }),
+    role(7, 'TECH_LEAD', 'Tech Lead', 'PROJECT', TECH_LEAD_PERMS, {
+      isSystem: true,
+      description: 'Dẫn dắt kỹ thuật, quản lý luồng workflow, duyệt tài liệu và code review.',
+    }),
+    role(8, 'BA', 'Business Analyst', 'PROJECT', BA_PERMS, {
+      isSystem: true,
+      description: 'Soạn thảo & phê duyệt đặc tả URD/SRS, phân tách REQ-xx, quản lý backlog và kịch bản nghiệm thu.',
+    }),
+    role(9, 'DEVELOPER', 'Developer', 'PROJECT', DEV_PERMS, {
+      isSystem: true,
+      description: 'Lập trình, nhận issue, chuyển trạng thái theo luồng kỹ thuật và tra cứu đặc tả.',
+    }),
+    role(10, 'QA', 'QA / Tester', 'PROJECT', QA_PERMS, {
+      isSystem: true,
+      description: 'Thiết kế & phê duyệt Test Case chuẩn Excel, thực thi Test Cycle, log Bug và xác nhận DoD.',
+    }),
     role(11, 'TEAM_LEAD', 'Trưởng nhóm', 'TENANT', ['company.view', 'user.view', 'user.invite', 'workspace.create'], {
       description: 'Được tạo workspace mới và mời người vào công ty.',
     }),
-    role(12, 'AUDITOR', 'Kiểm toán viên', 'TENANT', ['company.view', 'user.view', 'role.view', 'workspace.view_all'], {
-      isActive: false,
-      description: 'Chỉ xem, phục vụ kiểm toán nội bộ. Đang tắt.',
+    role(12, 'AUDITOR', 'Kiểm toán viên', 'TENANT', ['company.view', 'user.view', 'role.view', 'workspace.view_all', 'audit.view'], {
+      isActive: true,
+      description: 'Chỉ xem toàn bộ workspace và nhật ký hệ thống phục vụ kiểm toán nội bộ.',
     }),
-    role(13, 'EXTERNAL_REVIEWER', 'External Reviewer', 'PROJECT', PROJECT_VIEW, {
-      description: 'Chuyên gia bên ngoài, đánh giá kiến trúc và phản biện tài liệu.',
+    role(13, 'EXTERNAL_REVIEWER', 'External Reviewer', 'PROJECT', REVIEWER_PERMS, {
+      description: 'Chuyên gia độc lập / Stakeholder: chỉ xem đặc tả, tiến độ Kanban, kết quả Test và viết bình luận phản biện.',
+    }),
+    role(14, 'DESIGNER', 'UI/UX Designer', 'PROJECT', DESIGNER_PERMS, {
+      description: 'Thiết kế giao diện, đồng bộ frame Figma và quản lý thẻ công việc DESIGN.',
     }),
   ]
 
   const companyMembers: MockCompanyMember[] = [
     { companyId: 1, userId: 1, roleId: 1, status: 'ACTIVE', joinedAt: at('2026-09-12') },
     { companyId: 1, userId: 2, roleId: 11, status: 'ACTIVE', joinedAt: at('2026-09-12') },
-    { companyId: 1, userId: 3, roleId: 2, status: 'ACTIVE', joinedAt: at('2026-09-13') },
+    { companyId: 1, userId: 3, roleId: 11, status: 'ACTIVE', joinedAt: at('2026-09-13') },
     { companyId: 1, userId: 4, roleId: 2, status: 'ACTIVE', joinedAt: at('2026-09-13') },
     { companyId: 1, userId: 5, roleId: 2, status: 'ACTIVE', joinedAt: at('2026-09-13') },
     { companyId: 1, userId: 6, roleId: 2, status: 'ACTIVE', joinedAt: at('2026-09-15') },
     { companyId: 1, userId: 7, roleId: 2, status: 'ACTIVE', joinedAt: at('2026-09-16') },
     { companyId: 1, userId: 8, roleId: 2, status: 'ACTIVE', joinedAt: at('2026-09-16') },
-    { companyId: 1, userId: 9, roleId: 2, status: 'ACTIVE', joinedAt: at('2026-09-17') },
+    { companyId: 1, userId: 9, roleId: 12, status: 'ACTIVE', joinedAt: at('2026-09-17') },
   ]
 
   const ws = (id: number, name: string, code: string, description: string, createdBy: number, created: string, updated: string, archived = false): MockWorkspace => ({
@@ -349,9 +466,9 @@ export function createSeed(): MockDb {
   })
 
   const workspaces: MockWorkspace[] = [
-    ws(10, 'Mobile Banking Revamp', 'mobile-banking-revamp', 'Tái thiết kế app ngân hàng di động, Q1–Q2 2026', 2, '2026-09-12', '2026-10-09'),
-    ws(11, 'Internal Portal v2', 'internal-portal-v2', 'Cổng thông tin nội bộ cho nhân viên', 1, '2026-09-14', '2026-10-08'),
-    ws(12, 'Legacy Core Banking', 'legacy-core-banking', 'Hệ thống cũ, đã chuyển sang chỉ đọc', 1, '2026-09-12', '2026-10-01', true),
+    ws(10, 'Mobile Banking Revamp', 'mobile-banking-revamp', 'Khối Ngân hàng số Bán lẻ — Nền tảng SuperApp & VietQR 24/7 (Q1–Q4 2026)', 2, '2026-09-12', '2026-10-12'),
+    ws(11, 'Internal Portal & Core Ops', 'internal-portal-v2', 'Khối Vận hành & Cổng quản trị nội bộ doanh nghiệp', 1, '2026-09-14', '2026-10-10'),
+    ws(12, 'Legacy Core Banking', 'legacy-core-banking', 'Hệ thống Core Banking thế hệ cũ, đã đóng băng lưu trữ chỉ đọc', 1, '2026-09-12', '2026-10-01', true),
   ]
 
   const wm = (workspaceId: number, userId: number, roleId: number, joined: string): MockWorkspaceMember => ({
@@ -363,14 +480,24 @@ export function createSeed(): MockDb {
   })
 
   const workspaceMembers: MockWorkspaceMember[] = [
+    // Workspace 10: đầy đủ các thành viên với các vai trò khác nhau để test phân quyền
     wm(10, 1, 3, '2026-09-12'), // Sarah — Workspace Admin
     wm(10, 2, 3, '2026-09-12'), // Khoa — Workspace Admin
-    wm(10, 3, 4, '2026-09-13'), // Kỳ — Project Initiator
-    wm(10, 4, 5, '2026-09-13'), // Lương — Workspace Member
-    wm(10, 5, 5, '2026-09-13'), // Tâm — Workspace Member
+    wm(10, 3, 4, '2026-09-13'), // Kỳ — Project Initiator (Tạo dự án mới)
+    wm(10, 4, 5, '2026-09-13'), // Lương — Workspace Member (Developer ở dự án)
+    wm(10, 5, 5, '2026-09-13'), // Tâm — Workspace Member (QA / Tester ở dự án)
+    wm(10, 6, 5, '2026-09-15'), // Minh — Workspace Member (Business Analyst ở dự án)
+    wm(10, 7, 5, '2026-09-16'), // Trang — Workspace Member (Tech Lead ở dự án)
+    wm(10, 8, 5, '2026-09-16'), // Quân — Workspace Member (UI/UX Designer ở dự án)
+    wm(10, 9, 5, '2026-09-17'), // Trần Thị C — Workspace Member (External Reviewer ở dự án)
+    // Workspace 11
     wm(11, 1, 3, '2026-09-14'),
-    wm(11, 3, 5, '2026-09-15'), // Kỳ — 1 người, role khác ở workspace khác
+    wm(11, 2, 4, '2026-09-15'),
+    wm(11, 3, 5, '2026-09-15'),
+    wm(11, 6, 5, '2026-09-16'),
     wm(11, 7, 5, '2026-09-16'),
+    wm(11, 8, 5, '2026-09-16'),
+    // Workspace 12 (Archived)
     wm(12, 1, 3, '2026-09-12'),
   ]
 
@@ -422,11 +549,25 @@ export function createSeed(): MockDb {
     instantiateTemplate(db, id, sdlcMethod)
   }
 
-  project(20, 10, 'CORE', 'Lõi tài khoản & KYC', 'Mở tài khoản, eKYC và quản lý hồ sơ khách hàng', 'CUSTOM', 2, '2026-09-12', '2026-10-09', [[1, 6], [2, 6], [4, 9], [5, 10]])
-  project(21, 10, 'PAY', 'Thanh toán & QR', 'Thanh toán QR, chuyển khoản nhanh 24/7', 'KANBAN', 3, '2026-09-15', '2026-10-08', [[1, 6], [3, 6], [4, 9]])
-  project(22, 10, 'NOTIF', 'Thông báo đẩy', 'Push notification & in-app message', 'SCRUM', 2, '2026-09-18', '2026-10-07', [[1, 6], [2, 6], [5, 10]])
-  project(23, 10, 'RPT', 'Báo cáo & Đối soát', 'Báo cáo giao dịch và đối soát cuối ngày', 'CUSTOM', 3, '2026-09-13', '2026-10-02', [[3, 6]], true)
-  project(24, 11, 'PORTAL', 'Cổng thông tin nội bộ', 'Tin tức, quy trình và biểu mẫu nội bộ', 'KANBAN', 1, '2026-09-14', '2026-10-08', [[1, 6], [7, 9]])
+  // Các dự án có đầy đủ đội ngũ: PM (6), Tech Lead (7), BA (8), Developer (9), QA (10), External Reviewer (13), Designer (14)
+  const fullTeam: [number, number][] = [
+    [1, 6],  // Sarah Lin — Project Manager
+    [2, 6],  // Phạm Văn Khoa — Project Manager
+    [3, 6],  // Vũ Kim Kỳ — Project Manager
+    [6, 8],  // Phạm Công Minh — Business Analyst (BA)
+    [7, 7],  // Đặng Thu Trang — Tech Lead
+    [4, 9],  // Phạm Minh Lương — Developer
+    [5, 10], // Trương Quang Tâm — QA / Tester
+    [8, 14], // Hoàng Minh Quân — UI/UX Designer
+    [9, 13], // Trần Thị C — External Reviewer (Read-only + Comment)
+  ]
+
+  project(20, 10, 'CORE', 'Lõi tài khoản & eKYC Sinh trắc học', 'Mở tài khoản trực tuyến, xác thực khuôn mặt NFC CCCD và quản lý hồ sơ khách hàng chuẩn NHNN', 'SCRUM', 2, '2026-09-12', '2026-10-12', fullTeam)
+  project(21, 10, 'PAY', 'Thanh toán VietQR & Chuyển tiền 24/7', 'Cổng thanh toán mã VietQR động EMVCo, xử lý Webhook NAPAS247 và đối soát tự động', 'SCRUM', 3, '2026-09-15', '2026-10-12', fullTeam)
+  project(22, 10, 'NOTIF', 'Trung tâm Thông báo Đa kênh (Omni-Push)', 'Push Notification biến động số dư thời gian thực, OTT In-app, SMS Brandname và ZNS', 'KANBAN', 2, '2026-09-18', '2026-10-11', fullTeam)
+  project(25, 10, 'LOAN', 'Khởi tạo Khoản vay & Chấm điểm Tín dụng Số (LOS)', 'Luồng đăng ký vay tiêu dùng 100% online, phê duyệt tự động AI Credit Scoring và giải ngân tức thời', 'CUSTOM', 3, '2026-09-22', '2026-10-11', fullTeam)
+  project(23, 10, 'RPT', 'Báo cáo Thanh khoản & Đối soát Cuối ngày', 'Hệ thống tổng hợp giao dịch, đối chiếu sổ cái Core Banking và báo cáo tuân thủ', 'CUSTOM', 3, '2026-09-13', '2026-10-02', [[1, 6], [3, 6], [5, 10], [9, 13]], true)
+  project(24, 11, 'PORTAL', 'Cổng thông tin Nhân sự & Phê duyệt Nội bộ', 'Quản lý quy trình tờ trình điện tử, chữ ký số nội bộ và danh bạ SSO toàn tập đoàn', 'KANBAN', 1, '2026-09-14', '2026-10-10', [[1, 6], [2, 6], [6, 8], [7, 7], [8, 14]])
 
   return db
 }

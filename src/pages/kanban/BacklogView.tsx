@@ -231,6 +231,15 @@ export function BacklogView({
                       {i.requirements.slice(0, 1).map((r) => (
                         <ReqChip key={r.reqUid} req={r} short />
                       ))}
+                      {(i.phaseOrder || i.phaseName) && (
+                        <span
+                          className="hidden md:inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600 truncate max-w-[130px]"
+                          title={i.phaseName ?? undefined}
+                        >
+                          {i.phaseOrder ? `P${i.phaseOrder}: ` : ''}
+                          {i.phaseName ?? ''}
+                        </span>
+                      )}
                       <span className="sr-only">{i.key}</span>
                     </button>
                     <span className="hidden sm:block">

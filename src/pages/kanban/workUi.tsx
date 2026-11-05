@@ -19,12 +19,16 @@ export const priorityLabel = (p: IssuePriority) =>
 export const testTypeLabel = (type: TestType) =>
   ({
     FUNCTIONAL: tr('Chức năng', 'Functional'),
-    INTEGRATION: tr('Tích hợp', 'Integration'),
+    BOUNDARY: tr('Biên (Boundary)', 'Boundary'),
+    NEGATIVE: tr('Ngoại lệ (Negative)', 'Negative'),
+    UI_UX: 'UI / UX',
     SECURITY: tr('Bảo mật', 'Security'),
+    PERFORMANCE: tr('Hiệu năng', 'Performance'),
+    INTEGRATION: tr('Tích hợp', 'Integration'),
     E2E: 'E2E',
     UNIT: 'Unit',
     REGRESSION: tr('Hồi quy', 'Regression'),
-  })[type]
+  })[type] ?? type
 
 export const resultLabel = (r: RunResult | null) =>
   ({

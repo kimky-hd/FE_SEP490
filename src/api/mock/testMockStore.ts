@@ -14,10 +14,12 @@ import type {
   RunQuery,
   RunResult,
   SuggestedTestCase,
+  TestApprovalStatus,
   TestCaseDetailDto,
   TestCaseQuery,
   TestCaseSummaryDto,
   TestCycleDto,
+  TestEnvironment,
   TestPriority,
   TestRunDto,
   TestStep,
@@ -78,6 +80,14 @@ interface TestCaseRec {
   createdAt: string
   updatedAt: string
   isDeleted: boolean
+  moduleName?: string
+  testType?: TestType
+  testData?: string
+  expectedSummary?: string
+  actualResult?: string
+  environment?: TestEnvironment
+  approvalStatus?: TestApprovalStatus
+  linkedBugId?: string
 }
 
 interface CycleRec {
@@ -253,7 +263,98 @@ export class TestMockStore {
 
   // ---------- DTO ----------
 
+  private inferEnterprise(t: TestCaseRec, reqs: ReturnType<typeof reqRefDto>[], issues: { issueId: number; key: string }[]) {
+    const titleLower = t.title.toLocaleLowerCase('vi')
+    const firstReq = reqs[0]
+    let moduleName = t.moduleName?.trim()
+    if (!moduleName) {
+      if (firstReq?.reqUid === PAY_REQ.qr || titleLower.includes('qr')) {
+        moduleName = 'Payment & VietQR'
+      } else if (firstReq?.reqUid === PAY_REQ.webhook || titleLower.includes('webhook') || titleLower.includes('hmac')) {
+        moduleName = 'Webhook & Banking Gateway'
+      } else if (firstReq?.reqUid === PAY_REQ.reconcile || titleLower.includes('đối soát') || titleLower.includes('hoàn tiền')) {
+        moduleName = 'Reconciliation & Audit'
+      } else if (firstReq?.reqUid === AUTH_REQ.login || titleLower.includes('email') || titleLower.includes('token') || titleLower.includes('đăng nhập')) {
+        moduleName = 'Authentication & SSO'
+      } else if (t.folderId) {
+        const folder = this.load().folders.find((f) => f.folderId === t.folderId)
+        moduleName = folder?.name ?? 'General Regression'
+      } else if (firstReq?.documentCode) {
+        moduleName = `${firstReq.documentCode} Functional`
+      } else {
+        moduleName = 'Core System'
+      }
+    }
+
+    let testData = t.testData?.trim()
+    if (!testData) {
+      if (moduleName === 'Payment & VietQR') {
+        testData = 'orderId: ORD-2026-109\namount: 150,000 VND\nbankCode: NAPAS247_VCB'
+      } else if (moduleName === 'Webhook & Banking Gateway') {
+        testData = 'header: X-Signature-HMAC-SHA256\npayload: {"txId":"FT2629182","amount":150000}\nretryCount: 2'
+      } else if (moduleName === 'Reconciliation & Audit') {
+        testData = 'txStatus: LATE_SETTLEMENT\nexpiredAt: T+15m\npaidAt: T+18m'
+      } else if (moduleName === 'Authentication & SSO') {
+        testData = 'email: user@fintechcorp.com\npassword: Password@123\ntokenTTL: 900s'
+      } else {
+        testData = 'env: SIT_SANDBOX\nactor: Authenticated_User'
+      }
+    }
+
+    const expectedSummary =
+      t.expectedSummary?.trim() ||
+      t.steps
+        .map((s) => s.expected?.trim())
+        .filter(Boolean)
+        .join(' → ') ||
+      t.title
+
+    let actualResult = t.actualResult
+    if (actualResult === undefined) {
+      if (t.lastResult === 'PASS') {
+        actualResult = tr('Đạt chuẩn nghiệm thu, phản hồi đúng đặc tả (200 OK)', 'Passed acceptance criteria as specified (200 OK)')
+      } else if (t.lastResult === 'FAIL') {
+        const lastFail = this.load()
+          .history.filter((h) => h.testCaseId === t.testCaseId && h.result === 'FAIL')
+          .sort((a, b) => b.id - a.id)[0]
+        actualResult = lastFail?.note ?? tr('Ghi có 2 lần khi ngân hàng gửi lại sau 10 giây', 'Credited twice when resent after 10 seconds')
+      } else if (t.lastResult === 'BLOCKED') {
+        const lastBlocked = this.load()
+          .history.filter((h) => h.testCaseId === t.testCaseId && h.result === 'BLOCKED')
+          .sort((a, b) => b.id - a.id)[0]
+        actualResult = lastBlocked?.note ?? tr('Sandbox ngân hàng đang bảo trì', 'Bank sandbox is down')
+      } else {
+        actualResult = ''
+      }
+    }
+
+    const environment: TestEnvironment = t.environment ?? 'SIT'
+    const approvalStatus: TestApprovalStatus =
+      t.approvalStatus ?? (t.needsReview ? 'IN_REVIEW' : t.lastResult === 'PASS' || t.lastResult === 'FAIL' ? 'APPROVED' : 'DRAFT')
+    const linkedBugId = t.linkedBugId ?? (t.lastResult === 'FAIL' && issues[0] ? issues[0].key : undefined)
+    const preconditions =
+      t.preconditions ??
+      (firstReq?.reqKey
+        ? tr(`Tài khoản hợp lệ; môi trường ${environment} sẵn sàng cho ${firstReq.reqKey}`, `Valid account; ${environment} ready for ${firstReq.reqKey}`)
+        : tr(`Hệ thống sẵn sàng trên môi trường ${environment}`, `System ready on ${environment} environment`))
+
+    return {
+      moduleName,
+      testType: t.testType ?? t.type,
+      testData,
+      expectedSummary,
+      actualResult,
+      environment,
+      approvalStatus,
+      linkedBugId,
+      preconditions,
+    }
+  }
+
   private summary(ctx: Ctx, t: TestCaseRec): TestCaseSummaryDto {
+    const requirements = t.links.map((l) => reqRefDto(ctx.index, l, t.needsReview))
+    const issues = this.issues.refs(ctx.projectId, t.issueIds).map(({ issueId, key }) => ({ issueId, key }))
+    const ent = this.inferEnterprise(t, requirements, issues)
     return {
       testCaseId: t.testCaseId,
       key: t.key,
@@ -261,14 +362,24 @@ export class TestMockStore {
       type: t.type,
       priority: t.priority,
       folderId: t.folderId,
-      requirements: t.links.map((l) => reqRefDto(ctx.index, l, t.needsReview)),
-      issues: this.issues.refs(ctx.projectId, t.issueIds).map(({ issueId, key }) => ({ issueId, key })),
+      requirements,
+      issues,
       stepCount: t.steps.length,
       needsReview: t.needsReview,
       lastResult: t.lastResult,
       lastRunAt: t.lastRunAt,
       lastRunBy: t.lastRunBy ? { ...t.lastRunBy } : null,
       updatedAt: t.updatedAt,
+      preconditions: ent.preconditions,
+      steps: clone(t.steps),
+      moduleName: ent.moduleName,
+      testType: ent.testType,
+      testData: ent.testData,
+      expectedSummary: ent.expectedSummary,
+      actualResult: ent.actualResult,
+      environment: ent.environment,
+      approvalStatus: ent.approvalStatus,
+      linkedBugId: ent.linkedBugId,
     }
   }
 
@@ -502,19 +613,25 @@ export class TestMockStore {
   }
 
   private insert(ctx: Ctx, body: CreateTestCaseBody, at = this.iso()): TestCaseRec {
-    this.validate(ctx, body, true)
+    const normalizedType: TestType = body.type ?? body.testType ?? 'FUNCTIONAL'
+    const fullBody: CreateTestCaseBody = {
+      ...body,
+      type: normalizedType,
+    }
+    this.validate(ctx, fullBody, true)
+    const cleanSteps = this.cleanSteps(fullBody.steps)
     const t: TestCaseRec = {
       testCaseId: this.nextId(),
       projectId: ctx.projectId,
       key: this.nextKey(ctx.projectId),
-      title: body.title.trim(),
-      type: body.type,
-      priority: body.priority,
-      preconditions: body.preconditions?.trim() || null,
-      steps: this.cleanSteps(body.steps),
-      folderId: body.folderId ?? null,
-      links: newLinks(ctx.index, body.requirementRefs),
-      issueIds: [...new Set(body.issueIds ?? [])],
+      title: fullBody.title.trim(),
+      type: normalizedType,
+      priority: fullBody.priority,
+      preconditions: fullBody.preconditions?.trim() || null,
+      steps: cleanSteps,
+      folderId: fullBody.folderId ?? null,
+      links: newLinks(ctx.index, fullBody.requirementRefs),
+      issueIds: [...new Set(fullBody.issueIds ?? [])],
       needsReview: false,
       lastResult: null,
       lastRunAt: null,
@@ -523,6 +640,20 @@ export class TestMockStore {
       createdAt: at,
       updatedAt: at,
       isDeleted: false,
+      moduleName: fullBody.moduleName?.trim() || undefined,
+      testType: fullBody.testType ?? normalizedType,
+      testData: fullBody.testData?.trim() || undefined,
+      expectedSummary:
+        fullBody.expectedSummary?.trim() ||
+        cleanSteps
+          .map((s) => s.expected)
+          .filter(Boolean)
+          .join(' → ') ||
+        undefined,
+      actualResult: fullBody.actualResult?.trim() || undefined,
+      environment: fullBody.environment ?? 'SIT',
+      approvalStatus: fullBody.approvalStatus ?? 'DRAFT',
+      linkedBugId: fullBody.linkedBugId?.trim() || undefined,
     }
     this.load().testcases.push(t)
     return t
@@ -531,6 +662,102 @@ export class TestMockStore {
   async createTestCase(projectId: number, body: CreateTestCaseBody): Promise<TestCaseDetailDto> {
     const ctx = await this.ctx(projectId, PERMISSIONS.testCaseManage, true)
     const t = this.insert(ctx, body)
+    this.persist()
+    return this.detail(ctx, t)
+  }
+
+  async bulkCreateTestCases(projectId: number, items: CreateTestCaseBody[]): Promise<TestCaseDetailDto[]> {
+    const ctx = await this.ctx(projectId, PERMISSIONS.testCaseManage, true)
+    if (!items.length) {
+      validationError({ items: [tr('Danh sách import trống.', 'Import list is empty.')] })
+    }
+    // Enforce GB-02: Every imported test case must be linked to at least 1 Requirement
+    const missingIdx = items.findIndex((it) => !it.requirementRefs || it.requirementRefs.length === 0)
+    if (missingIdx !== -1) {
+      validationError({
+        requirementRefs: [
+          tr(
+            `Vi phạm quy tắc GB-02 tại dòng #${missingIdx + 1}: Mọi kịch bản kiểm thử bắt buộc phải liên kết với ít nhất 1 Requirement (REQ-xx).`,
+            `Rule GB-02 violation at row #${missingIdx + 1}: Every test case must be linked to at least 1 Requirement (REQ-xx).`,
+          ),
+        ],
+      })
+    }
+    const created: TestCaseRec[] = []
+    const at = this.iso()
+    for (const item of items) {
+      const normalizedSteps =
+        item.steps && item.steps.length > 0
+          ? item.steps
+          : [
+              {
+                action: item.title?.trim() || 'Thực hiện kịch bản kiểm thử',
+                expected: item.expectedSummary?.trim() || 'Hệ thống xử lý đúng mong đợi',
+              },
+            ]
+      created.push(this.insert(ctx, { ...item, steps: normalizedSteps }, at))
+    }
+    this.persist()
+    return created.map((t) => this.detail(ctx, t))
+  }
+
+  async bulkApproveTestCases(projectId: number, testCaseIds: number[]): Promise<{ updatedCount: number }> {
+    await this.ctx(projectId, PERMISSIONS.testCaseManage, true)
+    const idSet = new Set(testCaseIds)
+    const at = this.iso()
+    let updatedCount = 0
+    for (const t of this.projectCases(projectId)) {
+      if (idSet.has(t.testCaseId)) {
+        t.approvalStatus = 'APPROVED'
+        t.needsReview = false
+        for (const l of t.links) l.changedLabel = null
+        t.updatedAt = at
+        updatedCount++
+      }
+    }
+    this.persist()
+    return { updatedCount }
+  }
+
+  async aiRefreshStaleTestCase(projectId: number, testCaseId: number): Promise<TestCaseDetailDto> {
+    const ctx = await this.ctx(projectId, PERMISSIONS.testCaseManage, true)
+    const t = this.testcase(testCaseId)
+    const primaryLink = t.links[0]
+    const reqInfo = primaryLink ? findReq(ctx.index, primaryLink.documentId, primaryLink.reqUid) : { doc: null, req: null }
+    const req = reqInfo.req
+    const doc = reqInfo.doc
+    const versionTag = doc?.baselineLabel ? `v${doc.baselineLabel}` : 'v1.1'
+
+    if (req) {
+      const criteria = req.acceptanceCriteria.map((c) => c.text.trim()).filter(Boolean)
+      if (criteria.length > 0) {
+        t.steps = criteria.slice(0, 3).map((c, idx) => ({
+          action: tr(
+            `[Đồng bộ ${req.reqKey} ${versionTag} - Bước ${idx + 1}] Kiểm tra: ${c}`,
+            `[Synced ${req.reqKey} ${versionTag} - Step ${idx + 1}] Verify: ${c}`,
+          ),
+          expected: c,
+        }))
+      } else {
+        t.steps = t.steps.map((s) => ({
+          action: s.action,
+          expected: `${s.expected} (${tr('Đã đồng bộ chuẩn', 'Synced baseline')} ${req.reqKey} ${versionTag})`,
+        }))
+      }
+      t.expectedSummary = t.steps.map((s) => s.expected).join(' → ')
+      t.testData = `${t.testData ? t.testData + '\n' : ''}baselineSync: ${req.reqKey}_${versionTag}`
+    } else {
+      t.expectedSummary = `${t.expectedSummary ?? t.title} (Synced ${versionTag})`
+    }
+
+    t.needsReview = false
+    t.approvalStatus = 'APPROVED'
+    for (const l of t.links) {
+      const base = ctx.index.find((d) => d.documentId === l.documentId)?.baseline.find((r) => r.reqUid === l.reqUid)
+      if (base) l.hash = base.contentHash
+      l.changedLabel = null
+    }
+    t.updatedAt = this.iso()
     this.persist()
     return this.detail(ctx, t)
   }
@@ -544,7 +771,14 @@ export class TestMockStore {
       content ||= body.title.trim() !== t.title
       t.title = body.title.trim()
     }
-    if (body.type !== undefined) t.type = body.type
+    if (body.type !== undefined) {
+      t.type = body.type
+      t.testType = body.type
+    }
+    if (body.testType !== undefined) {
+      t.testType = body.testType
+      t.type = body.testType
+    }
     if (body.priority !== undefined) t.priority = body.priority
     if (body.preconditions !== undefined) t.preconditions = body.preconditions?.trim() || null
     if (body.steps !== undefined) {
@@ -555,9 +789,40 @@ export class TestMockStore {
     if (body.folderId !== undefined) t.folderId = body.folderId ?? null
     if (body.requirementRefs !== undefined) t.links = newLinks(ctx.index, body.requirementRefs, t.links)
     if (body.issueIds !== undefined) t.issueIds = [...new Set(body.issueIds)]
+    if (body.moduleName !== undefined) t.moduleName = body.moduleName.trim() || undefined
+    if (body.testData !== undefined) t.testData = body.testData
+    if (body.expectedSummary !== undefined) {
+      t.expectedSummary = body.expectedSummary
+      if (t.steps.length === 1 && body.expectedSummary.trim()) {
+        t.steps[0].expected = body.expectedSummary.trim()
+      }
+    }
+    if (body.actualResult !== undefined) t.actualResult = body.actualResult
+    if (body.environment !== undefined) t.environment = body.environment
+    if (body.approvalStatus !== undefined) t.approvalStatus = body.approvalStatus
+    if (body.linkedBugId !== undefined) t.linkedBugId = body.linkedBugId || undefined
+    if (body.lastResult !== undefined) {
+      const at = this.iso()
+      t.lastResult = body.lastResult === 'NOT_RUN' ? null : body.lastResult
+      t.lastRunAt = body.lastResult && body.lastResult !== 'NOT_RUN' ? at : null
+      t.lastRunBy = body.lastResult && body.lastResult !== 'NOT_RUN' ? ctx.me : null
+      // Sync with latest open cycle run if present
+      const db = this.load()
+      const openCycleIds = new Set(db.cycles.filter((c) => c.projectId === ctx.projectId && c.status === 'OPEN').map((c) => c.cycleId))
+      const openRun = db.runs.find((r) => r.testCaseId === t.testCaseId && openCycleIds.has(r.cycleId))
+      if (openRun && body.lastResult) {
+        openRun.result = body.lastResult
+        openRun.executedAt = body.lastResult === 'NOT_RUN' ? null : at
+        openRun.executedBy = body.lastResult === 'NOT_RUN' ? null : ctx.me
+        openRun.needsRerun = false
+        if (body.actualResult) openRun.note = body.actualResult
+      }
+    }
     // §3: lưu lại testcase (hoặc needsReview:false) = đã xem lại theo REQ mới.
+    const metaKeys = new Set(['lastResult', 'actualResult', 'approvalStatus', 'environment', 'linkedBugId'])
+    const onlyMeta = Object.keys(body).every((k) => metaKeys.has(k))
     const onlyFlag = Object.keys(body).every((k) => k === 'needsReview')
-    if (!onlyFlag || body.needsReview === false) {
+    if ((!onlyFlag && !onlyMeta) || body.needsReview === false || body.approvalStatus === 'APPROVED') {
       t.needsReview = false
       for (const l of t.links) l.changedLabel = null
     }
@@ -988,6 +1253,64 @@ export class TestMockStore {
     run(t8, th, 'PASS', 3)
     run(t9, th, 'PASS', 3)
     run(t10, th, 'NOT_RUN')
+    for (const t of [t1, t2, t3, t8, t9]) {
+      t.approvalStatus = 'APPROVED'
+      t.environment = 'SIT'
+    }
+    t1.moduleName = 'Payment & VietQR'
+    t1.testData = 'orderId: ORD-2026-101\namount: 150,000 VND\ncurrency: VND\nchannel: VietQR_NAPAS247'
+    t1.preconditions = 'Đơn hàng ở trạng thái PENDING_PAYMENT; cổng NAPAS247 kết nối thành công'
+
+    t2.moduleName = 'Payment & VietQR'
+    t2.testType = 'BOUNDARY'
+    t2.testData = 'orderId: ORD-2026-102\nqrTTL: 900s (15 mins)\nelapsedTime: 901s'
+    t2.preconditions = 'Mã VietQR đã khởi tạo thành công với TTL = 15 phút'
+
+    t3.moduleName = 'Payment & VietQR'
+    t3.testType = 'NEGATIVE'
+    t3.testData = 'orderId: ORD-2026-103\nregenerateCount: 2\noldQrToken: QR_TOKEN_V1'
+    t3.preconditions = 'Đơn hàng đang có 1 mã QR còn hiệu lực'
+
+    t4.moduleName = 'Webhook & Banking Gateway'
+    t4.testData = 'header: X-Signature-HMAC-SHA256=invalid_hash_00\npayload: {"txId":"FT26101","amount":150000}'
+    t4.preconditions = 'Secret Key HMAC-SHA256 đã cấu hình trên API Gateway'
+    t4.approvalStatus = 'IN_REVIEW'
+    t4.environment = 'SIT'
+
+    t5.moduleName = 'Webhook & Banking Gateway'
+    t5.testData = 'txId: FT2610299 (Idempotency Key)\nretryInterval: 10s\nduplicateCount: 2'
+    t5.preconditions = 'Đơn hàng đã nhận webhook lần 1 và chuyển trạng thái PAID'
+    t5.approvalStatus = 'IN_REVIEW'
+    t5.environment = 'SIT'
+
+    t6.moduleName = 'Webhook & Banking Gateway'
+    t6.testType = 'PERFORMANCE'
+    t6.testData = 'concurrentRequests: 50 webhooks/sec\nslaThreshold: <= 3000ms'
+    t6.preconditions = 'Môi trường Staging/SIT bật chế độ benchmark tải'
+    t6.approvalStatus = 'IN_REVIEW'
+    t6.environment = 'STAGING'
+
+    t7.moduleName = 'Reconciliation & Audit'
+    t7.testData = 'orderId: ORD-2026-107\nqrExpiredAt: 10:15:00\nbankCreditAt: 10:18:30'
+    t7.preconditions = 'Khách hàng chuyển khoản sau khi mã QR đã hết hạn 3 phút'
+    t7.approvalStatus = 'APPROVED'
+    t7.environment = 'UAT'
+
+    t8.moduleName = 'Authentication & SSO'
+    t8.testType = 'SECURITY'
+    t8.testData = 'email: unknown@fintechcorp.com / wrongPass: Invalid@999'
+    t8.preconditions = 'Tài khoản người dùng tồn tại trong hệ thống IAM'
+
+    t9.moduleName = 'Authentication & SSO'
+    t9.testData = 'accessTokenTTL: 0s (expired)\nrefreshToken: valid_rt_token_2026'
+    t9.preconditions = 'Người dùng đã đăng nhập và có Refresh Token hợp lệ trong HttpOnly Cookie'
+
+    t10.moduleName = 'General Regression'
+    t10.testData = 'cardType: NAPAS_DOMESTIC_ATM\nbank: Vietcombank_Sandbox\notp: 123456'
+    t10.preconditions = 'Cổng thanh toán thẻ nội địa bật chế độ UAT Sandbox'
+    t10.approvalStatus = 'DRAFT'
+    t10.environment = 'UAT'
+
     // REQ-02 (webhook) đổi ở bản đã duyệt gần nhất: testcase cần xem lại, lượt đã chạy cần chạy lại.
     for (const t of [t4, t5, t6]) {
       t.needsReview = true

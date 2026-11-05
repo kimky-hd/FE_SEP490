@@ -195,3 +195,6 @@ export function validateDraftPhase(phase: DraftPhase, phaseIndex: number): Workf
 export function validateDraftPhases(phases: DraftPhase[]): WorkflowIssue[] {
   return phases.flatMap((phase, index) => validateDraftPhase(phase, index))
 }
+
+export { getProjectPhases, type ProjectPhaseInfo } from '@/lib/phaseGateEngine'
+

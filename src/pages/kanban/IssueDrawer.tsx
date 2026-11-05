@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import clsx from 'clsx'
 import { issueApi } from '@/api/issueApi'
@@ -11,6 +11,7 @@ import { onDataChanged } from '@/lib/dataEvents'
 import { useI18n } from '@/i18n'
 import { MentionText, MentionTextarea, mentionIdsIn } from '@/components/work/MentionInput'
 import type { BoardStatus } from '@/lib/workflowBoard'
+import { getProjectPhases } from '@/lib/phaseGateEngine'
 import {
   ISSUE_PRIORITIES,
   ISSUE_TYPES,
@@ -110,6 +111,14 @@ export function IssueDrawer({
 
   const statusName = (id: number) => statuses.find((s) => s.statusId === id)?.name ?? '—'
   const can = issue?.can
+  const phases = useMemo(() => getProjectPhases(projectId), [projectId])
+  const currentPhase = useMemo(
+    () =>
+      phases.find((p) => String(p.id) === String(issue?.phaseId)) ||
+      phases.find((p) => p.order === issue?.phaseOrder) ||
+      phases[0],
+    [phases, issue?.phaseId, issue?.phaseOrder],
+  )
 
   return (
     <>
@@ -188,6 +197,72 @@ export function IssueDrawer({
                     {t('Vai trò của bạn không chuyển tiếp được', 'Your role has no next step here')}
                   </span>
                 )}
+              </dd>
+              <dt className="text-gray-500">{t('Giai đoạn SDLC', 'SDLC Phase')}</dt>
+              <dd>
+                <select
+                  aria-label={t('Giai đoạn SDLC', 'SDLC Phase')}
+                  value={currentPhase?.id ?? ''}
+                  disabled={!can?.edit}
+                  onChange={(e) => {
+                    const nextPh = phases.find((p) => String(p.id) === e.target.value)
+                    if (!nextPh) return
+                    const initialSt = nextPh.statuses.find((s) => s.isInitial) ?? nextPh.statuses[0]
+                    const cat = initialSt?.category ?? 'TODO'
+                    const mappedStatus = cat === 'DONE' ? 'DONE' : cat === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'TODO'
+                    void run(
+                      () =>
+                        issueApi.update(issue.issueId, {
+                          phaseId: nextPh.id,
+                          phaseName: nextPh.name,
+                          phaseOrder: nextPh.order,
+                          phaseStatusId: initialSt ? initialSt.statusId : undefined,
+                          phaseStatusName: initialSt ? initialSt.name : undefined,
+                          statusId: initialSt ? initialSt.statusId : undefined,
+                          status: mappedStatus,
+                        }),
+                      t(`Đã chuyển sang Giai đoạn P${nextPh.order}`, `Moved to Phase P${nextPh.order}`),
+                    )
+                  }}
+                  className={inlineSelect}
+                >
+                  {phases.map((ph) => (
+                    <option key={ph.id} value={ph.id}>
+                      P{ph.order}: {ph.name} {ph.lifecycleStatus === 'active' ? `(${t('Đang chạy', 'Active')})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </dd>
+              <dt className="text-gray-500">{t('Trạng thái Phase', 'Phase Status')}</dt>
+              <dd>
+                <select
+                  aria-label={t('Trạng thái Phase', 'Phase Status')}
+                  value={issue.phaseStatusId ?? issue.statusId}
+                  disabled={!can?.changeStatus}
+                  onChange={(e) => {
+                    const sid = Number(e.target.value)
+                    const stObj = currentPhase?.statuses.find((s) => s.statusId === sid)
+                    const cat = stObj?.category ?? 'TODO'
+                    const mappedStatus = cat === 'DONE' ? 'DONE' : cat === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'TODO'
+                    void run(
+                      () =>
+                        issueApi.update(issue.issueId, {
+                          phaseStatusId: sid,
+                          phaseStatusName: stObj?.name,
+                          statusId: sid,
+                          status: mappedStatus,
+                        }),
+                      t(`Đã đổi trạng thái sang ${stObj?.name ?? sid}`, `Updated status to ${stObj?.name ?? sid}`),
+                    )
+                  }}
+                  className={inlineSelect}
+                >
+                  {(currentPhase?.statuses || []).map((st) => (
+                    <option key={st.statusId} value={st.statusId}>
+                      {st.name} ({st.category})
+                    </option>
+                  ))}
+                </select>
               </dd>
               <dt className="text-gray-500">{t('Người làm', 'Assignee')}</dt>
               <dd className="flex items-center gap-2">

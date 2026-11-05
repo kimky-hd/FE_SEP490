@@ -1,6 +1,7 @@
 import type { ComponentType, SVGProps } from 'react'
-import type { PhaseDto, PhaseExitCriterionKey, PhaseLifecycleStatus } from '@/types/project'
+import type { PhaseDto, PhaseExitCriterionKey, PhaseLifecycleStatus, StatusCategory } from '@/types/project'
 import type { DraftPhase } from '@/lib/workflowDraft'
+import { SDLC_TEMPLATES } from '@/mocks/sdlcTemplates'
 import { CheckIcon, DocumentIcon, LayersIcon, LinkIcon, BeakerIcon, ShieldIcon } from '@/components/ui/icons'
 import { documentMockStore } from '@/api/documentApi'
 import { MOCK_STORAGE_KEY as DOC_STORAGE_KEY } from '@/api/mock/documentMockStore'
@@ -146,6 +147,101 @@ export function saveStoredPhaseLifecycleMap(projectId: number, map: Record<strin
   }
 }
 
+export interface ProjectPhaseInfo {
+  id: string | number
+  phaseId: number
+  order: number
+  name: string
+  description: string | null
+  statuses: {
+    id: number
+    statusId: number
+    name: string
+    category: StatusCategory
+    color: string
+    isInitial: boolean
+  }[]
+  exitCriteria: PhaseExitCriterionKey[]
+  lifecycleStatus: PhaseLifecycleStatus
+  completedAt?: string | null
+  completionNote?: string | null
+}
+
+/**
+ * Đọc danh sách Phase của dự án từ mockdb hoặc fallback về mẫu SDLC Scrum mặc định.
+ */
+export function getProjectPhases(projectId: string | number): ProjectPhaseInfo[] {
+  const pId = Number(projectId)
+  const storedLifecycle = getStoredPhaseLifecycleMap(pId)
+
+  // 1. Thử đọc từ ssam.mockdb.v4 hoặc ssam.mockdb.v3
+  try {
+    const rawDb = localStorage.getItem('ssam.mockdb.v4') ?? localStorage.getItem('ssam.mockdb.v3')
+    if (rawDb) {
+      const db = JSON.parse(rawDb)
+      const phases = (db.phases || []).filter((p: any) => p.projectId === pId)
+      if (phases.length > 0) {
+        return phases
+          .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
+          .map((p: any, idx: number) => {
+            const phaseStatuses = (db.statuses || [])
+              .filter((s: any) => s.phaseId === p.id)
+              .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
+              .map((s: any) => ({
+                id: s.id,
+                statusId: s.id,
+                name: s.name,
+                category: s.category as StatusCategory,
+                color: s.color || '#64748b',
+                isInitial: Boolean(s.isInitial),
+              }))
+            const stored = storedLifecycle[String(p.id)] ?? storedLifecycle[String(p.position ?? idx + 1)]
+            return {
+              id: p.id,
+              phaseId: p.id,
+              order: p.position ?? idx + 1,
+              name: p.name,
+              description: p.description ?? null,
+              statuses: phaseStatuses,
+              exitCriteria: p.exitCriteria && p.exitCriteria.length ? p.exitCriteria : ['ISSUES_DONE'],
+              lifecycleStatus: stored?.lifecycleStatus ?? (idx === 0 ? 'active' : 'upcoming'),
+              completedAt: stored?.completedAt ?? p.completedAt ?? null,
+              completionNote: stored?.completionNote ?? p.completionNote ?? null,
+            }
+          })
+      }
+    }
+  } catch {
+    // fallback
+  }
+
+  // 2. Fallback về mẫu SDLC Scrum mặc định
+  const scrumTemplate = SDLC_TEMPLATES.find((t) => t.method === 'SCRUM') || SDLC_TEMPLATES[0]
+  return (scrumTemplate?.phases || []).map((tp, idx) => {
+    const phaseId = (idx + 1) * 10
+    const stored = storedLifecycle[String(phaseId)] ?? storedLifecycle[String(idx + 1)]
+    return {
+      id: phaseId,
+      phaseId,
+      order: idx + 1,
+      name: tp.name,
+      description: tp.description ?? null,
+      statuses: tp.statuses.map((s, sIdx) => ({
+        id: phaseId + sIdx + 1,
+        statusId: phaseId + sIdx + 1,
+        name: s.name,
+        category: s.category,
+        color: s.color,
+        isInitial: s.isInitial,
+      })),
+      exitCriteria: tp.exitCriteria && tp.exitCriteria.length ? tp.exitCriteria : ['ISSUES_DONE'],
+      lifecycleStatus: stored?.lifecycleStatus ?? (idx === 0 ? 'active' : 'upcoming'),
+      completedAt: stored?.completedAt ?? null,
+      completionNote: stored?.completionNote ?? null,
+    }
+  })
+}
+
 /** Đọc trạng thái dữ liệu thời gian thực của dự án từ các mock store / localStorage */
 function readProjectRealStats(projectId: number) {
   // 1. Documents stats
@@ -184,6 +280,7 @@ function readProjectRealStats(projectId: number) {
   let totalIssuesCount = 0
   let issuesByStatusId = new Map<number, { total: number; isDone: boolean }>()
   let linkedReqKeys = new Set<string>()
+  let projectIssues: any[] = []
 
   try {
     const rawIssue = localStorage.getItem(ISSUE_STORAGE_KEY)
@@ -191,6 +288,7 @@ function readProjectRealStats(projectId: number) {
       const db = JSON.parse(rawIssue)
       const issues = (db.issues || []).filter((i: any) => i.projectId === projectId && !i.isDeleted)
       totalIssuesCount = issues.length
+      projectIssues = issues
       for (const i of issues) {
         const sid = i.statusId
         const existing = issuesByStatusId.get(sid) ?? { total: 0, isDone: false }
@@ -214,9 +312,14 @@ function readProjectRealStats(projectId: number) {
     const rawTest = localStorage.getItem(TEST_STORAGE_KEY)
     if (rawTest) {
       const db = JSON.parse(rawTest)
-      const testCases = (db.testCases || []).filter((t: any) => t.projectId === projectId && !t.isDeleted)
+      const testCases = (db.testcases || db.testCases || []).filter((t: any) => t.projectId === projectId && !t.isDeleted)
       totalTestsCount = testCases.length
-      approvedTestsCount = testCases.filter((t: any) => !t.needsReview).length
+      approvedTestsCount = testCases.filter(
+        (t: any) =>
+          !t.needsReview &&
+          (t.approvalStatus === 'APPROVED' ||
+            (!t.approvalStatus && (t.lastResult === 'PASS' || t.lastResult === 'FAIL'))),
+      ).length
     }
   } catch {
     // fallback
@@ -229,6 +332,7 @@ function readProjectRealStats(projectId: number) {
     staleReqCount,
     totalIssuesCount,
     issuesByStatusId,
+    projectIssues,
     linkedReqKeysCount: linkedReqKeys.size,
     totalTestsCount,
     approvedTestsCount,
@@ -270,16 +374,23 @@ export function evaluateProjectPhases(
       }
     }
 
-    let phaseIssuesTotal = 0
-    let phaseIssuesDone = 0
-    for (const [sid, info] of stats.issuesByStatusId.entries()) {
-      if (phaseStatusIds.has(sid)) {
-        phaseIssuesTotal += info.total
-        if (doneStatusIds.has(sid)) {
-          phaseIssuesDone += info.total
-        }
-      }
-    }
+    const phaseIdNum = 'phaseId' in phase ? Number(phase.phaseId) : ('id' in phase ? Number((phase as any).id) : undefined)
+    const phaseOrder = 'position' in phase ? phase.position : ('order' in phase ? (phase as any).order : index + 1)
+
+    // Lọc các issue thuộc đúng Phase này (qua phaseId, phaseOrder, hoặc statusId thuộc phase)
+    const issuesInPhase = stats.projectIssues.filter((i: any) => {
+      if (phaseIdNum !== undefined && i.phaseId !== undefined && (Number(i.phaseId) === phaseIdNum || String(i.phaseId) === String(phaseIdNum))) return true
+      if (i.phaseOrder !== undefined && Number(i.phaseOrder) === Number(phaseOrder)) return true
+      if (i.statusId !== undefined && phaseStatusIds.has(i.statusId)) return true
+      return false
+    })
+
+    const phaseIssuesTotal = issuesInPhase.length
+    const phaseIssuesDone = issuesInPhase.filter((i: any) => {
+      if (i.status === 'DONE') return true
+      if (doneStatusIds.has(i.statusId)) return true
+      return false
+    }).length
 
     const criteriaResults: CriterionEvaluation[] = exitCriteria.map((critKey) => {
       const meta = CRITERIA_METADATA[critKey] ?? CRITERIA_METADATA.ISSUES_DONE
@@ -290,10 +401,10 @@ export function evaluateProjectPhases(
         case 'ISSUES_DONE': {
           if (phaseIssuesTotal === 0) {
             passed = true
-            currentText = isVi ? '0 issue tồn đọng (Sạch)' : '0 pending issues'
+            currentText = isVi ? `0 issue trong giai đoạn ${phaseOrder}` : `0 issues in phase ${phaseOrder}`
           } else {
             passed = phaseIssuesDone >= phaseIssuesTotal
-            currentText = `${phaseIssuesDone}/${phaseIssuesTotal} ${isVi ? 'Issues Done' : 'Issues Done'}`
+            currentText = `${phaseIssuesDone}/${phaseIssuesTotal} Issues Done (Phase ${phaseOrder})`
           }
           break
         }

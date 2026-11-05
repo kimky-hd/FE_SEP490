@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { useI18n } from '@/i18n'
 import type { RequirementRef } from '@/types/issue'
 import { loadReqOptions, type ReqOption } from './reqLinks'
+export type { ReqOption }
 
 /** REQ của dự án (một lần cho mỗi lần mở). */
 export function useReqOptions(projectId: number, enabled = true) {

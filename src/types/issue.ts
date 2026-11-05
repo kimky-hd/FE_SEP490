@@ -4,6 +4,7 @@ import type { StatusCategory } from './project'
 
 export type IssueType = 'TASK' | 'BUG' | 'STORY' | 'DESIGN'
 export type IssuePriority = 'HIGHEST' | 'HIGH' | 'MEDIUM' | 'LOW'
+export type IssueStatus = 'TODO' | 'IN_PROGRESS' | 'IN_REVIEW' | 'DONE'
 export const SPRINT_STATUSES = ['PLANNED', 'ACTIVE', 'COMPLETED'] as const
 export type SprintStatus = (typeof SPRINT_STATUSES)[number]
 export const ISSUE_ACTIVITY_ACTIONS = [
@@ -93,6 +94,12 @@ export interface IssueSummaryDto {
   subtaskCount: number
   subtaskDone: number
   updatedAt: string
+  phaseId?: string | number
+  phaseName?: string
+  phaseOrder?: number
+  phaseStatusId?: string | number
+  phaseStatusName?: string
+  status?: IssueStatus
 }
 
 export interface IssueDetailDto extends IssueSummaryDto {
@@ -167,6 +174,12 @@ export interface CreateIssueBody {
    * Bỏ trống = trạng thái IsInitial của phase đầu.
    */
   statusId?: number
+  phaseId?: string | number
+  phaseName?: string
+  phaseOrder?: number
+  phaseStatusId?: string | number
+  phaseStatusName?: string
+  status?: IssueStatus
 }
 
 export interface UpdateIssueBody {
@@ -179,6 +192,13 @@ export interface UpdateIssueBody {
   sprintId?: number | null
   labels?: string[]
   dueDate?: string | null
+  statusId?: number
+  phaseId?: string | number
+  phaseName?: string
+  phaseOrder?: number
+  phaseStatusId?: string | number
+  phaseStatusName?: string
+  status?: IssueStatus
 }
 
 export interface CreateSprintBody {
@@ -192,3 +212,8 @@ export interface CreateSprintBody {
 export interface UpdateSprintBody extends Partial<CreateSprintBody> {
   status?: 'ACTIVE'
 }
+
+export type KanbanIssue = IssueSummaryDto
+export type CreateIssueInput = CreateIssueBody
+export type UpdateIssuePatch = UpdateIssueBody
+

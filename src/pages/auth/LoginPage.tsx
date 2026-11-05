@@ -138,40 +138,41 @@ export function LoginPage() {
       {isMock && (
         <div className="mb-4 rounded-control border border-brand-200 bg-brand-50/70 p-3 text-xs text-brand-900">
           <div className="flex items-center justify-between font-medium">
-            <span>{t('Tài khoản mẫu thử nghiệm', 'Demo Test Accounts')}</span>
-            <span className="rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-semibold text-brand-700">MOCK</span>
+            <span>{t('Tài khoản mẫu theo Vai trò & Phân quyền', 'Demo Accounts by Role & Permission')}</span>
+            <span className="rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-semibold text-brand-700">
+              Password@123
+            </span>
           </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            <button
-              type="button"
-              onClick={() => {
-                setValue('email', 'sarah@fintechcorp.com')
-                setValue('password', 'Password@123')
-              }}
-              className="rounded border border-brand-300 bg-white px-2 py-1 font-medium text-brand-700 shadow-xs hover:bg-brand-50"
-            >
-              Sarah Lin (Admin)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setValue('email', 'khoa@fintechcorp.com')
-                setValue('password', 'Password@123')
-              }}
-              className="rounded border border-brand-300 bg-white px-2 py-1 font-medium text-brand-700 shadow-xs hover:bg-brand-50"
-            >
-              Khoa (BA Lead)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setValue('email', 'ky@fintechcorp.com')
-                setValue('password', 'Password@123')
-              }}
-              className="rounded border border-brand-300 bg-white px-2 py-1 font-medium text-brand-700 shadow-xs hover:bg-brand-50"
-            >
-              Kỳ (Project Lead)
-            </button>
+          <p className="mt-1 text-[11px] text-brand-800/80">
+            {t(
+              'Chọn nhanh tài khoản để kiểm thử luồng dự án và phân quyền RBAC theo từng vị trí:',
+              'Click an account below to test the project workflow and RBAC permissions per role:',
+            )}
+          </p>
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
+            {[
+              { email: 'sarah@fintechcorp.com', label: 'Sarah Lin', role: 'Tenant & WS Admin' },
+              { email: 'ky@fintechcorp.com', label: 'Vũ Kim Kỳ', role: 'Project Manager' },
+              { email: 'minh@fintechcorp.com', label: 'Phạm Công Minh', role: 'Business Analyst (BA)' },
+              { email: 'trang@fintechcorp.com', label: 'Đặng Thu Trang', role: 'Tech Lead' },
+              { email: 'luong@fintechcorp.com', label: 'Phạm Minh Lương', role: 'Developer' },
+              { email: 'tam@fintechcorp.com', label: 'Trương Quang Tâm', role: 'QA / Tester' },
+              { email: 'quan@fintechcorp.com', label: 'Hoàng Minh Quân', role: 'UI/UX Designer' },
+              { email: 'tran.c@fintechcorp.com', label: 'Trần Thị C', role: 'Reviewer (Chỉ xem)' },
+            ].map((acc) => (
+              <button
+                key={acc.email}
+                type="button"
+                onClick={() => {
+                  setValue('email', acc.email, { shouldValidate: true })
+                  setValue('password', 'Password@123', { shouldValidate: true })
+                }}
+                className="flex flex-col items-start rounded border border-brand-200 bg-white px-2.5 py-1.5 text-left transition-colors hover:border-brand-400 hover:bg-brand-50/60"
+              >
+                <span className="font-semibold text-gray-900">{acc.label}</span>
+                <span className="text-[10.5px] font-medium text-brand-700">{acc.role}</span>
+              </button>
+            ))}
           </div>
         </div>
       )}

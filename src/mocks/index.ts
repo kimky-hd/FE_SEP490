@@ -39,7 +39,7 @@ import {
 } from './data'
 import { SDLC_TEMPLATES } from './sdlcTemplates'
 
-const STORAGE_KEY = 'ssam.mockdb.v3'
+const STORAGE_KEY = 'ssam.mockdb.v4'
 const TOKEN_PREFIX = 'mock-token-'
 
 type Reply = [number, unknown?]

@@ -2,15 +2,41 @@
 
 import type { ReqRefDto, RequirementRef, UserRef } from './issue'
 
-export type TestType = 'FUNCTIONAL' | 'INTEGRATION' | 'SECURITY' | 'E2E' | 'UNIT' | 'REGRESSION'
+export type TestType =
+  | 'FUNCTIONAL'
+  | 'BOUNDARY'
+  | 'NEGATIVE'
+  | 'UI_UX'
+  | 'SECURITY'
+  | 'PERFORMANCE'
+  | 'INTEGRATION'
+  | 'E2E'
+  | 'UNIT'
+  | 'REGRESSION'
 export type TestPriority = 'HIGH' | 'MEDIUM' | 'LOW'
+export type TestEnvironment = 'SIT' | 'UAT' | 'STAGING' | 'PROD'
+export type TestApprovalStatus = 'DRAFT' | 'IN_REVIEW' | 'APPROVED'
+
 export const RUN_RESULTS = ['NOT_RUN', 'PASS', 'FAIL', 'BLOCKED'] as const
 export type RunResult = (typeof RUN_RESULTS)[number]
 export const CYCLE_STATUSES = ['OPEN', 'CLOSED'] as const
 export type CycleStatus = (typeof CYCLE_STATUSES)[number]
 
-export const TEST_TYPES: TestType[] = ['FUNCTIONAL', 'INTEGRATION', 'SECURITY', 'E2E', 'UNIT', 'REGRESSION']
+export const TEST_TYPES: TestType[] = [
+  'FUNCTIONAL',
+  'BOUNDARY',
+  'NEGATIVE',
+  'UI_UX',
+  'SECURITY',
+  'PERFORMANCE',
+  'INTEGRATION',
+  'E2E',
+  'UNIT',
+  'REGRESSION',
+]
 export const TEST_PRIORITIES: TestPriority[] = ['HIGH', 'MEDIUM', 'LOW']
+export const TEST_ENVIRONMENTS: TestEnvironment[] = ['SIT', 'UAT', 'STAGING', 'PROD']
+export const TEST_APPROVAL_STATUSES: TestApprovalStatus[] = ['DRAFT', 'IN_REVIEW', 'APPROVED']
 
 export interface TestStep {
   action: string
@@ -43,7 +69,19 @@ export interface TestCaseSummaryDto {
   lastRunAt: string | null
   lastRunBy: UserRef | null
   updatedAt: string
+  preconditions?: string | null
+  steps?: TestStep[]
+  moduleName?: string
+  testType?: TestType
+  testData?: string
+  expectedSummary?: string
+  actualResult?: string
+  environment?: TestEnvironment
+  approvalStatus?: TestApprovalStatus
+  linkedBugId?: string
 }
+
+export type TestCase = TestCaseSummaryDto
 
 export interface TestRunHistoryDto {
   runId: number
@@ -117,11 +155,24 @@ export interface CreateTestCaseBody {
   folderId?: number | null
   requirementRefs?: RequirementRef[]
   issueIds?: number[]
+  moduleName?: string
+  testType?: TestType
+  testData?: string
+  expectedSummary?: string
+  actualResult?: string
+  environment?: TestEnvironment
+  approvalStatus?: TestApprovalStatus
+  linkedBugId?: string
 }
 
+export type CreateTestCaseInput = CreateTestCaseBody
+
 export interface UpdateTestCaseBody extends Partial<CreateTestCaseBody> {
-  needsReview?: false
+  needsReview?: boolean
+  lastResult?: RunResult | null
 }
+
+export type UpdateTestCasePatch = UpdateTestCaseBody
 
 export interface CreateCycleBody {
   name: string

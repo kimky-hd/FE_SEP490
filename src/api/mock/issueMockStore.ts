@@ -15,6 +15,7 @@ import type {
   IssueDetailDto,
   IssueListQuery,
   IssuePriority,
+  IssueStatus,
   IssueSummaryDto,
   IssueTestCounts,
   IssueType,
@@ -74,6 +75,12 @@ interface IssueRec {
   updatedAt: string
   resolvedAt: string | null
   isDeleted: boolean
+  phaseId?: string | number
+  phaseName?: string
+  phaseOrder?: number
+  phaseStatusId?: string | number
+  phaseStatusName?: string
+  status?: IssueStatus
 }
 
 interface SprintRec {
@@ -291,6 +298,10 @@ export class IssueMockStore {
 
   private summary(ctx: Ctx, i: IssueRec): IssueSummaryDto {
     const subs = this.load().issues.filter((x) => x.parentId === i.issueId && !x.isDeleted)
+    const stObj = ctx.statuses.find((s) => s.statusId === i.statusId)
+    const cat = this.category(ctx, i.statusId)
+    const mappedStatus = cat === 'DONE' ? 'DONE' : cat === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'TODO'
+
     return {
       issueId: i.issueId,
       key: i.key,
@@ -310,6 +321,12 @@ export class IssueMockStore {
       subtaskCount: subs.length,
       subtaskDone: subs.filter((s) => this.category(ctx, s.statusId) === 'DONE').length,
       updatedAt: i.updatedAt,
+      phaseId: i.phaseId ?? stObj?.phaseId,
+      phaseName: i.phaseName ?? stObj?.phaseName,
+      phaseOrder: i.phaseOrder,
+      phaseStatusId: i.phaseStatusId ?? i.statusId,
+      phaseStatusName: i.phaseStatusName ?? stObj?.name,
+      status: i.status ?? mappedStatus,
     }
   }
 
@@ -520,6 +537,10 @@ export class IssueMockStore {
     const assignee = await this.person(ctx.projectId, body.assigneeId)
     const at = opts.at ?? this.iso()
     const all = this.projectIssues(ctx.projectId)
+    const statusCategory = this.category(ctx, statusId!)
+    const autoStatus: IssueStatus = statusCategory === 'DONE' ? 'DONE' : statusCategory === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'TODO'
+    const statusObj = ctx.statuses.find((s) => s.statusId === statusId)
+
     const rec: IssueRec = {
       issueId: this.nextId(),
       projectId: ctx.projectId,
@@ -546,6 +567,12 @@ export class IssueMockStore {
       updatedAt: at,
       resolvedAt: null,
       isDeleted: false,
+      phaseId: body.phaseId ?? statusObj?.phaseId,
+      phaseName: body.phaseName ?? statusObj?.phaseName,
+      phaseOrder: body.phaseOrder,
+      phaseStatusId: body.phaseStatusId ?? body.statusId ?? statusId!,
+      phaseStatusName: body.phaseStatusName ?? statusObj?.name,
+      status: body.status ?? autoStatus,
     }
     this.load().issues.push(rec)
     this.log(rec.issueId, 'CREATED', ctx.me)
@@ -640,6 +667,44 @@ export class IssueMockStore {
     if (body.dueDate !== undefined) {
       i.dueDate = body.dueDate
       changes.push('dueDate')
+    }
+    if (body.phaseId !== undefined) {
+      i.phaseId = body.phaseId
+      changes.push('phaseId')
+    }
+    if (body.phaseName !== undefined) {
+      i.phaseName = body.phaseName
+      changes.push('phaseName')
+    }
+    if (body.phaseOrder !== undefined) {
+      i.phaseOrder = body.phaseOrder
+      changes.push('phaseOrder')
+    }
+    if (body.phaseStatusId !== undefined) {
+      i.phaseStatusId = body.phaseStatusId
+      i.statusId = Number(body.phaseStatusId)
+      changes.push('phaseStatusId')
+    }
+    if (body.phaseStatusName !== undefined) {
+      i.phaseStatusName = body.phaseStatusName
+      changes.push('phaseStatusName')
+    }
+    if (body.status !== undefined) {
+      i.status = body.status
+      changes.push('status')
+    }
+    if (body.statusId !== undefined && body.statusId !== i.statusId) {
+      i.statusId = body.statusId
+      const cat = this.category(ctx, body.statusId)
+      i.status = cat === 'DONE' ? 'DONE' : cat === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'TODO'
+      const stObj = ctx.statuses.find((s) => s.statusId === body.statusId)
+      if (stObj) {
+        i.phaseStatusId = stObj.statusId
+        i.phaseStatusName = stObj.name
+        if (stObj.phaseId) i.phaseId = stObj.phaseId
+        if (stObj.phaseName) i.phaseName = stObj.phaseName
+      }
+      changes.push('statusId')
     }
     if (changes.length) this.log(i.issueId, 'UPDATED', ctx.me, changes.join(', '))
     i.updatedAt = this.iso()
@@ -979,13 +1044,17 @@ export class IssueMockStore {
     db.keySeq[projectId] = 100
     const keys: Record<string, number> = {}
     const add = async (
-      body: CreateIssueBody & { status?: number; assignee?: UserRef | null; daysAgo?: number },
+      body: Omit<CreateIssueBody, 'status'> & { status?: number | IssueStatus; assignee?: UserRef | null; daysAgo?: number },
     ): Promise<IssueRec> => {
       const { status, assignee, daysAgo = 3, ...create } = body
       const rec = await this.insertIssue(ctx, { ...create, assigneeId: null }, { at: this.iso(-daysAgo * day) })
       rec.assignee = assignee ?? null
-      if (status) rec.statusId = status
+      if (typeof status === 'number') rec.statusId = status
+      else if (typeof status === 'string') rec.status = status
       if (status && status === st.done) rec.resolvedAt = this.iso(-day)
+      if (create.phaseOrder) rec.phaseOrder = create.phaseOrder
+      if (create.phaseName) rec.phaseName = create.phaseName
+      if (create.phaseStatusName) rec.phaseStatusName = create.phaseStatusName
       keys[rec.key.split('-').pop()!] = rec.issueId
       return rec
     }
@@ -998,6 +1067,9 @@ export class IssueMockStore {
       points: 5,
       sprintId: s,
       requirementRefs: ref(AUTH_REQ.login),
+      phaseOrder: 1,
+      phaseName: 'Phân tích & Đặc tả yêu cầu',
+      phaseStatusName: 'In Review',
     })
     await add({
       type: 'STORY',
@@ -1008,6 +1080,9 @@ export class IssueMockStore {
       sprintId: s,
       requirementRefs: ref(AUTH_REQ.login),
       daysAgo: 6,
+      phaseOrder: 1,
+      phaseName: 'Phân tích & Đặc tả yêu cầu',
+      phaseStatusName: 'Done',
     })
     await add({
       type: 'TASK',
@@ -1017,6 +1092,9 @@ export class IssueMockStore {
       points: 8,
       sprintId: s,
       requirementRefs: ref(PAY_REQ.qr),
+      phaseOrder: 3,
+      phaseName: 'Sprint Execution & Coding',
+      phaseStatusName: 'In Development',
     })
     const webhook = await add({
       type: 'BUG',
@@ -1028,6 +1106,9 @@ export class IssueMockStore {
       sprintId: s,
       requirementRefs: ref(PAY_REQ.webhook),
       daysAgo: 2,
+      phaseOrder: 3,
+      phaseName: 'Sprint Execution & Coding',
+      phaseStatusName: 'In Development',
     })
     await add({
       type: 'TASK',
@@ -1037,6 +1118,9 @@ export class IssueMockStore {
       points: 5,
       sprintId: s,
       requirementRefs: ref(PAY_REQ.reconcile),
+      phaseOrder: 4,
+      phaseName: 'Testing & Deployment',
+      phaseStatusName: 'Code Review & QA',
     })
     await add({
       type: 'DESIGN',
@@ -1046,6 +1130,9 @@ export class IssueMockStore {
       points: 3,
       sprintId: s,
       requirementRefs: ref(PAY_REQ.qr),
+      phaseOrder: 2,
+      phaseName: 'System & UI Design',
+      phaseStatusName: 'Designing',
     })
     await add({
       type: 'TASK',
@@ -1056,6 +1143,9 @@ export class IssueMockStore {
       priority: 'HIGHEST',
       sprintId: s,
       labels: ['blocked'],
+      phaseOrder: 3,
+      phaseName: 'Sprint Execution & Coding',
+      phaseStatusName: 'Open / To Do',
     })
     await add({
       type: 'TASK',
@@ -1067,6 +1157,9 @@ export class IssueMockStore {
       sprintId: s,
       requirementRefs: ref(PAY_REQ.qr),
       daysAgo: 1,
+      phaseOrder: 3,
+      phaseName: 'Sprint Execution & Coding',
+      phaseStatusName: 'Open / To Do',
     })
     await add({
       type: 'STORY',
@@ -1075,6 +1168,9 @@ export class IssueMockStore {
       points: 5,
       sprintId: null,
       daysAgo: 4,
+      phaseOrder: 1,
+      phaseName: 'Phân tích & Đặc tả yêu cầu',
+      phaseStatusName: 'Drafting',
     })
     await add({
       type: 'TASK',
@@ -1084,6 +1180,9 @@ export class IssueMockStore {
       priority: 'LOW',
       sprintId: null,
       daysAgo: 4,
+      phaseOrder: 1,
+      phaseName: 'Phân tích & Đặc tả yêu cầu',
+      phaseStatusName: 'Drafting',
     })
     const sub1 = await add({
       type: 'TASK',
