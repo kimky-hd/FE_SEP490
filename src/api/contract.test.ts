@@ -102,6 +102,7 @@ type Calls<T> = { [K in keyof T]-?: () => Promise<unknown> }
 const NOTES = { scope: '', actors: '', mainFlows: '', businessRules: '' }
 const DOC_CALLS: Calls<Omit<DocumentApi, 'mock'>> = {
   listTree: () => httpDocumentApi.listTree(1),
+  listProjectRequirements: () => httpDocumentApi.listProjectRequirements(1),
   createNode: () => httpDocumentApi.createNode(1, { kind: 'FOLDER', title: 'x' }),
   updateNode: () => httpDocumentApi.updateNode(2, { title: 'y' }),
   deleteNode: () => httpDocumentApi.deleteNode(2),
@@ -167,6 +168,7 @@ const TEST_CALLS: Calls<TestApi> = {
   aiRefreshStale: () => httpTestApi.aiRefreshStale(1, 8),
   get: () => httpTestApi.get(8),
   update: () => httpTestApi.update(8, { needsReview: false }),
+  markFresh: () => httpTestApi.markFresh(8),
   remove: () => httpTestApi.remove(8),
   suggest: () => httpTestApi.suggest(1, []),
   cycles: () => httpTestApi.cycles(1, 'OPEN'),

@@ -50,7 +50,7 @@ import {
   type WorkMockEnv,
 } from './workMockBase'
 
-export const TEST_STORAGE_KEY = 'ssam.mock.tests.v1'
+export const TEST_STORAGE_KEY = 'ssam.mock.tests.v3'
 
 interface FolderRec {
   folderId: number
@@ -64,11 +64,13 @@ interface TestCaseRec {
   testCaseId: number
   projectId: number
   key: string
+  code?: string
   title: string
   type: TestType
   priority: TestPriority
   preconditions: string | null
   steps: TestStep[]
+  stepsText?: string
   folderId: number | null
   links: LinkRec[]
   issueIds: number[]
@@ -88,6 +90,9 @@ interface TestCaseRec {
   environment?: TestEnvironment
   approvalStatus?: TestApprovalStatus
   linkedBugId?: string
+  customFields?: Record<string, string>
+  requirementId?: number | string
+  figmaUrl?: string
 }
 
 interface CycleRec {
@@ -355,9 +360,16 @@ export class TestMockStore {
     const requirements = t.links.map((l) => reqRefDto(ctx.index, l, t.needsReview))
     const issues = this.issues.refs(ctx.projectId, t.issueIds).map(({ issueId, key }) => ({ issueId, key }))
     const ent = this.inferEnterprise(t, requirements, issues)
+    const code = t.code || t.key.replace(/^TC-(\d+)$/, (_, d) => `TC-${String(d).padStart(3, '0')}`)
+    const stepsText = t.stepsText ?? t.steps.map((s) => s.action).filter(Boolean).join('\n')
+    const expectedSummary =
+      t.expectedSummary !== undefined
+        ? t.expectedSummary
+        : t.steps.map((s) => s.expected).filter(Boolean).join('\n')
     return {
       testCaseId: t.testCaseId,
       key: t.key,
+      code,
       title: t.title,
       type: t.type,
       priority: t.priority,
@@ -372,14 +384,18 @@ export class TestMockStore {
       updatedAt: t.updatedAt,
       preconditions: ent.preconditions,
       steps: clone(t.steps),
+      stepsText,
       moduleName: ent.moduleName,
       testType: ent.testType,
       testData: ent.testData,
-      expectedSummary: ent.expectedSummary,
+      expectedSummary,
       actualResult: ent.actualResult,
       environment: ent.environment,
       approvalStatus: ent.approvalStatus,
       linkedBugId: ent.linkedBugId,
+      customFields: t.customFields ? { ...t.customFields } : {},
+      requirementId: t.requirementId,
+      figmaUrl: t.figmaUrl,
     }
   }
 
@@ -583,13 +599,20 @@ export class TestMockStore {
   private validate(ctx: Ctx, body: Partial<CreateTestCaseBody>, creating: boolean) {
     const errors: Record<string, string[]> = {}
     const title = body.title?.trim()
-    if ((creating || body.title !== undefined) && (!title || title.length > 300))
+    const strictForm = creating && body.steps !== undefined
+    if (strictForm && (!title || title.length > 300))
       errors.title = [tr('Tiêu đề bắt buộc, tối đa 300 ký tự.', 'Title is required, max 300 characters.')]
-    if ((creating || body.type !== undefined) && !TEST_TYPES.includes(body.type as TestType))
+    else if (title && title.length > 300)
+      errors.title = [tr('Tiêu đề tối đa 300 ký tự.', 'Title max 300 characters.')]
+    if ((creating || body.type !== undefined) && body.type !== undefined && !TEST_TYPES.includes(body.type as TestType))
       errors.type = [tr('Loại test không hợp lệ.', 'Invalid test type.')]
-    if ((creating || body.priority !== undefined) && !TEST_PRIORITIES.includes(body.priority as TestPriority))
+    if (
+      (creating || body.priority !== undefined) &&
+      body.priority !== undefined &&
+      !TEST_PRIORITIES.includes(body.priority as TestPriority)
+    )
       errors.priority = [tr('Độ ưu tiên không hợp lệ.', 'Invalid priority.')]
-    if (creating || body.steps !== undefined) {
+    if (strictForm) {
       const steps = this.cleanSteps(body.steps)
       if (!steps.length || steps.some((s) => !s.action))
         errors.steps = [tr('Cần ít nhất 1 bước, mỗi bước có hành động.', 'At least 1 step, each with an action.')]
@@ -620,20 +643,24 @@ export class TestMockStore {
     }
     this.validate(ctx, fullBody, true)
     const cleanSteps = this.cleanSteps(fullBody.steps)
+    const key = this.nextKey(ctx.projectId)
+    const code = fullBody.code?.trim() || key.replace(/^TC-(\d+)$/, (_, d) => `TC-${String(d).padStart(3, '0')}`)
     const t: TestCaseRec = {
       testCaseId: this.nextId(),
       projectId: ctx.projectId,
-      key: this.nextKey(ctx.projectId),
-      title: fullBody.title.trim(),
+      key,
+      code,
+      title: (fullBody.title ?? '').trim(),
       type: normalizedType,
-      priority: fullBody.priority,
+      priority: fullBody.priority ?? 'MEDIUM',
       preconditions: fullBody.preconditions?.trim() || null,
       steps: cleanSteps,
+      stepsText: fullBody.stepsText ?? (cleanSteps.length ? cleanSteps.map((s) => s.action).join('\n') : ''),
       folderId: fullBody.folderId ?? null,
       links: newLinks(ctx.index, fullBody.requirementRefs),
       issueIds: [...new Set(fullBody.issueIds ?? [])],
       needsReview: false,
-      lastResult: null,
+      lastResult: fullBody.lastResult ?? null,
       lastRunAt: null,
       lastRunBy: null,
       createdBy: ctx.me,
@@ -644,16 +671,21 @@ export class TestMockStore {
       testType: fullBody.testType ?? normalizedType,
       testData: fullBody.testData?.trim() || undefined,
       expectedSummary:
-        fullBody.expectedSummary?.trim() ||
-        cleanSteps
-          .map((s) => s.expected)
-          .filter(Boolean)
-          .join(' → ') ||
-        undefined,
+        fullBody.expectedSummary !== undefined
+          ? fullBody.expectedSummary
+          : cleanSteps.length
+            ? cleanSteps
+                .map((s) => s.expected)
+                .filter(Boolean)
+                .join(' → ')
+            : '',
       actualResult: fullBody.actualResult?.trim() || undefined,
       environment: fullBody.environment ?? 'SIT',
       approvalStatus: fullBody.approvalStatus ?? 'DRAFT',
       linkedBugId: fullBody.linkedBugId?.trim() || undefined,
+      customFields: fullBody.customFields ? { ...fullBody.customFields } : {},
+      requirementId: fullBody.requirementId,
+      figmaUrl: fullBody.figmaUrl,
     }
     this.load().testcases.push(t)
     return t
@@ -786,8 +818,21 @@ export class TestMockStore {
       content ||= JSON.stringify(steps) !== JSON.stringify(t.steps)
       t.steps = steps
     }
+    if (body.code !== undefined) t.code = body.code.trim() || undefined
+    if (body.stepsText !== undefined) {
+      content ||= body.stepsText !== t.stepsText
+      t.stepsText = body.stepsText
+      if (body.steps === undefined) {
+        t.steps = body.stepsText.trim()
+          ? [{ action: body.stepsText.trim(), expected: t.expectedSummary ?? '' }]
+          : []
+      }
+    }
     if (body.folderId !== undefined) t.folderId = body.folderId ?? null
     if (body.requirementRefs !== undefined) t.links = newLinks(ctx.index, body.requirementRefs, t.links)
+    if (body.requirementId !== undefined) t.requirementId = body.requirementId
+    if (body.figmaUrl !== undefined) t.figmaUrl = body.figmaUrl
+    if (body.customFields !== undefined) t.customFields = { ...(t.customFields ?? {}), ...body.customFields }
     if (body.issueIds !== undefined) t.issueIds = [...new Set(body.issueIds)]
     if (body.moduleName !== undefined) t.moduleName = body.moduleName.trim() || undefined
     if (body.testData !== undefined) t.testData = body.testData
@@ -803,17 +848,18 @@ export class TestMockStore {
     if (body.linkedBugId !== undefined) t.linkedBugId = body.linkedBugId || undefined
     if (body.lastResult !== undefined) {
       const at = this.iso()
+      const isUntested = body.lastResult === 'NOT_RUN' || body.lastResult === 'UNTESTED'
       t.lastResult = body.lastResult === 'NOT_RUN' ? null : body.lastResult
-      t.lastRunAt = body.lastResult && body.lastResult !== 'NOT_RUN' ? at : null
-      t.lastRunBy = body.lastResult && body.lastResult !== 'NOT_RUN' ? ctx.me : null
+      t.lastRunAt = body.lastResult && !isUntested ? at : null
+      t.lastRunBy = body.lastResult && !isUntested ? ctx.me : null
       // Sync with latest open cycle run if present
       const db = this.load()
       const openCycleIds = new Set(db.cycles.filter((c) => c.projectId === ctx.projectId && c.status === 'OPEN').map((c) => c.cycleId))
       const openRun = db.runs.find((r) => r.testCaseId === t.testCaseId && openCycleIds.has(r.cycleId))
       if (openRun && body.lastResult) {
-        openRun.result = body.lastResult
-        openRun.executedAt = body.lastResult === 'NOT_RUN' ? null : at
-        openRun.executedBy = body.lastResult === 'NOT_RUN' ? null : ctx.me
+        openRun.result = body.lastResult === 'UNTESTED' ? 'NOT_RUN' : body.lastResult
+        openRun.executedAt = isUntested ? null : at
+        openRun.executedBy = isUntested ? null : ctx.me
         openRun.needsRerun = false
         if (body.actualResult) openRun.note = body.actualResult
       }
@@ -831,6 +877,10 @@ export class TestMockStore {
     t.updatedAt = this.iso()
     this.persist()
     return this.detail(ctx, t)
+  }
+
+  async markFresh(testCaseId: number): Promise<TestCaseDetailDto> {
+    return this.updateTestCase(testCaseId, { needsReview: false, approvalStatus: 'APPROVED' })
   }
 
   async deleteTestCase(testCaseId: number): Promise<void> {

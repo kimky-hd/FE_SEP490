@@ -36,7 +36,8 @@ export const resultLabel = (r: RunResult | null) =>
     FAIL: tr('Lỗi', 'Fail'),
     BLOCKED: tr('Bị chặn', 'Blocked'),
     NOT_RUN: tr('Chưa chạy', 'Not run'),
-  })[r ?? 'NOT_RUN']
+    UNTESTED: tr('Chưa chạy', 'Untested'),
+  })[r ?? 'UNTESTED'] ?? tr('Chưa chạy', 'Untested')
 
 /** dd/MM theo giờ máy. */
 export const shortDate = (iso: string | null | undefined) => {
@@ -219,6 +220,7 @@ const RESULT_STYLE: Record<RunResult, string> = {
   FAIL: 'border-red-200 bg-red-50 text-red-700',
   BLOCKED: 'border-amber-200 bg-amber-50 text-amber-800',
   NOT_RUN: 'border-gray-300 bg-white text-gray-700',
+  UNTESTED: 'border-gray-300 bg-white text-gray-700',
 }
 
 export function ResultPill({ result, empty }: { result: RunResult | null; empty?: string }) {

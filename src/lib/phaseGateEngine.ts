@@ -317,8 +317,7 @@ function readProjectRealStats(projectId: number) {
       approvedTestsCount = testCases.filter(
         (t: any) =>
           !t.needsReview &&
-          (t.approvalStatus === 'APPROVED' ||
-            (!t.approvalStatus && (t.lastResult === 'PASS' || t.lastResult === 'FAIL'))),
+          (t.approvalStatus === 'APPROVED' || t.lastResult === 'PASS' || (!t.approvalStatus && t.lastResult === 'FAIL')),
       ).length
     }
   } catch {

@@ -56,7 +56,7 @@ export function ProjectLayout() {
   const location = useLocation()
   const { data: project, error, isLoading, reload, setData } = useAsync(() => projectApi.get(projectId), [projectId])
   const justCreated = (location.state as { created?: boolean } | null)?.created === true
-  const isDocs = /^\/projects\/\d+\/documents(\/|$)/.test(location.pathname)
+  const isFullBleed = /^\/projects\/\d+\/(documents|tests)(\/|$)/.test(location.pathname)
   const [fullscreen, setFullscreen] = useState(false)
   const loadedId = project?.projectId
   const projectList = useMemo(() => (project ? [project] : null), [project])
@@ -71,16 +71,16 @@ export function ProjectLayout() {
   // "Tiếp tục" trong Ctrl K: các trang dự án đã mở (trừ Việc của tôi; tài liệu do tab Tài liệu tự ghi).
   const pageTitle = sectionTitle(section, t)
   useEffect(() => {
-    if (!user || !project || isDocs || section === 'my-work' || !pageTitle) return
+    if (!user || !project || isFullBleed || section === 'my-work' || !pageTitle) return
     rememberItem(user.id, { href: location.pathname, title: `${pageTitle} · ${project.name}`, code: project.key })
-  }, [user, project, isDocs, section, pageTitle, location.pathname])
+  }, [user, project, isFullBleed, section, pageTitle, location.pathname])
 
   useEffect(() => {
-    if (!isDocs) setFullscreen(false)
-  }, [isDocs])
+    if (!isFullBleed) setFullscreen(false)
+  }, [isFullBleed])
 
   useEffect(() => {
-    if (!isDocs) return
+    if (!isFullBleed) return
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return
       if (document.querySelector('[aria-modal="true"]')) return
@@ -95,7 +95,7 @@ export function ProjectLayout() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isDocs, fullscreen])
+  }, [isFullBleed, fullscreen])
 
   if (isLoading && !project) {
     return (
@@ -135,7 +135,7 @@ export function ProjectLayout() {
     isArchived,
     reload,
     setProject: (next) => setData(() => next),
-    fullscreen: isDocs && fullscreen,
+    fullscreen: isFullBleed && fullscreen,
     setFullscreen,
     role,
     work: {
@@ -179,7 +179,7 @@ export function ProjectLayout() {
       navLabel={t('Mục dự án', 'Project sections')}
       trailing={
         <>
-          {isDocs ? (
+          {isFullBleed ? (
             <IconButton
               label={t('Toàn màn hình (F)', 'Full screen (F)')}
               onClick={() => setFullscreen(true)}
@@ -211,7 +211,7 @@ export function ProjectLayout() {
       mobileTitle={project.name}
     >
       {!context.fullscreen && header}
-      {isDocs ? (
+      {isFullBleed ? (
         <div className="flex min-h-0 flex-1 flex-col">
           {alerts && !context.fullscreen && <div className="shrink-0 px-4 pt-3 sm:px-5">{alerts}</div>}
           <LazyOutlet context={context} />

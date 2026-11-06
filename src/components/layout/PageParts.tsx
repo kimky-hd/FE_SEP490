@@ -8,6 +8,10 @@ import { HelpTips } from '@/help/HelpTips'
 
 // Mảnh ghép dùng chung cho các trang bên trong DashboardLayout (Workspace, Quản trị công ty).
 
+export function PageShell({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={clsx('space-y-4', className)}>{children}</div>
+}
+
 export interface Crumb {
   label: string
   to?: string

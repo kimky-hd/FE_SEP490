@@ -45,6 +45,16 @@ export default {
           700: '#067647',
           800: '#05603a',
         },
+        // Semantic design tokens
+        surface: '#ffffff',
+        'surface-muted': '#f9fafb',
+        line: '#e4e7ec',
+        'line-subtle': '#f2f4f7',
+        ink: '#101828',
+        'ink-muted': '#475467',
+        'ink-subtle': '#98a2b3',
+        warning: '#f79009',
+        danger: '#d92d20',
       },
       fontFamily: {
         sans: ['Roboto', 'ui-sans-serif', 'system-ui', '-apple-system', '"Segoe UI"', 'sans-serif'],

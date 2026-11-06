@@ -38,6 +38,7 @@ export interface TestApi {
   aiRefreshStale: (projectId: number, testCaseId: number) => Promise<TestCaseDetailDto>
   get: (testCaseId: number) => Promise<TestCaseDetailDto>
   update: (testCaseId: number, body: UpdateTestCaseBody) => Promise<TestCaseDetailDto>
+  markFresh: (testCaseId: number) => Promise<TestCaseDetailDto>
   remove: (testCaseId: number) => Promise<void>
   // 5.3 Gợi ý
   suggest: (projectId: number, refs: RequirementRef[]) => Promise<SuggestedTestCase[]>
@@ -82,6 +83,8 @@ export const httpTestApi: TestApi = {
       .then((r) => r.data),
   get: (testCaseId) => api.get<TestCaseDetailDto>(`/testcases/${testCaseId}`).then((r) => r.data),
   update: (testCaseId, body) => api.patch<TestCaseDetailDto>(`/testcases/${testCaseId}`, body).then((r) => r.data),
+  markFresh: (testCaseId) =>
+    api.patch<TestCaseDetailDto>(`/testcases/${testCaseId}`, { needsReview: false, approvalStatus: 'APPROVED' }).then((r) => r.data),
   remove: (testCaseId) => api.delete(`/testcases/${testCaseId}`).then(() => undefined),
   suggest: (projectId, refs) =>
     api
@@ -111,6 +114,7 @@ function createMockTestApi(store: TestMockStore): TestApi {
     aiRefreshStale: (projectId, testCaseId) => store.aiRefreshStaleTestCase(projectId, testCaseId),
     get: (testCaseId) => store.getTestCase(testCaseId),
     update: (testCaseId, body) => store.updateTestCase(testCaseId, body),
+    markFresh: (testCaseId) => store.markFresh(testCaseId),
     remove: (testCaseId) => store.deleteTestCase(testCaseId),
     suggest: (projectId, refs) => store.suggest(projectId, { refs }).then((r) => r.items),
     cycles: (projectId, status) => store.listCycles(projectId, status).then((r) => r.items),
@@ -129,6 +133,7 @@ const MOCK_MUTATIONS = [
   'bulkApprove',
   'aiRefreshStale',
   'update',
+  'markFresh',
   'remove',
   'createCycle',
   'updateCycle',

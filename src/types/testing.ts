@@ -17,7 +17,7 @@ export type TestPriority = 'HIGH' | 'MEDIUM' | 'LOW'
 export type TestEnvironment = 'SIT' | 'UAT' | 'STAGING' | 'PROD'
 export type TestApprovalStatus = 'DRAFT' | 'IN_REVIEW' | 'APPROVED'
 
-export const RUN_RESULTS = ['NOT_RUN', 'PASS', 'FAIL', 'BLOCKED'] as const
+export const RUN_RESULTS = ['UNTESTED', 'NOT_RUN', 'PASS', 'FAIL', 'BLOCKED'] as const
 export type RunResult = (typeof RUN_RESULTS)[number]
 export const CYCLE_STATUSES = ['OPEN', 'CLOSED'] as const
 export type CycleStatus = (typeof CYCLE_STATUSES)[number]
@@ -57,6 +57,7 @@ export interface TestTreeNodeDto {
 export interface TestCaseSummaryDto {
   testCaseId: number
   key: string
+  code?: string
   title: string
   type: TestType
   priority: TestPriority
@@ -71,6 +72,10 @@ export interface TestCaseSummaryDto {
   updatedAt: string
   preconditions?: string | null
   steps?: TestStep[]
+  stepsText?: string
+  requirementId?: number | string
+  figmaUrl?: string
+  customFields?: Record<string, string>
   moduleName?: string
   testType?: TestType
   testData?: string
@@ -147,11 +152,16 @@ export interface TestCaseQuery {
 }
 
 export interface CreateTestCaseBody {
-  title: string
-  type: TestType
-  priority: TestPriority
+  title?: string
+  type?: TestType
+  priority?: TestPriority
   preconditions?: string | null
-  steps: TestStep[]
+  steps?: TestStep[]
+  stepsText?: string
+  code?: string
+  requirementId?: number | string
+  figmaUrl?: string
+  customFields?: Record<string, string>
   folderId?: number | null
   requirementRefs?: RequirementRef[]
   issueIds?: number[]
@@ -163,6 +173,7 @@ export interface CreateTestCaseBody {
   environment?: TestEnvironment
   approvalStatus?: TestApprovalStatus
   linkedBugId?: string
+  lastResult?: RunResult | null
 }
 
 export type CreateTestCaseInput = CreateTestCaseBody
@@ -170,6 +181,11 @@ export type CreateTestCaseInput = CreateTestCaseBody
 export interface UpdateTestCaseBody extends Partial<CreateTestCaseBody> {
   needsReview?: boolean
   lastResult?: RunResult | null
+  code?: string
+  customFields?: Record<string, string>
+  stepsText?: string
+  requirementId?: number | string
+  figmaUrl?: string
 }
 
 export type UpdateTestCasePatch = UpdateTestCaseBody

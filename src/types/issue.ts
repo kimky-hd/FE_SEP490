@@ -21,7 +21,7 @@ export const ISSUE_ACTIVITY_ACTIONS = [
 ] as const
 /** D10: `REQ_CHANGED` do hệ thống ghi, actor = { userId: 0, fullName: 'SSAM' }. */
 export type IssueActivityAction = (typeof ISSUE_ACTIVITY_ACTIONS)[number]
-export type RunResultLite = 'NOT_RUN' | 'PASS' | 'FAIL' | 'BLOCKED'
+export type RunResultLite = 'UNTESTED' | 'NOT_RUN' | 'PASS' | 'FAIL' | 'BLOCKED'
 
 export const ISSUE_TYPES: IssueType[] = ['TASK', 'BUG', 'STORY', 'DESIGN']
 export const ISSUE_PRIORITIES: IssuePriority[] = ['HIGHEST', 'HIGH', 'MEDIUM', 'LOW']

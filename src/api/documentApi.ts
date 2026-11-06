@@ -27,9 +27,22 @@ import type {
 // doc/BE-Changes-2026-10-28_30-API.md §A (#1–#22) — một hàm cho mỗi endpoint, path / body đúng tài liệu.
 // Mock trong trình duyệt khi VITE_MOCK_DOCUMENTS=true (src/api/mockFlags.ts); 'false' thì gọi BE thật.
 
+export interface ProjectRequirementItem {
+  id: string
+  documentId: number
+  documentCode: string
+  documentTitle: string
+  reqUid: string
+  code: string
+  reqKey: string
+  title: string
+  acceptanceCriteria: { text: string; checked: boolean }[]
+}
+
 export interface DocumentApi {
   // 7.1 Cây tài liệu
   listTree: (projectId: number, search?: string) => Promise<DocumentNodeDto[]>
+  listProjectRequirements: (projectId: number) => Promise<ProjectRequirementItem[]>
   createNode: (projectId: number, body: CreateNodeBody) => Promise<DocumentNodeDto>
   updateNode: (documentId: number, body: UpdateNodeBody) => Promise<DocumentNodeDto>
   deleteNode: (documentId: number) => Promise<void>
@@ -71,6 +84,28 @@ export const httpDocumentApi: DocumentApi = {
     api
       .get<ItemsDto<DocumentNodeDto>>(`/projects/${projectId}/documents`, { params: { search: search || undefined } })
       .then((r) => r.data.items),
+  listProjectRequirements: async (projectId) => {
+    const nodes = await httpDocumentApi.listTree(projectId).catch(() => [])
+    const pages = nodes.filter((n) => n.kind === 'PAGE')
+    const out: ProjectRequirementItem[] = []
+    for (const p of pages) {
+      const reqs = await httpDocumentApi.listRequirements(p.documentId).catch(() => [])
+      for (const r of reqs) {
+        out.push({
+          id: `${p.documentId}:${r.reqUid}`,
+          documentId: p.documentId,
+          documentCode: p.code ?? p.title,
+          documentTitle: p.title,
+          reqUid: r.reqUid,
+          code: r.reqKey,
+          reqKey: r.reqKey,
+          title: r.title,
+          acceptanceCriteria: r.acceptanceCriteria,
+        })
+      }
+    }
+    return out
+  },
   createNode: (projectId, body) =>
     api.post<DocumentNodeDto>(`/projects/${projectId}/documents`, body).then((r) => r.data),
   updateNode: (documentId, body) => api.patch<DocumentNodeDto>(`/documents/${documentId}`, body).then((r) => r.data),
@@ -130,6 +165,27 @@ const projectAccess = (projectId: number): Promise<ProjectAccess> => mockProject
 function createMockDocumentApi(store: DocumentMockStore): DocumentApi {
   const mockApi: DocumentApi = {
     listTree: (projectId, search) => store.listTree(projectId, search).then((r) => r.items),
+    listProjectRequirements: async (projectId) => {
+      const idx = store.reqIndex(projectId)
+      const out: ProjectRequirementItem[] = []
+      for (const doc of idx) {
+        const reqs = [...doc.baseline, ...doc.current.filter((r) => !doc.baseline.some((b) => b.reqUid === r.reqUid))]
+        for (const r of reqs) {
+          out.push({
+            id: `${doc.documentId}:${r.reqUid}`,
+            documentId: doc.documentId,
+            documentCode: doc.code,
+            documentTitle: doc.title,
+            reqUid: r.reqUid,
+            code: r.reqKey,
+            reqKey: r.reqKey,
+            title: r.title,
+            acceptanceCriteria: r.acceptanceCriteria,
+          })
+        }
+      }
+      return out
+    },
     createNode: (projectId, body) => store.createNode(projectId, body),
     updateNode: (documentId, body) => store.updateNode(documentId, body),
     deleteNode: (documentId) => store.deleteNode(documentId),
