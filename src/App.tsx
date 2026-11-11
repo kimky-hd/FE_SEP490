@@ -18,10 +18,7 @@ const VerifyEmailPage = lazyPage(() => import('@/pages/auth/VerifyEmailPage'), '
 const ForgotPasswordPage = lazyPage(() => import('@/pages/auth/ForgotPasswordPage'), 'ForgotPasswordPage')
 const ForgotPasswordSentPage = lazyPage(() => import('@/pages/auth/ForgotPasswordSentPage'), 'ForgotPasswordSentPage')
 const ResetPasswordPage = lazyPage(() => import('@/pages/auth/ResetPasswordPage'), 'ResetPasswordPage')
-const ChooseAccountTypePage = lazyPage(
-  () => import('@/pages/onboarding/ChooseAccountTypePage'),
-  'ChooseAccountTypePage',
-)
+const OnboardingStartPage = lazyPage(() => import('@/pages/onboarding/OnboardingStartPage'), 'OnboardingStartPage')
 const CompanySetupPage = lazyPage(() => import('@/pages/onboarding/CompanySetupPage'), 'CompanySetupPage')
 const CreateWorkspacePage = lazyPage(() => import('@/pages/onboarding/CreateWorkspacePage'), 'CreateWorkspacePage')
 const DomainMatchPage = lazyPage(() => import('@/pages/onboarding/DomainMatchPage'), 'DomainMatchPage')
@@ -56,14 +53,18 @@ const ProjectMembersPage = lazyPage(() => import('@/pages/projects/ProjectMember
 const ProjectSettingsPage = lazyPage(() => import('@/pages/projects/ProjectSettingsPage'), 'ProjectSettingsPage')
 const ProjectDocumentsPage = lazyPage(() => import('@/pages/documents/ProjectDocumentsPage'), 'ProjectDocumentsPage')
 const KanbanPage = lazyPage(() => import('@/pages/kanban/KanbanPage'), 'KanbanPage')
+const IssuePage = lazyPage(() => import('@/pages/kanban/IssuePage'), 'IssuePage')
 const TestsPage = lazyPage(() => import('@/pages/tests/TestsPage'), 'TestsPage')
+const TestSetupPage = lazyPage(() => import('@/pages/tests/TestSetupPage'), 'TestSetupPage')
 const RoleListPage = lazyPage(() => import('@/pages/admin/RoleListPage'), 'RoleListPage')
 const RoleEditorPage = lazyPage(() => import('@/pages/admin/RoleEditorPage'), 'RoleEditorPage')
 const CompanyUsersPage = lazyPage(() => import('@/pages/admin/CompanyUsersPage'), 'CompanyUsersPage')
 
 function RootRoute() {
-  const { isAuthenticated, isBootstrapping } = useAuth()
+  const { isAuthenticated, isBootstrapping, hasOnboarded } = useAuth()
   if (isBootstrapping) return <FullPageSpinner />
+  // Chưa thuộc công ty nào (tài khoản mới, hoặc tài khoản cá nhân cũ) thì đi onboarding trước.
+  if (isAuthenticated && !hasOnboarded) return <Navigate to="/onboarding/start" replace />
   return isAuthenticated ? (
     <ProtectedRoute>
       <DashboardHomePage />
@@ -107,7 +108,9 @@ function AppRoutes() {
       <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       <Route element={<ProtectedRoute />}>
-        <Route path="/onboarding/account-type" element={<ChooseAccountTypePage />} />
+        <Route path="/onboarding/start" element={<OnboardingStartPage />} />
+        {/* Đã bỏ bước chọn Cá nhân / Doanh nghiệp; giữ đường cũ cho link đã lưu. */}
+        <Route path="/onboarding/account-type" element={<Navigate to="/onboarding/start" replace />} />
         <Route path="/onboarding/company-setup" element={<CompanySetupPage />} />
         <Route path="/onboarding/domain-match" element={<DomainMatchPage />} />
         <Route path="/onboarding/pending-approval" element={<PendingApprovalPage />} />
@@ -136,8 +139,11 @@ function AppRoutes() {
           {/* Kanban & Test cases — doc/Issues-Testcases-API-Contract.md */}
           <Route path="kanban" element={<KanbanPage />} />
           <Route path="kanban/backlog" element={<KanbanPage />} />
+          <Route path="kanban/issues/:issueKey" element={<IssuePage />} />
           <Route path="tests" element={<TestsPage />} />
-          <Route path="tests/cycles/:cycleId?" element={<TestsPage />} />
+          <Route path="tests/setup" element={<TestSetupPage />} />
+          {/* Đợt chạy (v1) đã bỏ: link cũ về bảng testcase. */}
+          <Route path="tests/cycles/*" element={<Navigate to="../tests?tab=sheet" replace />} />
           <Route path="testcases" element={<Navigate to="../tests" replace />} />
           <Route path="workflow" element={<ProjectWorkflowPage />} />
           <Route path="members" element={<ProjectMembersPage />} />

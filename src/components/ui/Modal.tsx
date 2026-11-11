@@ -88,7 +88,12 @@ export function Modal({
         tabIndex={-1}
         className={clsx(
           'relative flex max-h-[92dvh] w-full flex-col rounded-t-card border border-gray-200 bg-white shadow-float focus:outline-none sm:rounded-card',
-          size === 'md' ? 'sm:max-w-lg' : size === 'lg' ? 'sm:max-w-2xl' : 'sm:max-w-6xl',
+          // Bề rộng theo % cửa sổ, chặn trên/dưới để màn nhỏ không chật, màn lớn không loãng.
+          size === 'md'
+            ? 'sm:max-w-[clamp(28rem,40vw,36rem)]'
+            : size === 'lg'
+              ? 'sm:max-w-[clamp(36rem,55vw,52rem)]'
+              : 'sm:max-w-[min(92vw,80rem)]',
         )}
       >
         <div className={clsx('flex items-start justify-between gap-4 rounded-t-card px-6 pb-2 pt-5')}>

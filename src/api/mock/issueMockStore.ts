@@ -15,7 +15,6 @@ import type {
   IssueDetailDto,
   IssueListQuery,
   IssuePriority,
-  IssueStatus,
   IssueSummaryDto,
   IssueTestCounts,
   IssueType,
@@ -75,12 +74,6 @@ interface IssueRec {
   updatedAt: string
   resolvedAt: string | null
   isDeleted: boolean
-  phaseId?: string | number
-  phaseName?: string
-  phaseOrder?: number
-  phaseStatusId?: string | number
-  phaseStatusName?: string
-  status?: IssueStatus
 }
 
 interface SprintRec {
@@ -133,6 +126,9 @@ export interface LinkedTest {
   key: string
   title: string
   lastResult: RunResultLite | null
+  /** Test cases v2: đợt test và môi trường của kết quả hiển thị (để mở đúng chỗ). */
+  planId?: number
+  envId?: number | null
 }
 
 /** Testcase liên kết theo issue (testMockStore cung cấp). */
@@ -298,10 +294,6 @@ export class IssueMockStore {
 
   private summary(ctx: Ctx, i: IssueRec): IssueSummaryDto {
     const subs = this.load().issues.filter((x) => x.parentId === i.issueId && !x.isDeleted)
-    const stObj = ctx.statuses.find((s) => s.statusId === i.statusId)
-    const cat = this.category(ctx, i.statusId)
-    const mappedStatus = cat === 'DONE' ? 'DONE' : cat === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'TODO'
-
     return {
       issueId: i.issueId,
       key: i.key,
@@ -321,12 +313,6 @@ export class IssueMockStore {
       subtaskCount: subs.length,
       subtaskDone: subs.filter((s) => this.category(ctx, s.statusId) === 'DONE').length,
       updatedAt: i.updatedAt,
-      phaseId: i.phaseId ?? stObj?.phaseId,
-      phaseName: i.phaseName ?? stObj?.phaseName,
-      phaseOrder: i.phaseOrder,
-      phaseStatusId: i.phaseStatusId ?? i.statusId,
-      phaseStatusName: i.phaseStatusName ?? stObj?.name,
-      status: i.status ?? mappedStatus,
     }
   }
 
@@ -537,10 +523,6 @@ export class IssueMockStore {
     const assignee = await this.person(ctx.projectId, body.assigneeId)
     const at = opts.at ?? this.iso()
     const all = this.projectIssues(ctx.projectId)
-    const statusCategory = this.category(ctx, statusId!)
-    const autoStatus: IssueStatus = statusCategory === 'DONE' ? 'DONE' : statusCategory === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'TODO'
-    const statusObj = ctx.statuses.find((s) => s.statusId === statusId)
-
     const rec: IssueRec = {
       issueId: this.nextId(),
       projectId: ctx.projectId,
@@ -567,12 +549,6 @@ export class IssueMockStore {
       updatedAt: at,
       resolvedAt: null,
       isDeleted: false,
-      phaseId: body.phaseId ?? statusObj?.phaseId,
-      phaseName: body.phaseName ?? statusObj?.phaseName,
-      phaseOrder: body.phaseOrder,
-      phaseStatusId: body.phaseStatusId ?? body.statusId ?? statusId!,
-      phaseStatusName: body.phaseStatusName ?? statusObj?.name,
-      status: body.status ?? autoStatus,
     }
     this.load().issues.push(rec)
     this.log(rec.issueId, 'CREATED', ctx.me)
@@ -593,23 +569,89 @@ export class IssueMockStore {
     return this.detail(ctx, rec)
   }
 
-  /** Cho testMockStore: tạo bug từ lượt chạy FAIL (§5.5). Quyền đã kiểm ở phía ghi kết quả. */
+  /**
+   * Cho testMockStore: tạo bug từ testcase FAIL (Test cases v2, T26). Quyền `issue.create` đã kiểm ở phía test.
+   * `inProgress`: chỉ cho dữ liệu mẫu (bug đang xử lý).
+   */
   async createDefect(
     projectId: number,
-    body: { title: string; priority?: IssuePriority; assigneeId?: number | null; refs: RequirementRef[] },
+    body: {
+      title: string
+      priority?: IssuePriority
+      assigneeId?: number | null
+      refs: RequirementRef[]
+      description?: string | null
+      inProgress?: boolean
+    },
   ): Promise<{ issueId: number; key: string; statusId: number }> {
     const ctx = await this.ctx(projectId, PERMISSIONS.issueView, true)
     const active = this.activeSprint(projectId)
     const rec = await this.insertIssue(ctx, {
       type: 'BUG',
       title: body.title,
+      description: body.description ?? undefined,
       priority: body.priority ?? 'HIGH',
       assigneeId: body.assigneeId ?? null,
       sprintId: active?.sprintId ?? null,
       requirementRefs: body.refs,
     })
+    if (body.inProgress) {
+      const doing = demoStatuses(ctx.wf).doing
+      if (doing) rec.statusId = doing
+    }
     this.persist()
     return { issueId: rec.issueId, key: rec.key, statusId: rec.statusId }
+  }
+
+  /** Cho testMockStore: thông tin bug (key, tiêu đề, trạng thái Kanban) — cột "Bug" / "Trạng thái bug" chỉ đọc. */
+  async bugRefs(
+    projectId: number,
+    ids: number[],
+  ): Promise<
+    {
+      issueId: number
+      key: string
+      title: string
+      priority: IssuePriority
+      statusName: string
+      statusCategory: 'TODO' | 'IN_PROGRESS' | 'DONE'
+      type: IssueType
+    }[]
+  > {
+    if (!ids.length) return []
+    const wf = await this.env.workflow(projectId).catch(() => null)
+    const statuses = wf ? boardStatuses(wf) : []
+    return ids
+      .map((id) => this.load().issues.find((i) => i.issueId === id && i.projectId === projectId && !i.isDeleted))
+      .filter((i): i is IssueRec => !!i)
+      .map((i) => {
+        const st = statuses.find((x) => x.statusId === i.statusId)
+        return {
+          issueId: i.issueId,
+          key: i.key,
+          title: i.title,
+          priority: i.priority,
+          statusName: st?.name ?? '',
+          statusCategory: st?.category ?? 'TODO',
+          type: i.type,
+        }
+      })
+  }
+
+  /** Cho testMockStore: bug đã Done nhưng test FAIL lại → về trạng thái khởi đầu, ghi lịch sử. */
+  async reopenDefect(projectId: number, issueId: number, actor: UserRef, note: string): Promise<boolean> {
+    const wf = await this.env.workflow(projectId)
+    const i = this.issue(issueId)
+    const to = initialStatusId(wf)
+    // Chỉ mở lại bug thật sự đang ở category DONE.
+    const category = boardStatuses(wf).find((s) => s.statusId === i.statusId)?.category
+    if (to === null || i.projectId !== projectId || category !== 'DONE') return false
+    i.statusId = to
+    i.resolvedAt = null
+    i.updatedAt = this.iso()
+    this.log(i.issueId, 'TRANSITIONED', actor, note)
+    this.persist()
+    return true
   }
 
   /** Tra key + trạng thái issue (cho testcase / lượt chạy). */
@@ -667,44 +709,6 @@ export class IssueMockStore {
     if (body.dueDate !== undefined) {
       i.dueDate = body.dueDate
       changes.push('dueDate')
-    }
-    if (body.phaseId !== undefined) {
-      i.phaseId = body.phaseId
-      changes.push('phaseId')
-    }
-    if (body.phaseName !== undefined) {
-      i.phaseName = body.phaseName
-      changes.push('phaseName')
-    }
-    if (body.phaseOrder !== undefined) {
-      i.phaseOrder = body.phaseOrder
-      changes.push('phaseOrder')
-    }
-    if (body.phaseStatusId !== undefined) {
-      i.phaseStatusId = body.phaseStatusId
-      i.statusId = Number(body.phaseStatusId)
-      changes.push('phaseStatusId')
-    }
-    if (body.phaseStatusName !== undefined) {
-      i.phaseStatusName = body.phaseStatusName
-      changes.push('phaseStatusName')
-    }
-    if (body.status !== undefined) {
-      i.status = body.status
-      changes.push('status')
-    }
-    if (body.statusId !== undefined && body.statusId !== i.statusId) {
-      i.statusId = body.statusId
-      const cat = this.category(ctx, body.statusId)
-      i.status = cat === 'DONE' ? 'DONE' : cat === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'TODO'
-      const stObj = ctx.statuses.find((s) => s.statusId === body.statusId)
-      if (stObj) {
-        i.phaseStatusId = stObj.statusId
-        i.phaseStatusName = stObj.name
-        if (stObj.phaseId) i.phaseId = stObj.phaseId
-        if (stObj.phaseName) i.phaseName = stObj.phaseName
-      }
-      changes.push('statusId')
     }
     if (changes.length) this.log(i.issueId, 'UPDATED', ctx.me, changes.join(', '))
     i.updatedAt = this.iso()
@@ -1002,9 +1006,27 @@ export class IssueMockStore {
     if (this.hasData(projectId)) return null
     const db = this.load()
     db.seeded.push(projectId)
-    db.people[projectId] = DEMO_PEOPLE.map((p) => ({ ...p }))
+    const isSec = projectId >= 20
+    const secPeople: UserRef[] = [
+      { userId: 3, fullName: 'Vũ Kim Kỳ' },
+      { userId: 4, fullName: 'Phạm Minh Lương' },
+      { userId: 5, fullName: 'Trương Quang Tâm' },
+      { userId: 6, fullName: 'Phạm Công Minh' },
+      { userId: 7, fullName: 'Đặng Thu Trang' },
+      { userId: 8, fullName: 'Hoàng Minh Quân' },
+      { userId: 10, fullName: 'Nguyễn Hoàng Nam' },
+      { userId: 11, fullName: 'Lê Thị Khánh Linh' },
+    ]
+    db.people[projectId] = (isSec ? secPeople : DEMO_PEOPLE).map((p) => ({ ...p }))
     const [ln, th, nm] = DEMO_PEOPLE
     const me = ctx.me
+    const uLuong: UserRef = { userId: 4, fullName: 'Phạm Minh Lương' }
+    const uTam: UserRef = { userId: 5, fullName: 'Trương Quang Tâm' }
+    const uMinh: UserRef = { userId: 6, fullName: 'Phạm Công Minh' }
+    const uTrang: UserRef = { userId: 7, fullName: 'Đặng Thu Trang' }
+    const uQuan: UserRef = { userId: 8, fullName: 'Hoàng Minh Quân' }
+    const uNam: UserRef = { userId: 10, fullName: 'Nguyễn Hoàng Nam' }
+    const uLinh: UserRef = { userId: 11, fullName: 'Lê Thị Khánh Linh' }
     const st = demoStatuses(ctx.wf)
     const day = 86_400_000
     const date = (d: number) => this.iso(d * day).slice(0, 10)
@@ -1030,9 +1052,18 @@ export class IssueMockStore {
       db.sprints.push(s)
       return s
     }
-    sprint('Sprint 3', 'COMPLETED', -14, -1, 28)
-    const s4 = sprint('Sprint 4', 'ACTIVE', 0, 7, 40, 'Thanh toán VietQR chạy ổn định trên production')
-    sprint('Sprint 5', 'PLANNED', 7, 14, 40)
+    sprint(isSec ? 'Sprint 3 – Kết nối FIX 4.4 KRX & Tiểu khoản' : 'Sprint 3', 'COMPLETED', -14, -1, 28)
+    const s4 = sprint(
+      isSec ? 'Sprint 4 – Đặt lệnh KRX, Margin & Nộp tiền VietQR 9688' : 'Sprint 4',
+      'ACTIVE',
+      0,
+      7,
+      40,
+      isSec
+        ? 'Hoàn thiện đặt lệnh LO/MP/ATO/ATC qua cổng FIX 4.4 và nộp tiền VietQR định danh 9688 cộng sức mua T+0'
+        : 'Thanh toán VietQR chạy ổn định trên production',
+    )
+    sprint(isSec ? 'Sprint 5 – Đối soát VSD T+2 & Bảng giá WebSocket' : 'Sprint 5', 'PLANNED', 7, 14, 40)
     if (st.doing) db.wip.push({ projectId, statusId: st.doing, limit: 4 })
     if (st.review && st.review !== st.doing) db.wip.push({ projectId, statusId: st.review, limit: 3 })
 
@@ -1044,159 +1075,167 @@ export class IssueMockStore {
     db.keySeq[projectId] = 100
     const keys: Record<string, number> = {}
     const add = async (
-      body: Omit<CreateIssueBody, 'status'> & { status?: number | IssueStatus; assignee?: UserRef | null; daysAgo?: number },
+      body: CreateIssueBody & { status?: number; assignee?: UserRef | null; daysAgo?: number },
     ): Promise<IssueRec> => {
       const { status, assignee, daysAgo = 3, ...create } = body
       const rec = await this.insertIssue(ctx, { ...create, assigneeId: null }, { at: this.iso(-daysAgo * day) })
       rec.assignee = assignee ?? null
-      if (typeof status === 'number') rec.statusId = status
-      else if (typeof status === 'string') rec.status = status
+      if (status) rec.statusId = status
       if (status && status === st.done) rec.resolvedAt = this.iso(-day)
-      if (create.phaseOrder) rec.phaseOrder = create.phaseOrder
-      if (create.phaseName) rec.phaseName = create.phaseName
-      if (create.phaseStatusName) rec.phaseStatusName = create.phaseStatusName
       keys[rec.key.split('-').pop()!] = rec.issueId
       return rec
     }
     const s = s4.sprintId
     await add({
       type: 'TASK',
-      title: 'Cấu hình OAuth2 và JWT',
+      title: isSec
+        ? 'Cấu hình cổng xác thực OAuth2/JWT & Ký số lệnh đặt bằng SmartOTP TOTP (RFC 6238)'
+        : 'Cấu hình OAuth2 và JWT',
+      description: isSec
+        ? 'Xây dựng microservice xác thực phiên giao dịch chứng khoán, kiểm tra chữ ký TOTP 6 số khi gửi lệnh Mua/Bán cổ phiếu qua FIX 4.4.'
+        : undefined,
       status: st.review,
-      assignee: me,
+      assignee: isSec ? uLuong : me,
       points: 5,
       sprintId: s,
       requirementRefs: ref(AUTH_REQ.login),
-      phaseOrder: 1,
-      phaseName: 'Phân tích & Đặc tả yêu cầu',
-      phaseStatusName: 'In Review',
     })
     await add({
       type: 'STORY',
-      title: 'Màn hình đăng nhập bằng email',
+      title: isSec
+        ? 'Màn hình đăng nhập Số lưu ký 058C & Mở khoá đặt lệnh SmartOTP 6 số trên bảng giá'
+        : 'Màn hình đăng nhập bằng email',
+      description: isSec
+        ? 'Hỗ trợ đăng nhập bằng số tài khoản lưu ký (058Cxxxxxx), chọn Tiểu khoản Thường (1) / Margin (6) và popup nhập PIN SmartOTP.'
+        : undefined,
       status: st.done,
-      assignee: ln,
+      assignee: isSec ? uQuan : ln,
       points: 3,
       sprintId: s,
       requirementRefs: ref(AUTH_REQ.login),
       daysAgo: 6,
-      phaseOrder: 1,
-      phaseName: 'Phân tích & Đặc tả yêu cầu',
-      phaseStatusName: 'Done',
     })
     await add({
       type: 'TASK',
-      title: 'Tích hợp SDK Napas247 sinh mã VietQR',
+      title: isSec
+        ? 'Tích hợp cổng Napas247 sinh mã VietQR định danh tiểu khoản chứng khoán (9688)'
+        : 'Tích hợp SDK Napas247 sinh mã VietQR',
+      description: isSec
+        ? 'Sinh mã QR động chứa tài khoản ảo 9688 + số lưu ký 6 số + hậu tố tiểu khoản (1/6) và số tiền nộp ký quỹ.'
+        : undefined,
       status: st.doing,
-      assignee: me,
+      assignee: isSec ? uNam : me,
       points: 8,
       sprintId: s,
       requirementRefs: ref(PAY_REQ.qr),
-      phaseOrder: 3,
-      phaseName: 'Sprint Execution & Coding',
-      phaseStatusName: 'In Development',
     })
     const webhook = await add({
       type: 'BUG',
-      title: 'Ghi có trùng khi ngân hàng gửi lại webhook',
+      title: isSec
+        ? 'Cộng trùng Sức mua T+0 khi ngân hàng lưu ký BIDV gửi lại webhook báo có'
+        : 'Ghi có trùng khi ngân hàng gửi lại webhook',
+      description: isSec
+        ? 'Khi kết nối mạng giữa BIDV và API Gateway chập chờn (> 3s), ngân hàng retry webhook báo có dẫn tới cộng gấp đôi Purchasing Power trên tiểu khoản Margin.'
+        : undefined,
       status: st.doing,
-      assignee: me,
+      assignee: isSec ? uLuong : me,
       points: 5,
       priority: 'HIGHEST',
       sprintId: s,
       requirementRefs: ref(PAY_REQ.webhook),
       daysAgo: 2,
-      phaseOrder: 3,
-      phaseName: 'Sprint Execution & Coding',
-      phaseStatusName: 'In Development',
     })
     await add({
       type: 'TASK',
-      title: 'Đối soát giao dịch VietQR',
+      title: isSec
+        ? 'Engine đối soát tự động giao dịch nộp tiền T+0 & Giải tỏa cảnh báo Call Margin'
+        : 'Đối soát giao dịch VietQR',
+      description: isSec
+        ? 'Tự động tính lại tỷ lệ ký quỹ Rtt ngay sau khi hạch toán tiền nộp; nếu Rtt >= 85% thì gỡ cờ Force Sell trên OMS.'
+        : undefined,
       status: st.review,
-      assignee: th,
+      assignee: isSec ? uNam : th,
       points: 5,
       sprintId: s,
       requirementRefs: ref(PAY_REQ.reconcile),
-      phaseOrder: 4,
-      phaseName: 'Testing & Deployment',
-      phaseStatusName: 'Code Review & QA',
     })
     await add({
       type: 'DESIGN',
-      title: 'Thiết kế modal VietQR có đồng hồ đếm ngược',
+      title: isSec
+        ? 'Thiết kế UI Modal Nộp tiền VietQR 9688 có đồng hồ đếm ngược & Cảnh báo tỷ lệ Rtt'
+        : 'Thiết kế modal VietQR có đồng hồ đếm ngược',
       status: st.doing,
-      assignee: nm,
+      assignee: isSec ? uTrang : nm,
       points: 3,
       sprintId: s,
       requirementRefs: ref(PAY_REQ.qr),
-      phaseOrder: 2,
-      phaseName: 'System & UI Design',
-      phaseStatusName: 'Designing',
     })
     await add({
       type: 'TASK',
-      title: 'Ghi log kiểm toán cho mỗi lần đăng nhập',
+      title: isSec
+        ? 'Ghi nhật ký kiểm toán (Audit Log) bất biến cho mọi lần đặt lệnh & khoá SmartOTP'
+        : 'Ghi log kiểm toán cho mỗi lần đăng nhập',
       status: st.todo,
-      assignee: ln,
+      assignee: isSec ? uNam : ln,
       points: 3,
       priority: 'HIGHEST',
       sprintId: s,
       labels: ['blocked'],
-      phaseOrder: 3,
-      phaseName: 'Sprint Execution & Coding',
-      phaseStatusName: 'Open / To Do',
+      requirementRefs: isSec ? ref(AUTH_REQ.lock) : undefined,
     })
     await add({
       type: 'TASK',
-      title: 'Hiện đồng hồ đếm ngược trên màn thanh toán',
+      title: isSec
+        ? 'Hiển thị đồng hồ đếm ngược 10 phút & tự điền số tiền Top-up Call Margin trên màn Nộp tiền'
+        : 'Hiện đồng hồ đếm ngược trên màn thanh toán',
       status: st.todo,
-      assignee: me,
+      assignee: isSec ? uQuan : me,
       points: 3,
       priority: 'HIGH',
       sprintId: s,
       requirementRefs: ref(PAY_REQ.qr),
       daysAgo: 1,
-      phaseOrder: 3,
-      phaseName: 'Sprint Execution & Coding',
-      phaseStatusName: 'Open / To Do',
     })
     await add({
       type: 'STORY',
-      title: 'Đối soát thủ công khi sai số tiền',
+      title: isSec
+        ? 'Luồng xử lý đối soát thủ công cho Kế toán Tiền khi khách nộp lệch tiền / sai tiểu khoản'
+        : 'Đối soát thủ công khi sai số tiền',
       status: st.todo,
+      assignee: isSec ? uMinh : null,
       points: 5,
       sprintId: null,
       daysAgo: 4,
-      phaseOrder: 1,
-      phaseName: 'Phân tích & Đặc tả yêu cầu',
-      phaseStatusName: 'Drafting',
     })
     await add({
       type: 'TASK',
-      title: 'Gửi email cho kế toán khi lệch tiền',
+      title: isSec
+        ? 'Gửi cảnh báo SMS/Email cho Kế toán Giao dịch Tiền & Broker khi giao dịch nộp tiền bị treo'
+        : 'Gửi email cho kế toán khi lệch tiền',
       status: st.todo,
+      assignee: isSec ? uLinh : null,
       points: 2,
       priority: 'LOW',
       sprintId: null,
       daysAgo: 4,
-      phaseOrder: 1,
-      phaseName: 'Phân tích & Đặc tả yêu cầu',
-      phaseStatusName: 'Drafting',
     })
     const sub1 = await add({
       type: 'TASK',
-      title: 'Thêm bảng lưu mã giao dịch',
+      title: isSec
+        ? 'Thêm bảng lưu khoá chống trùng bankTransId (Idempotency Key) trên Redis & PostgreSQL'
+        : 'Thêm bảng lưu mã giao dịch',
       status: st.done,
-      assignee: me,
+      assignee: isSec ? uLuong : me,
       parentId: webhook.issueId,
       daysAgo: 1,
     })
     const sub2 = await add({
       type: 'TASK',
-      title: 'Viết job xoá mã giao dịch sau 24 giờ',
+      title: isSec
+        ? 'Viết Cronjob đối chiếu và dọn cache khoá giao dịch webhook sau 24 giờ (sau batch EOD)'
+        : 'Viết job xoá mã giao dịch sau 24 giờ',
       status: st.todo,
-      assignee: me,
+      assignee: isSec ? uNam : me,
       parentId: webhook.issueId,
       daysAgo: 1,
     })
@@ -1206,13 +1245,17 @@ export class IssueMockStore {
       l.changedLabel = ctx.index.find((d) => d.documentId === l.documentId)?.baselineLabel ?? '1.1'
       webhook.reqChanged = true
     }
+    const targetDev = isSec ? uLuong : me
+    const commentAuthor = isSec ? uTam : th
     this.load().comments.push({
       commentId: this.nextId(),
       issueId: webhook.issueId,
       parentId: null,
-      body: `@${me.fullName} lỗi vẫn còn khi ngân hàng gửi lại sau 10 giây, mình đã ghi ở TC "Không ghi có trùng".`,
-      mentions: [me],
-      author: th,
+      body: isSec
+        ? `@${targetDev.fullName} lỗi cộng trùng sức mua T+0 vẫn tái hiện trên SIT khi giả lập BIDV gửi lại webhook sau 10 giây, mình đã log chi tiết trong kịch bản kiểm thử.`
+        : `@${me.fullName} lỗi vẫn còn khi ngân hàng gửi lại sau 10 giây, mình đã ghi ở TC "Không ghi có trùng".`,
+      mentions: [targetDev],
+      author: commentAuthor,
       createdAt: this.iso(-3 * 3_600_000),
     })
     this.persist()

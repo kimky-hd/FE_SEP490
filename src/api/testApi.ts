@@ -1,146 +1,168 @@
 import { api } from '@/lib/apiClient'
 import { withInvalidation } from '@/lib/dataEvents'
 import { testMockStore } from './workMockStores'
-import type { TestMockStore } from './mock/testMockStore'
 import type { ItemsDto } from '@/types/rbac'
 import type { RequirementRef } from '@/types/issue'
 import type {
-  CreateCycleBody,
+  ActivityQuery,
+  AiApplyItem,
+  AssignmentBody,
+  BulkUpdateBody,
+  CreateBugBody,
+  CreateModuleBody,
   CreateTestCaseBody,
-  CycleStatus,
-  RecordResultBody,
-  RunQuery,
-  SuggestedTestCase,
-  TestCaseDetailDto,
+  CreateTestPlanBody,
+  DeployBuildBody,
+  DocSectionDto,
+  EnvironmentBody,
+  RecordResultsBody,
+  RecordResultsResult,
+  SectionBody,
+  SheetLayoutDto,
+  SuggestedTestCaseDto,
+  TestActivityDto,
+  TestAssignmentDto,
+  TestBuildDto,
+  TestCaseDto,
   TestCaseQuery,
-  TestCaseSummaryDto,
-  TestCycleDto,
-  TestRunDto,
-  TestTreeNodeDto,
+  TestEnvironmentDto,
+  TestModuleDto,
+  TestPlanDto,
+  TestPlanSummaryDto,
+  TestResult,
+  TestSectionDto,
+  TraceRowDto,
   UpdateTestCaseBody,
+  UpdateTestPlanBody,
 } from '@/types/testing'
 
-// doc/BE-Changes-2026-10-28_30-API.md §D (#45–#58) — một hàm cho mỗi endpoint, path / body đúng tài liệu.
-// Mock trong trình duyệt khi VITE_MOCK_TESTS=true (src/api/mockFlags.ts).
+// Test cases v2 — doc/Issues-Testcases-API-Contract.md mục "v2" (T1–T34). Một hàm cho mỗi endpoint, path / body đúng
+// tài liệu. Mock trong trình duyệt khi VITE_MOCK_TESTS=true (src/api/mockFlags.ts).
 
 export interface TestApi {
-  // 5.1 Cây
-  tree: (projectId: number) => Promise<TestTreeNodeDto[]>
-  createFolder: (
-    projectId: number,
-    body: { name: string; parentId?: number | null },
-  ) => Promise<{ folderId: number; name: string; parentId: number | null }>
-  // 5.2 Testcase
-  list: (projectId: number, query?: TestCaseQuery) => Promise<TestCaseSummaryDto[]>
-  create: (projectId: number, body: CreateTestCaseBody) => Promise<TestCaseDetailDto>
-  bulkCreate: (projectId: number, items: CreateTestCaseBody[]) => Promise<TestCaseDetailDto[]>
-  bulkApprove: (projectId: number, testCaseIds: number[]) => Promise<{ updatedCount: number }>
-  aiRefreshStale: (projectId: number, testCaseId: number) => Promise<TestCaseDetailDto>
-  get: (testCaseId: number) => Promise<TestCaseDetailDto>
-  update: (testCaseId: number, body: UpdateTestCaseBody) => Promise<TestCaseDetailDto>
-  markFresh: (testCaseId: number) => Promise<TestCaseDetailDto>
+  // Đợt test
+  plans: (projectId: number) => Promise<TestPlanSummaryDto[]>
+  createPlan: (projectId: number, body: CreateTestPlanBody) => Promise<TestPlanDto>
+  plan: (planId: number) => Promise<TestPlanDto>
+  updatePlan: (planId: number, body: UpdateTestPlanBody) => Promise<TestPlanDto>
+  // Môi trường & build
+  addEnvironment: (planId: number, body: EnvironmentBody & { name: string }) => Promise<TestEnvironmentDto>
+  updateEnvironment: (envId: number, body: EnvironmentBody) => Promise<TestEnvironmentDto>
+  removeEnvironment: (envId: number) => Promise<void>
+  deployBuild: (envId: number, body: DeployBuildBody) => Promise<{ build: TestBuildDto; retestCount: number }>
+  regression: (envId: number, body: { moduleIds?: number[] }) => Promise<{ retestCount: number }>
+  // Module = tài liệu, mục, nhóm
+  documentSections: (documentId: number) => Promise<DocSectionDto[]>
+  addModule: (planId: number, body: CreateModuleBody) => Promise<TestModuleDto>
+  updateModule: (moduleId: number, body: { name?: string; position?: number }) => Promise<TestModuleDto>
+  removeModule: (moduleId: number) => Promise<void>
+  addSection: (moduleId: number, body: SectionBody) => Promise<TestSectionDto>
+  updateSection: (sectionId: number, body: { title?: string; position?: number }) => Promise<TestSectionDto>
+  removeSection: (sectionId: number) => Promise<void>
+  // Phân công
+  setAssignments: (planId: number, body: AssignmentBody) => Promise<TestAssignmentDto[]>
+  // Testcase (#47–#51 đổi)
+  list: (projectId: number, query?: TestCaseQuery) => Promise<TestCaseDto[]>
+  create: (projectId: number, body: CreateTestCaseBody) => Promise<TestCaseDto>
+  get: (testCaseId: number) => Promise<TestCaseDto>
+  update: (testCaseId: number, body: UpdateTestCaseBody) => Promise<TestCaseDto>
   remove: (testCaseId: number) => Promise<void>
-  // 5.3 Gợi ý
-  suggest: (projectId: number, refs: RequirementRef[]) => Promise<SuggestedTestCase[]>
-  // 5.4 Đợt chạy
-  cycles: (projectId: number, status?: CycleStatus) => Promise<TestCycleDto[]>
-  createCycle: (projectId: number, body: CreateCycleBody) => Promise<TestCycleDto>
-  updateCycle: (cycleId: number, body: { name?: string; status?: CycleStatus }) => Promise<TestCycleDto>
-  runs: (cycleId: number, query?: RunQuery) => Promise<TestRunDto[]>
-  updateRun: (runId: number, body: { assigneeId: number | null }) => Promise<TestRunDto>
-  // 5.5 Ghi kết quả
-  recordResult: (runId: number, body: RecordResultBody) => Promise<TestRunDto>
+  bulkUpdate: (planId: number, body: BulkUpdateBody) => Promise<TestCaseDto[]>
+  // Kết quả & bug
+  recordResult: (testCaseId: number, body: { envId: number; result: TestResult }) => Promise<RecordResultsResult>
+  recordResults: (planId: number, body: RecordResultsBody) => Promise<RecordResultsResult>
+  createBug: (
+    planId: number,
+    body: CreateBugBody,
+  ) => Promise<{ issue: { issueId: number; key: string }; items: TestCaseDto[] }>
+  linkBug: (planId: number, issueId: number, body: { testCaseIds: number[] }) => Promise<TestCaseDto[]>
+  // Bàn giao
+  handover: (planId: number, body: { note: string | null }) => Promise<TestPlanDto>
+  reopen: (planId: number) => Promise<TestPlanDto>
+  // Bố cục bảng, lịch sử, đối chiếu
+  saveLayout: (planId: number, body: SheetLayoutDto) => Promise<SheetLayoutDto>
+  activity: (planId: number, query?: ActivityQuery) => Promise<TestActivityDto[]>
+  traceability: (planId: number, envId: number) => Promise<TraceRowDto[]>
+  // AI (#52 đổi + áp dụng)
+  suggest: (projectId: number, body: { planId: number; refs: RequirementRef[] }) => Promise<SuggestedTestCaseDto[]>
+  aiApply: (planId: number, body: { items: AiApplyItem[] }) => Promise<TestCaseDto[]>
 }
+
+const items = <T>(p: Promise<{ data: ItemsDto<T> }>) => p.then((r) => r.data.items)
+const data = <T>(p: Promise<{ data: T }>) => p.then((r) => r.data)
+const none = (p: Promise<unknown>) => p.then(() => undefined)
 
 export const httpTestApi: TestApi = {
-  tree: (projectId) => api.get<ItemsDto<TestTreeNodeDto>>(`/projects/${projectId}/test-tree`).then((r) => r.data.items),
-  createFolder: (projectId, body) =>
-    api
-      .post<{ folderId: number; name: string; parentId: number | null }>(`/projects/${projectId}/test-folders`, body)
-      .then((r) => r.data),
+  plans: (projectId) => items(api.get<ItemsDto<TestPlanSummaryDto>>(`/projects/${projectId}/test-plans`)),
+  createPlan: (projectId, body) => data(api.post<TestPlanDto>(`/projects/${projectId}/test-plans`, body)),
+  plan: (planId) => data(api.get<TestPlanDto>(`/test-plans/${planId}`)),
+  updatePlan: (planId, body) => data(api.patch<TestPlanDto>(`/test-plans/${planId}`, body)),
+  addEnvironment: (planId, body) => data(api.post<TestEnvironmentDto>(`/test-plans/${planId}/environments`, body)),
+  updateEnvironment: (envId, body) => data(api.patch<TestEnvironmentDto>(`/test-environments/${envId}`, body)),
+  removeEnvironment: (envId) => none(api.delete(`/test-environments/${envId}`)),
+  deployBuild: (envId, body) =>
+    data(api.post<{ build: TestBuildDto; retestCount: number }>(`/test-environments/${envId}/builds`, body)),
+  regression: (envId, body) => data(api.post<{ retestCount: number }>(`/test-environments/${envId}/regression`, body)),
+  documentSections: (documentId) => items(api.get<ItemsDto<DocSectionDto>>(`/documents/${documentId}/sections`)),
+  addModule: (planId, body) => data(api.post<TestModuleDto>(`/test-plans/${planId}/modules`, body)),
+  updateModule: (moduleId, body) => data(api.patch<TestModuleDto>(`/test-modules/${moduleId}`, body)),
+  removeModule: (moduleId) => none(api.delete(`/test-modules/${moduleId}`)),
+  addSection: (moduleId, body) => data(api.post<TestSectionDto>(`/test-modules/${moduleId}/sections`, body)),
+  updateSection: (sectionId, body) => data(api.patch<TestSectionDto>(`/test-sections/${sectionId}`, body)),
+  removeSection: (sectionId) => none(api.delete(`/test-sections/${sectionId}`)),
+  setAssignments: (planId, body) =>
+    items(api.put<ItemsDto<TestAssignmentDto>>(`/test-plans/${planId}/assignments`, body)),
   list: (projectId, query = {}) =>
-    api
-      .get<ItemsDto<TestCaseSummaryDto>>(`/projects/${projectId}/testcases`, { params: query })
-      .then((r) => r.data.items),
-  create: (projectId, body) =>
-    api.post<TestCaseDetailDto>(`/projects/${projectId}/testcases`, body).then((r) => r.data),
-  bulkCreate: async (projectId, items) => {
-    const out: TestCaseDetailDto[] = []
-    for (const item of items) {
-      out.push(await api.post<TestCaseDetailDto>(`/projects/${projectId}/testcases`, item).then((r) => r.data))
-    }
-    return out
-  },
-  bulkApprove: async (_projectId, testCaseIds) => {
-    for (const id of testCaseIds) {
-      await api.patch<TestCaseDetailDto>(`/testcases/${id}`, { approvalStatus: 'APPROVED', needsReview: false })
-    }
-    return { updatedCount: testCaseIds.length }
-  },
-  aiRefreshStale: (_projectId, testCaseId) =>
-    api
-      .patch<TestCaseDetailDto>(`/testcases/${testCaseId}`, { approvalStatus: 'APPROVED', needsReview: false })
-      .then((r) => r.data),
-  get: (testCaseId) => api.get<TestCaseDetailDto>(`/testcases/${testCaseId}`).then((r) => r.data),
-  update: (testCaseId, body) => api.patch<TestCaseDetailDto>(`/testcases/${testCaseId}`, body).then((r) => r.data),
-  markFresh: (testCaseId) =>
-    api.patch<TestCaseDetailDto>(`/testcases/${testCaseId}`, { needsReview: false, approvalStatus: 'APPROVED' }).then((r) => r.data),
-  remove: (testCaseId) => api.delete(`/testcases/${testCaseId}`).then(() => undefined),
-  suggest: (projectId, refs) =>
-    api
-      .post<ItemsDto<SuggestedTestCase>>(`/projects/${projectId}/testcases/suggest`, { refs })
-      .then((r) => r.data.items),
-  cycles: (projectId, status) =>
-    api
-      .get<ItemsDto<TestCycleDto>>(`/projects/${projectId}/test-cycles`, { params: { status } })
-      .then((r) => r.data.items),
-  createCycle: (projectId, body) =>
-    api.post<TestCycleDto>(`/projects/${projectId}/test-cycles`, body).then((r) => r.data),
-  updateCycle: (cycleId, body) => api.patch<TestCycleDto>(`/test-cycles/${cycleId}`, body).then((r) => r.data),
-  runs: (cycleId, query = {}) =>
-    api.get<ItemsDto<TestRunDto>>(`/test-cycles/${cycleId}/runs`, { params: query }).then((r) => r.data.items),
-  updateRun: (runId, body) => api.patch<TestRunDto>(`/test-runs/${runId}`, body).then((r) => r.data),
-  recordResult: (runId, body) => api.post<TestRunDto>(`/test-runs/${runId}/result`, body).then((r) => r.data),
+    items(api.get<ItemsDto<TestCaseDto>>(`/projects/${projectId}/testcases`, { params: query })),
+  create: (projectId, body) => data(api.post<TestCaseDto>(`/projects/${projectId}/testcases`, body)),
+  get: (testCaseId) => data(api.get<TestCaseDto>(`/testcases/${testCaseId}`)),
+  update: (testCaseId, body) => data(api.patch<TestCaseDto>(`/testcases/${testCaseId}`, body)),
+  remove: (testCaseId) => none(api.delete(`/testcases/${testCaseId}`)),
+  bulkUpdate: (planId, body) =>
+    items(api.post<ItemsDto<TestCaseDto>>(`/test-plans/${planId}/testcases/bulk-update`, body)),
+  recordResult: (testCaseId, body) => data(api.post<RecordResultsResult>(`/testcases/${testCaseId}/results`, body)),
+  recordResults: (planId, body) => data(api.post<RecordResultsResult>(`/test-plans/${planId}/results`, body)),
+  createBug: (planId, body) =>
+    data(
+      api.post<{ issue: { issueId: number; key: string }; items: TestCaseDto[] }>(`/test-plans/${planId}/bugs`, body),
+    ),
+  linkBug: (planId, issueId, body) =>
+    items(api.post<ItemsDto<TestCaseDto>>(`/test-plans/${planId}/bugs/${issueId}/links`, body)),
+  handover: (planId, body) => data(api.post<TestPlanDto>(`/test-plans/${planId}/handover`, body)),
+  reopen: (planId) => data(api.post<TestPlanDto>(`/test-plans/${planId}/reopen`, {})),
+  saveLayout: (planId, body) => data(api.put<SheetLayoutDto>(`/test-plans/${planId}/sheet-layout`, body)),
+  activity: (planId, query = {}) =>
+    items(api.get<ItemsDto<TestActivityDto>>(`/test-plans/${planId}/activity`, { params: query })),
+  traceability: (planId, envId) =>
+    items(api.get<ItemsDto<TraceRowDto>>(`/test-plans/${planId}/traceability`, { params: { envId } })),
+  suggest: (projectId, body) =>
+    items(api.post<ItemsDto<SuggestedTestCaseDto>>(`/projects/${projectId}/testcases/suggest`, body)),
+  aiApply: (planId, body) => items(api.post<ItemsDto<TestCaseDto>>(`/test-plans/${planId}/testcases/ai-apply`, body)),
 }
 
-function createMockTestApi(store: TestMockStore): TestApi {
-  return {
-    tree: (projectId) => store.tree(projectId).then((r) => r.items),
-    createFolder: (projectId, body) => store.createFolder(projectId, body),
-    list: (projectId, query) => store.listTestCases(projectId, query).then((r) => r.items),
-    create: (projectId, body) => store.createTestCase(projectId, body),
-    bulkCreate: (projectId, items) => store.bulkCreateTestCases(projectId, items),
-    bulkApprove: (projectId, testCaseIds) => store.bulkApproveTestCases(projectId, testCaseIds),
-    aiRefreshStale: (projectId, testCaseId) => store.aiRefreshStaleTestCase(projectId, testCaseId),
-    get: (testCaseId) => store.getTestCase(testCaseId),
-    update: (testCaseId, body) => store.updateTestCase(testCaseId, body),
-    markFresh: (testCaseId) => store.markFresh(testCaseId),
-    remove: (testCaseId) => store.deleteTestCase(testCaseId),
-    suggest: (projectId, refs) => store.suggest(projectId, { refs }).then((r) => r.items),
-    cycles: (projectId, status) => store.listCycles(projectId, status).then((r) => r.items),
-    createCycle: (projectId, body) => store.createCycle(projectId, body),
-    updateCycle: (cycleId, body) => store.updateCycle(cycleId, body),
-    runs: (cycleId, query) => store.listRuns(cycleId, query).then((r) => r.items),
-    updateRun: (runId, body) => store.updateRun(runId, body),
-    recordResult: (runId, body) => store.recordResult(runId, body),
-  }
-}
-
-const MOCK_MUTATIONS = [
-  'createFolder',
-  'create',
-  'bulkCreate',
-  'bulkApprove',
-  'aiRefreshStale',
-  'update',
-  'markFresh',
-  'remove',
-  'createCycle',
-  'updateCycle',
-  'updateRun',
-  'recordResult',
+/** Hàm đọc (không làm mới dữ liệu khác khi gọi). Mọi hàm còn lại là ghi. */
+const READS = [
+  'plans',
+  'plan',
+  'documentSections',
+  'list',
+  'get',
+  'activity',
+  'traceability',
+  'suggest',
 ] as const satisfies readonly (keyof TestApi)[]
 
-export const testApi: TestApi = testMockStore
-  ? withInvalidation(createMockTestApi(testMockStore), MOCK_MUTATIONS)
-  : httpTestApi
+function bindMock(store: TestApi): TestApi {
+  const out = {} as Record<keyof TestApi, unknown>
+  for (const key of Object.keys(httpTestApi) as (keyof TestApi)[]) {
+    const fn = store[key] as (...a: unknown[]) => unknown
+    out[key] = (...args: unknown[]) => fn.apply(store, args)
+  }
+  return out as unknown as TestApi
+}
+
+const MUTATIONS = (Object.keys(httpTestApi) as (keyof TestApi)[]).filter(
+  (k) => !(READS as readonly string[]).includes(k),
+)
+
+export const testApi: TestApi = testMockStore ? withInvalidation(bindMock(testMockStore), MUTATIONS) : httpTestApi

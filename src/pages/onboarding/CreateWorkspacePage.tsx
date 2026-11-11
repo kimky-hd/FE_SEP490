@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -55,6 +55,9 @@ export function CreateWorkspacePage() {
       setServerError(t('Có lỗi xảy ra, vui lòng thử lại.', 'Something went wrong. Please try again.'))
     }
   }
+
+  // Không còn workspace cá nhân: chỉ tạo workspace cho công ty vừa thiết lập / tham gia.
+  if (companyId === null) return <Navigate to="/onboarding/start" replace />
 
   return (
     <AuthCard

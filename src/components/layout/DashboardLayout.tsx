@@ -17,7 +17,9 @@ import { HelpProvider } from '@/help/HelpProvider'
  * Lề + bề rộng chuẩn của thân mọi trang (trừ tab Tài liệu, vốn tràn sát mép): dùng hết khung trắng,
  * màn rất rộng thì giới hạn 1440px và căn giữa. Header dạng dải (dự án, workspace) tự đặt lề riêng.
  */
-export const PAGE_BODY = 'mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-10 lg:py-8'
+// Lề và bề rộng co giãn theo cửa sổ (vw/vh, chặn bằng clamp) thay vì nhảy bậc theo breakpoint.
+export const PAGE_BODY =
+  'mx-auto w-full max-w-[min(100%,100rem)] px-[clamp(1rem,3vw,2.5rem)] py-[clamp(1.5rem,3.5vh,2.5rem)]'
 
 const DESKTOP_QUERY = '(min-width: 1024px)'
 
@@ -63,7 +65,7 @@ export function DashboardLayout({
   const [railOpen, setRailOpen] = useState(false)
   const closeMobileNav = () => setMobileNavOpen(false)
 
-  const companyName = currentCompany?.companyName ?? t('Không gian cá nhân', 'Personal space')
+  const companyName = currentCompany?.companyName ?? t('Chưa có công ty', 'No company')
   const navItems = getNavItems(t)
   const adminItems = currentCompany
     ? getAdminNavItems(t).filter((item) => !item.permission || can(item.permission))
@@ -74,8 +76,8 @@ export function DashboardLayout({
   // Trang dự án / workspace dùng cả khung trắng, sát mép (layout tự đặt lề): header là một dải ngang.
   const fullWidth =
     /^\/(projects|workspaces)\/\d+(\/|$)/.test(pathname) && !/^\/workspaces\/\d+\/projects\/new/.test(pathname)
-  // Tab Tài liệu & Kiểm thử: khung trắng cao đúng cửa sổ (cây trang + trang tự cuộn bên trong), sidebar thu thành dải icon 56px.
-  const fill = /^\/projects\/\d+\/(documents|tests)(\/|$)/.test(pathname)
+  // Tab Tài liệu: khung trắng cao đúng cửa sổ (cây trang + trang tự cuộn bên trong), sidebar thu thành dải icon 56px.
+  const fill = /^\/projects\/\d+\/documents(\/|$)/.test(pathname)
   const currentProjectId = Number(pathname.match(/^\/projects\/(\d+)/)?.[1] ?? NaN)
   const recentProjects = useRecentProjects(user?.id, currentCompany?.companyId ?? null)
   // Trong dự án sidebar đã là menu dự án nên không thu thành dải icon nữa.
@@ -146,6 +148,7 @@ export function DashboardLayout({
           ) : (
             <MainNav
               items={navItems}
+              adminItems={adminItems}
               isActive={isActive}
               recentProjects={recentProjects}
               currentProjectId={currentProjectId}
@@ -156,7 +159,8 @@ export function DashboardLayout({
         </>
       )}
       <div className="p-3">
-        <AccountMenu compact={false} adminItems={adminItems} accountHint={accountHint} />
+        {/* Sidebar chung đã có nhóm Quản trị; menu avatar chỉ còn giữ lối tắt khi đang ở trong dự án. */}
+        <AccountMenu compact={false} adminItems={projectNav ? adminItems : []} accountHint={accountHint} />
       </div>
     </>
   )
@@ -194,8 +198,8 @@ export function DashboardLayout({
           aria-label={t('Điều hướng', 'Navigation')}
           {...(!isDesktop && !mobileNavOpen ? { inert: '' } : {})}
           className={clsx(
-            'fixed inset-y-0 left-0 z-40 flex w-[min(18rem,100vw)] shrink-0 flex-col bg-paper transition-transform duration-200 motion-reduce:transition-none',
-            rail && !railOpen ? 'lg:w-14' : 'lg:w-60',
+            'fixed inset-y-0 left-0 z-40 flex w-[min(18rem,85vw)] shrink-0 flex-col bg-paper transition-transform duration-200 motion-reduce:transition-none',
+            rail && !railOpen ? 'lg:w-14' : 'lg:w-[clamp(14rem,16vw,17rem)]',
             rail && railOpen ? 'lg:fixed lg:h-dvh lg:shadow-float' : 'lg:sticky lg:top-0 lg:h-dvh',
             'lg:translate-x-0',
             mobileNavOpen ? 'translate-x-0' : '-translate-x-full',

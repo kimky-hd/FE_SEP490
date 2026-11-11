@@ -51,4 +51,3 @@ export function Switch({ checked, onChange, disabled = false, label, size = 'md'
     </label>
   )
 }
-

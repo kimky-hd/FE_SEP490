@@ -7,16 +7,28 @@ import { loadPageInfos, type PageInfo } from '@/api/documentWork'
 import { useAsync } from '@/lib/useAsync'
 import { formatRelative } from '@/lib/format'
 import { Avatar } from '@/components/ui/Avatar'
+import { SelectField } from '@/components/ui/SelectField'
+import { SearchInput } from '@/components/ui/listControls'
 import type { DocType, DocumentNodeDto, VersionStatus } from '@/types/document'
-import { Chip, IconButton, SidebarIcon, StatusPill, statusLabel } from './docUi'
+import { Chip, DOC_TYPES, IconButton, SidebarIcon, StatusPill, docTypeLabel, statusLabel } from './docUi'
 import { NewDocButton } from './NewDocButton'
+import {
+  DOC_TABS,
+  EMPTY_FILTER,
+  filterPages,
+  folderPath,
+  isFiltered,
+  tabCounts,
+  type DocListFilter,
+  type DocTab,
+} from './docListFilters'
 
-type Filter = Exclude<VersionStatus, 'SUPERSEDED'> | 'STALE'
 type Sort = 'recent' | 'status'
 
 const STATUS_ORDER: VersionStatus[] = ['IN_REVIEW', 'CHANGES_REQUESTED', 'DRAFT', 'APPROVED']
 
-// "Trang chủ tài liệu" của dự án (chưa chọn trang): số theo trạng thái (bấm để lọc) · bảng trang · "Cần chú ý".
+// "Trang chủ tài liệu" của dự án (chưa chọn trang): tab trạng thái kèm số · lọc Thư mục / Loại / tìm · bảng trang ·
+// "Cần chú ý" (doc/mockups/documents-redesign.html màn 1).
 // Dữ liệu tác giả / REQ stale ghép từ chi tiết từng trang (documentWork.loadPageInfos); bảng hiện ngay từ cây,
 // phần phụ điền vào khi tải xong.
 export function DocumentsHome({
@@ -39,7 +51,8 @@ export function DocumentsHome({
   onFolder: () => void
 }) {
   const { t } = useI18n()
-  const [filter, setFilter] = useState<Filter | null>(null)
+  const [filter, setFilter] = useState<DocListFilter>(EMPTY_FILTER)
+  const patch = (p: Partial<DocListFilter>) => setFilter((f) => ({ ...f, ...p }))
   const [sort, setSort] = useState<Sort>('recent')
   const infoQ = useAsync(() => loadPageInfos(documentApi, projectId, { nodes }), [projectId, nodes])
   const infoById = useMemo(() => new Map((infoQ.data?.pages ?? []).map((p) => [p.node.documentId, p])), [infoQ.data])
@@ -48,31 +61,29 @@ export function DocumentsHome({
   const byId = useMemo(() => new Map(nodes.map((n) => [n.documentId, n])), [nodes])
   const reqTotal = pages.reduce((sum, n) => sum + n.reqCount, 0)
   const staleOf = (n: DocumentNodeDto) => infoById.get(n.documentId)?.stale.length ?? 0
-  const count = (s: VersionStatus) => pages.filter((n) => n.currentVersion!.status === s).length
-  const staleTotal = pages.reduce((sum, n) => sum + staleOf(n), 0)
-
-  const cells: { key: Filter; label: string; value: number; dot: string; warn?: boolean }[] = [
-    { key: 'DRAFT', label: t('Nháp', 'Draft'), value: count('DRAFT'), dot: 'bg-gray-400' },
-    { key: 'IN_REVIEW', label: t('Chờ duyệt', 'In review'), value: count('IN_REVIEW'), dot: 'bg-brand-600' },
-    {
-      key: 'CHANGES_REQUESTED',
-      label: t('Cần sửa', 'Changes requested'),
-      value: count('CHANGES_REQUESTED'),
-      dot: 'bg-red-600',
-    },
-    { key: 'APPROVED', label: t('Đã duyệt', 'Approved'), value: count('APPROVED'), dot: 'bg-success-600' },
-    {
-      key: 'STALE',
-      label: t('REQ cần cập nhật', 'REQs to update'),
-      value: staleTotal,
-      dot: 'bg-amber-600',
-      warn: true,
-    },
-  ]
-
-  const visible = pages.filter(
-    (n) => !filter || (filter === 'STALE' ? staleOf(n) > 0 : n.currentVersion!.status === filter),
+  // Thư mục chọn được: mọi FOLDER trên cây, hiện theo đường dẫn đầy đủ.
+  const folders = useMemo(
+    () =>
+      nodes
+        .filter((n) => n.kind === 'FOLDER')
+        .map((n) => ({ id: n.documentId, label: [folderPath(n, byId), n.title].filter(Boolean).join(' / ') }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [nodes, byId],
   )
+  // Loại: chỉ các loại đang có trong dự án.
+  const docTypes = DOC_TYPES.filter((d) => pages.some((n) => (n.docType ?? 'OTHER') === d))
+
+  const counts = tabCounts(pages, filter, byId, staleOf)
+  const tabLabel: Record<DocTab, string> = {
+    ALL: t('Tất cả', 'All'),
+    IN_REVIEW: t('Chờ duyệt', 'In review'),
+    CHANGES_REQUESTED: t('Cần sửa', 'Changes requested'),
+    APPROVED: t('Đã duyệt', 'Approved'),
+    DRAFT: t('Bản nháp', 'Drafts'),
+    STALE: t('REQ cần cập nhật', 'REQs to update'),
+  }
+
+  const visible = filterPages(pages, filter, byId, staleOf)
   const recent = [...visible].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
   const groups: { status: VersionStatus; rows: DocumentNodeDto[] }[] =
     sort === 'status'
@@ -83,7 +94,7 @@ export function DocumentsHome({
       : [{ status: 'DRAFT', rows: recent }]
 
   const href = (n: { documentId: number }) => `/projects/${projectId}/documents/${n.documentId}`
-  const parentTitle = (n: DocumentNodeDto) => (n.parentId !== null ? (byId.get(n.parentId)?.title ?? null) : null)
+  const parentTitle = (n: DocumentNodeDto) => folderPath(n, byId) || null
 
   const attention: ReactNode[] = []
   for (const n of [...pages]
@@ -146,55 +157,102 @@ export function DocumentsHome({
           {canEdit && <NewDocButton onBlank={onBlank} onNotes={onNotes} onFolder={onFolder} />}
         </div>
 
+        {/* Tab trạng thái kèm số (thay 5 ô số cũ). Hẹp thì cuộn ngang trong dải tab, không cuộn cả trang. */}
         <div
-          className="mt-4 grid grid-cols-5 overflow-hidden rounded-card border border-gray-200"
-          role="group"
+          role="tablist"
           aria-label={t('Lọc theo trạng thái', 'Filter by status')}
+          className="-mx-4 mt-4 flex gap-5 overflow-x-auto border-b border-gray-200 px-4 sm:-mx-6 sm:px-6 lg:-mx-7 lg:px-7"
         >
-          {cells.map((c, i) => {
-            const on = filter === c.key
+          {DOC_TABS.map((key) => {
+            const on = filter.tab === key
+            const warn = key === 'STALE' && counts.STALE > 0
             return (
               <button
-                key={c.key}
+                key={key}
                 type="button"
-                aria-pressed={on}
-                onClick={() => setFilter(on ? null : c.key)}
+                role="tab"
+                aria-selected={on}
+                onClick={() => patch({ tab: key })}
                 className={clsx(
-                  'min-w-0 px-2.5 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-brand-100 sm:px-4',
-                  i > 0 && 'border-l border-gray-200',
-                  on ? 'bg-brand-50/60 shadow-[inset_0_-2px_0_theme(colors.brand.600)]' : 'hover:bg-gray-50',
+                  '-mb-px flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-0.5 pb-2.5 pt-1 text-sm transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-brand-100',
+                  on
+                    ? 'border-brand-600 font-medium text-gray-950'
+                    : 'border-transparent text-gray-600 hover:text-gray-950',
                 )}
               >
+                {tabLabel[key]}
                 <span
                   className={clsx(
-                    'block text-[22px] font-semibold leading-tight tabular-nums',
-                    c.warn && c.value > 0 ? 'text-amber-700' : 'text-gray-950',
+                    'rounded-full px-1.5 text-xs font-medium leading-[18px] tabular-nums',
+                    on
+                      ? 'bg-brand-50 text-brand-700'
+                      : warn
+                        ? 'bg-amber-50 text-amber-700'
+                        : 'bg-gray-100 text-gray-600',
                   )}
                 >
-                  {c.value}
-                </span>
-                <span className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500 sm:text-[13px]">
-                  <i aria-hidden="true" className={clsx('h-2 w-2 shrink-0 rounded-[2px]', c.dot)} />
-                  <span className="truncate">{c.label}</span>
+                  {counts[key]}
                 </span>
               </button>
             )
           })}
         </div>
 
+        {/* Thanh công cụ: tìm · Thư mục · Loại (sắp xếp nằm ở đầu bảng). */}
+        <div className="mt-3.5 flex flex-wrap items-center gap-2">
+          <SearchInput
+            className="w-full sm:w-72"
+            value={filter.search}
+            onChange={(search) => patch({ search })}
+            label={t('Tìm tài liệu', 'Search documents')}
+            placeholder={t('Tìm theo mã, tên tài liệu…', 'Search by code or title…')}
+          />
+          {folders.length > 0 && (
+            <SelectField
+              compact
+              aria-label={t('Thư mục', 'Folder')}
+              className="max-w-[16rem]"
+              value={filter.folderId ?? ''}
+              onChange={(e) => patch({ folderId: e.target.value ? Number(e.target.value) : null })}
+            >
+              <option value="">{t('Thư mục: Tất cả', 'Folder: All')}</option>
+              {folders.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.label}
+                </option>
+              ))}
+            </SelectField>
+          )}
+          {docTypes.length > 1 && (
+            <SelectField
+              compact
+              aria-label={t('Loại tài liệu', 'Document type')}
+              value={filter.docType ?? ''}
+              onChange={(e) => patch({ docType: (e.target.value || null) as DocType | null })}
+            >
+              <option value="">{t('Loại: Tất cả', 'Type: All')}</option>
+              {docTypes.map((d) => (
+                <option key={d} value={d}>
+                  {docTypeLabel(d)}
+                </option>
+              ))}
+            </SelectField>
+          )}
+          {isFiltered(filter) && (
+            <button
+              type="button"
+              onClick={() => setFilter(EMPTY_FILTER)}
+              className="px-1 text-[13px] font-medium text-brand-700 hover:underline"
+            >
+              {t('Bỏ lọc', 'Clear filters')}
+            </button>
+          )}
+        </div>
+
         <div className="mt-6 grid items-start gap-6 min-[1600px]:grid-cols-[minmax(0,1fr)_280px]">
           <section className="min-w-0">
             <div className="flex min-h-9 items-center gap-3">
               <h3 className="text-[15px] font-semibold text-gray-950">{t('Trang', 'Pages')}</h3>
-              {filter && (
-                <button
-                  type="button"
-                  onClick={() => setFilter(null)}
-                  className="text-[13px] font-medium text-brand-700 hover:underline"
-                >
-                  {t('Bỏ lọc', 'Clear filter')}
-                </button>
-              )}
               <span className="flex-1" />
               <div
                 className="inline-flex rounded-[9px] bg-gray-100 p-[3px]"
@@ -234,6 +292,7 @@ export function DocumentsHome({
                     <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs font-medium text-gray-500">
                       <th className="px-4 py-2.5 font-medium">{t('Trang', 'Page')}</th>
                       <th className="px-4 py-2.5 font-medium">{t('Trạng thái', 'Status')}</th>
+                      <th className="px-4 py-2.5 font-medium">{t('Phiên bản', 'Version')}</th>
                       <th className="px-4 py-2.5 font-medium">REQ</th>
                       <th className="px-4 py-2.5 font-medium">{t('Cập nhật', 'Updated')}</th>
                     </tr>
@@ -243,7 +302,7 @@ export function DocumentsHome({
                       {sort === 'status' && (
                         <tr>
                           <th
-                            colSpan={4}
+                            colSpan={5}
                             scope="colgroup"
                             className="bg-white px-4 py-2 text-left text-[13px] font-medium text-gray-500"
                           >
@@ -348,7 +407,9 @@ function PageRow({
       </td>
       <td className="whitespace-nowrap px-4 py-3 max-md:p-0">
         <StatusPill status={v.status} />
-        <span className="ml-1.5 text-[12.5px] text-gray-500">{t(`bản ${v.label}`, `v${v.label}`)}</span>
+      </td>
+      <td className="whitespace-nowrap px-4 py-3 text-[13px] tabular-nums text-gray-700 max-md:p-0">
+        {t(`bản ${v.label}`, `v${v.label}`)}
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-[13px] tabular-nums text-gray-700 max-md:p-0">
         <span className="md:hidden">REQ </span>

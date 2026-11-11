@@ -29,13 +29,17 @@ import { BlockCompareModal, ConflictModal, RequestChangesModal } from './view/Do
 import { CompareBar, DocumentTopBar } from './view/DocumentTopBar'
 import { useVersionCompare } from './view/useVersionCompare'
 import { useReviewActions } from './view/useReviewActions'
+import { summarizeComments } from './view/commentSummary'
 import { DocumentHeading } from './view/DocumentHeading'
 import { anchorOfReq, scrollToAnchor, setHeadingPriority } from './view/editorDom'
 import { useReqLinkCounts } from '../kanban/reqLinkCounts'
+import { AiLayoutProposalDrawer } from '@/components/document/AiLayoutProposalDrawer'
 
 const EDITABLE: VersionStatus[] = ['DRAFT', 'CHANGES_REQUESTED']
 
 const num = (v: string | null) => (v && /^\d+$/.test(v) ? Number(v) : undefined)
+// Bảng bên trên desktop nằm cạnh nội dung; màn hẹp nó là lớp phủ nên không tự mở.
+const isDesktop = () => typeof window !== 'undefined' && !!window.matchMedia?.('(min-width: 1024px)').matches
 
 interface Props {
   documentId: number
@@ -174,6 +178,7 @@ function LoadedDocument({
   )
   const base = baseQ.data?.current ?? null
   const [editor, setEditor] = useState<Editor | null>(null)
+  const [layoutProposalReq, setLayoutProposalReq] = useState<RequirementItemDto | null>(null)
   const versionNav = useVersionCompare({
     editor,
     versionId: current.versionId,
@@ -190,10 +195,11 @@ function LoadedDocument({
     () => documentApi.listRequirements(documentId, current.versionId),
     [documentId, current.versionId],
   )
+  // Lấy cả góp ý đã xử lý (§7.3 includeResolved) để đếm "N đã xử lý · M còn mở"; giao diện chỉ hiện góp ý còn mở.
   const commentsQ = useAsync(
     () =>
       commentAccess.view
-        ? documentApi.listComments(documentId, { versionId: current.versionId })
+        ? documentApi.listComments(documentId, { versionId: current.versionId, includeResolved: true })
         : Promise.resolve([] as DocumentCommentDto[]),
     [documentId, current.versionId, commentAccess.view],
   )
@@ -202,10 +208,17 @@ function LoadedDocument({
   const activityQ = useAsync(() => documentApi.activity(documentId), [documentId])
   const genQ = useAsync(() => documentApi.getGeneration(documentId).catch(() => null), [documentId])
   const requirements = useMemo(() => reqsQ.data ?? [], [reqsQ.data])
-  const comments = useMemo(() => commentsQ.data ?? [], [commentsQ.data])
+  const comments = useMemo(() => (commentsQ.data ?? []).filter((c) => !c.resolvedAt), [commentsQ.data])
+  // null = chưa biết (đang tải / không xem được bình luận) → không chặn phê duyệt, không hiện tóm tắt.
+  const commentSummary = useMemo(
+    () => (commentAccess.view && commentsQ.data ? summarizeComments(commentsQ.data, current.versionId) : null),
+    [commentAccess.view, commentsQ.data, current.versionId],
+  )
   const activity = activityQ.data ?? []
 
-  const [panel, setPanel] = useState<PanelTab | null>(null)
+  // Mở trang ở chế độ soạn (bản nháp sửa được) → bảng "Yêu cầu" mở sẵn như mockup màn 3.
+  const [panel, setPanel] = useState<PanelTab | null>(() => (editable && isDesktop() ? 'reqs' : null))
+  const [toolbarSlot, setToolbarSlot] = useState<HTMLDivElement | null>(null)
   const panelRef = useRef(panel)
   panelRef.current = panel
   const reloadActivity = activityQ.reload
@@ -299,6 +312,8 @@ function LoadedDocument({
     detail,
     isLatest,
     editableStatus,
+    commentSummary,
+    onOpenCommentsConflict: () => void commentsQ.reload(),
     flush: autosave.flush,
     onChanged: (next) => {
       setDetail(next)
@@ -349,9 +364,15 @@ function LoadedDocument({
   }
   const resolveComment = async (c: DocumentCommentDto) => {
     try {
-      await documentApi.resolveComment(c.commentId)
-      // Resolve bình luận gốc = resolve cả luồng trả lời.
-      commentsQ.setData((list) => list?.filter((x) => x.commentId !== c.commentId && x.parentId !== c.commentId))
+      const done = await documentApi.resolveComment(c.commentId)
+      // Resolve bình luận gốc = resolve cả luồng trả lời. Giữ lại trong danh sách (đã xử lý) để đếm tóm tắt.
+      commentsQ.setData((list) =>
+        list?.map((x) =>
+          x.commentId === c.commentId || x.parentId === c.commentId
+            ? { ...x, resolvedAt: done.resolvedAt ?? new Date().toISOString(), resolvedBy: done.resolvedBy }
+            : x,
+        ),
+      )
     } catch (err) {
       notify(docErrorMessage(err), 'error')
     }
@@ -389,7 +410,7 @@ function LoadedDocument({
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1">
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative flex min-w-0 flex-1 flex-col">
         <DocumentTopBar
           node={node}
           parentTitle={parent?.title ?? null}
@@ -428,7 +449,7 @@ function LoadedDocument({
         {/* Nội dung */}
         <div className="min-h-0 flex-1 overflow-y-auto">
           {/* Cột đọc tối đa ~820px, căn giữa vùng còn lại. */}
-          <article className="mx-auto w-full max-w-[868px] px-5 pb-24 pt-8 sm:px-6">
+          <article className="mx-auto w-full max-w-[868px] px-5 pb-32 pt-8 sm:px-6">
             <DocumentHeading
               detail={detail}
               isLatest={isLatest}
@@ -441,6 +462,8 @@ function LoadedDocument({
               onOpenVersion={(id) => openVersion(id)}
               onCompareVersions={versionNav.compareVersions}
               onOpenHistory={() => setPanel('history')}
+              commentSummary={commentSummary}
+              onOpenComments={() => setPanel('comments')}
               onBackToLatest={() => setParams({})}
               canRename={can.edit}
               editable={editable}
@@ -470,6 +493,9 @@ function LoadedDocument({
                   if (c) openComment(c.commentId)
                 }}
                 onBlockCompare={(blockId) => setModal({ blockId })}
+                toolbar={compare ? undefined : fullscreen ? 'full' : 'compact'}
+                toolbarSlot={toolbarSlot}
+                onOpenComments={() => setPanel('comments')}
                 docType={node.docType}
                 onFromNotes={onFromNotes}
                 generateDiagram={
@@ -481,6 +507,11 @@ function LoadedDocument({
             </div>
           </article>
         </div>
+        {/* Khe thanh công cụ nổi ở giữa đáy cột nội dung (DocToolbar portal vào đây). */}
+        <div
+          ref={setToolbarSlot}
+          className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-3 [&>*]:pointer-events-auto"
+        />
       </div>
 
       {panel && (
@@ -491,7 +522,7 @@ function LoadedDocument({
             onClick={() => setPanel(null)}
             className="fixed inset-0 z-30 bg-gray-950/20 lg:hidden"
           />
-          <div className="fixed inset-y-0 right-0 z-40 w-full max-w-sm border-l border-gray-200 shadow-float lg:static lg:z-auto lg:w-[340px] lg:max-w-none lg:shrink-0 lg:shadow-none">
+          <div className="fixed inset-y-0 right-0 z-40 w-full max-w-sm border-l border-gray-200 shadow-float lg:static lg:z-auto lg:w-[clamp(18rem,24vw,26rem)] lg:max-w-none lg:shrink-0 lg:shadow-none">
             <SidePanel
               tab={panel}
               onTab={setPanel}
@@ -504,9 +535,12 @@ function LoadedDocument({
               onPriority={changePriority}
               onConfirmFresh={(r) => void confirmFresh(r)}
               onSelectReq={(r) => scrollToAnchor(editor, r.anchorId)}
+              onOpenAiLayout={setLayoutProposalReq}
               linkCounts={linkCounts}
               comments={comments}
+              commentSummary={commentSummary}
               canComment={canComment}
+
               mentionPeople={mentionPeople}
               pending={pending}
               activeCommentId={activeCommentId}
@@ -550,6 +584,21 @@ function LoadedDocument({
           }
         }}
       />
+
+      <AiLayoutProposalDrawer
+        open={!!layoutProposalReq}
+        onClose={() => setLayoutProposalReq(null)}
+        reqCode={layoutProposalReq?.reqKey}
+        reqTitle={layoutProposalReq?.title}
+        onAttachToReq={() => {
+          notify(
+            t(
+              'Đã lưu & đính kèm Khung giao diện mẫu vào yêu cầu.',
+              'Saved and attached AI layout to requirement.',
+            ),
+          )
+        }}
+      />
       <ConflictModal
         open={modal === 'conflict'}
         current={conflict}
@@ -567,7 +616,8 @@ function LoadedDocument({
         onClose={() => setModal(null)}
       />
 
-      <Toast toast={toast} />
+      {/* Đẩy toast lên trên thanh công cụ nổi ở đáy. */}
+      <Toast toast={toast} raised={editable && !compare} />
 
       {printing && editor && <PrintView detail={detail} html={editor.view.dom.innerHTML} requirements={requirements} />}
     </div>

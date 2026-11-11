@@ -1,23 +1,27 @@
 import { invalidateData } from '@/lib/dataEvents'
-import { documentApi } from './documentApi'
+import { documentApi, documentMockStore } from './documentApi'
 import { MOCK } from './mockFlags'
-import { issueMockStore } from './workMockStores'
+import { withSystemSeedContext } from './mockSupport'
+import { issueMockStore, testMockStore } from './workMockStores'
 
-// "Tạo dữ liệu mẫu" (chỉ khi có module chạy mock): tạo bộ tài liệu demo (nếu Tài liệu còn mock), rồi issue / sprint
-// bám theo REQ của dự án (Kanban còn mock). Danh sách Test Case được giữ trống hoàn toàn để người dùng tự nhập / sinh từ REQ.
+// "Tạo dữ liệu mẫu" (chỉ khi có module chạy mock): tạo bộ tài liệu demo (nếu Tài liệu còn mock), rồi issue / sprint /
+// đợt test (Kanban / Test còn mock). Test cases cần 3 tài liệu đặc tả mẫu (SRS-014, URD-014, SRS-020 — testSpecSeed.ts)
+// nên thêm chúng vào Tài liệu mock nếu chưa có. Phần nào đã có dữ liệu thì bỏ qua phần đó.
 
 export const canSeedDemo = MOCK.documents || MOCK.kanban || MOCK.tests
 
 export async function seedAllDemo(projectId: number): Promise<boolean> {
   if (!canSeedDemo) return false
-  const docs = documentApi.mock ? await documentApi.mock.seedDemo(projectId) : false
-  let work = false
-  if (issueMockStore) {
-    const keys = await issueMockStore.seedDemo(projectId).catch(() => null)
-    work = !!keys
-  }
-  invalidateData()
-  return docs || work
+  return withSystemSeedContext(async () => {
+    let docs = documentApi.mock ? await documentApi.mock.seedDemo(projectId) : false
+    if (documentMockStore && testMockStore)
+      docs = (await documentMockStore.seedTestSpecs(projectId).catch(() => false)) || docs
+    let work = false
+    if (issueMockStore) work = !!(await issueMockStore.seedDemo(projectId).catch(() => null))
+    if (testMockStore) work = (await testMockStore.seedDemo(projectId).catch(() => false)) || work
+    invalidateData()
+    return docs || work
+  })
 }
 
 // Cho script kiểm thử / dev: `window.__ssamDocsMock.seedDemo(projectId)` tạo đủ tài liệu + issue + testcase.

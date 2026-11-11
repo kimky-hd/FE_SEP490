@@ -20,7 +20,17 @@ import {
   VERSION_STATUSES,
 } from '@/types/document'
 import { ISSUE_ACTIVITY_ACTIONS, ISSUE_PRIORITIES, ISSUE_TYPES, SPRINT_STATUSES } from '@/types/issue'
-import { CYCLE_STATUSES, RUN_RESULTS, TEST_PRIORITIES, TEST_TYPES } from '@/types/testing'
+import {
+  BUG_SEVERITIES,
+  COLUMN_KINDS,
+  RETEST_REASONS,
+  TEST_ACTIVITY_TYPES,
+  TEST_PLAN_STATUSES,
+  TEST_PRIORITIES,
+  TEST_RESULTS,
+  TESTCASE_STATUSES,
+  TRACE_STATUSES,
+} from '@/types/testing'
 import { WORK_KINDS } from '@/types/work'
 import { ROLE_KINDS } from '@/types/rbac'
 
@@ -28,9 +38,15 @@ import { ROLE_KINDS } from '@/types/rbac'
 // Phụ lục B rồi so với các API client HTTP của FE (gọi thật từng hàm qua một axios adapter ghi lại method + url).
 // Sửa API client / tài liệu thì sửa cả bên kia, không thì test đỏ.
 
-const docPath = resolve(process.cwd(), 'doc/BE-Changes-2026-10-28_30-API.md')
-const hasDoc = existsSync(docPath)
-const DOC = hasDoc ? readFileSync(docPath, 'utf-8') : ''
+const DOC_PATH = resolve(process.cwd(), 'doc/BE-Changes-2026-10-28_30-API.md')
+const TESTS_DOC_PATH = resolve(process.cwd(), 'doc/Issues-Testcases-API-Contract.md')
+const HAS_CONTRACT_DOCS = existsSync(DOC_PATH) && existsSync(TESTS_DOC_PATH)
+const DOC = HAS_CONTRACT_DOCS ? readFileSync(DOC_PATH, 'utf-8') : ''
+// Test cases v2 (đợt test, môi trường, kết quả theo build) đặc tả ở mục "v2" của Issues-Testcases-API-Contract.md, khối
+// ```json contract-tests-v2```. Các endpoint Test cases v1 (#45–#58) và enum v1 trong tài liệu BE-Changes không còn
+// client FE — tài liệu bàn giao BE sẽ thay bằng v2; tới lúc đó test bỏ qua phần v1 của Test cases.
+const TESTS_DOC = HAS_CONTRACT_DOCS ? readFileSync(TESTS_DOC_PATH, 'utf-8') : ''
+const LEGACY_TEST_ENUMS = ['TestType', 'TestPriority', 'RunResult', 'CycleStatus']
 
 type Client = 'documentApi' | 'issueApi' | 'testApi' | 'workApi' | 'projectApi' | 'roleApi'
 interface ContractEndpoint {
@@ -38,6 +54,10 @@ interface ContractEndpoint {
   method: string
   path: string
   client: Client | null
+  /** Chỉ khối v2 Test cases: tham số query / trường body FE được gửi, kiểu bọc response. */
+  query?: string[]
+  body?: string[]
+  response?: 'items' | 'object' | 'none'
 }
 interface Contract {
   version: string
@@ -46,10 +66,19 @@ interface Contract {
   errorCodes: string[]
 }
 
+const EMPTY_CONTRACT: Contract = { version: '1.1', endpoints: [], enums: {}, errorCodes: [] }
+
 function readContract(): Contract {
-  if (!hasDoc) return { version: '', endpoints: [], enums: {}, errorCodes: [] }
+  if (!HAS_CONTRACT_DOCS) return EMPTY_CONTRACT
   const m = /```json contract\r?\n([\s\S]*?)\r?\n```/.exec(DOC)
   if (!m) throw new Error('Thiếu khối ```json contract ở Phụ lục B của tài liệu API')
+  return JSON.parse(m[1]) as Contract
+}
+
+function readTestsV2(): Contract {
+  if (!HAS_CONTRACT_DOCS) return EMPTY_CONTRACT
+  const m = /```json contract-tests-v2\r?\n([\s\S]*?)\r?\n```/.exec(TESTS_DOC)
+  if (!m) throw new Error('Thiếu khối ```json contract-tests-v2 trong Issues-Testcases-API-Contract.md')
   return JSON.parse(m[1]) as Contract
 }
 
@@ -64,6 +93,7 @@ function readSummaryTable(): { id: string; method: string; path: string }[] {
 }
 
 const contract = readContract()
+const testsV2 = readTestsV2()
 const norm = (method: string, path: string) => `${method.toUpperCase()} ${path.replace(/\{[^}]+\}/g, '{}')}`
 const normUrl = (method: string, url: string) =>
   `${method.toUpperCase()} ${url.split('?')[0].replace(/\/-?\d+(?=\/|$)/g, '/{}')}`
@@ -73,9 +103,20 @@ const docKeys = (pred: (e: ContractEndpoint) => boolean) =>
 // ---------- Ghi lại lời gọi HTTP ----------
 
 let calls: string[] = []
+/** Chi tiết từng lời gọi (key + tên tham số query + tên trường body) để kiểm field ở khối v2. */
+let details: { key: string; params: string[]; body: string[] }[] = []
 const original = api.defaults.adapter
 const recorder: AxiosAdapter = async (config) => {
-  calls.push(normUrl(config.method ?? 'get', config.url ?? ''))
+  const key = normUrl(config.method ?? 'get', config.url ?? '')
+  calls.push(key)
+  const data = typeof config.data === 'string' && config.data ? (JSON.parse(config.data) as unknown) : config.data
+  details.push({
+    key,
+    params: Object.entries((config.params ?? {}) as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .map(([k]) => k),
+    body: data && typeof data === 'object' && !Array.isArray(data) ? Object.keys(data) : [],
+  })
   return { data: { items: [] }, status: 200, statusText: 'OK', headers: {}, config }
 }
 
@@ -102,7 +143,6 @@ type Calls<T> = { [K in keyof T]-?: () => Promise<unknown> }
 const NOTES = { scope: '', actors: '', mainFlows: '', businessRules: '' }
 const DOC_CALLS: Calls<Omit<DocumentApi, 'mock'>> = {
   listTree: () => httpDocumentApi.listTree(1),
-  listProjectRequirements: () => httpDocumentApi.listProjectRequirements(1),
   createNode: () => httpDocumentApi.createNode(1, { kind: 'FOLDER', title: 'x' }),
   updateNode: () => httpDocumentApi.updateNode(2, { title: 'y' }),
   deleteNode: () => httpDocumentApi.deleteNode(2),
@@ -159,24 +199,53 @@ const ISSUE_CALLS: Calls<IssueApi> = {
 }
 
 const TEST_CALLS: Calls<TestApi> = {
-  tree: () => httpTestApi.tree(1),
-  createFolder: () => httpTestApi.createFolder(1, { name: 'x' }),
-  list: () => httpTestApi.list(1, { needsReview: true }),
-  create: () => httpTestApi.create(1, { title: 'x', type: 'FUNCTIONAL', priority: 'HIGH', steps: [] }),
-  bulkCreate: () => httpTestApi.bulkCreate(1, [{ title: 'x', type: 'FUNCTIONAL', priority: 'HIGH', steps: [] }]),
-  bulkApprove: () => httpTestApi.bulkApprove(1, [8]),
-  aiRefreshStale: () => httpTestApi.aiRefreshStale(1, 8),
+  plans: () => httpTestApi.plans(1),
+  createPlan: () => httpTestApi.createPlan(1, { name: 'SIT' }),
+  plan: () => httpTestApi.plan(5),
+  updatePlan: () => httpTestApi.updatePlan(5, { name: 'UAT' }),
+  addEnvironment: () => httpTestApi.addEnvironment(5, { name: 'UAT' }),
+  updateEnvironment: () => httpTestApi.updateEnvironment(6, { url: null }),
+  removeEnvironment: () => httpTestApi.removeEnvironment(6),
+  deployBuild: () => httpTestApi.deployBuild(6, { version: 'v1.0.2' }),
+  regression: () => httpTestApi.regression(6, {}),
+  documentSections: () => httpTestApi.documentSections(2),
+  addModule: () => httpTestApi.addModule(5, { documentId: 2 }),
+  updateModule: () => httpTestApi.updateModule(7, { name: 'x' }),
+  removeModule: () => httpTestApi.removeModule(7),
+  addSection: () => httpTestApi.addSection(7, { title: 'Flow', parentId: 3 }),
+  updateSection: () => httpTestApi.updateSection(3, { title: 'y' }),
+  removeSection: () => httpTestApi.removeSection(3),
+  setAssignments: () => httpTestApi.setAssignments(5, { items: [] }),
+  list: () =>
+    httpTestApi.list(1, { planId: 5, moduleId: 7, documentId: 2, reqUid: 'u', search: 'x', includeDeleted: true }),
+  create: () =>
+    httpTestApi.create(1, {
+      sectionId: 3,
+      title: 'x',
+      steps: [],
+      requirementRefs: [],
+      aiSuggestedReqs: true,
+      priority: 'HIGH',
+      category: 'Flow',
+      customFields: {},
+      afterTestCaseId: null,
+    }),
   get: () => httpTestApi.get(8),
-  update: () => httpTestApi.update(8, { needsReview: false }),
-  markFresh: () => httpTestApi.markFresh(8),
+  update: () => httpTestApi.update(8, { aiSuggestedReqs: false }),
   remove: () => httpTestApi.remove(8),
-  suggest: () => httpTestApi.suggest(1, []),
-  cycles: () => httpTestApi.cycles(1, 'OPEN'),
-  createCycle: () => httpTestApi.createCycle(1, { name: 'x', testCaseIds: [8] }),
-  updateCycle: () => httpTestApi.updateCycle(5, { status: 'CLOSED' }),
-  runs: () => httpTestApi.runs(5),
-  updateRun: () => httpTestApi.updateRun(4, { assigneeId: null }),
-  recordResult: () => httpTestApi.recordResult(4, { result: 'PASS' }),
+  bulkUpdate: () => httpTestApi.bulkUpdate(5, { items: [] }),
+  recordResult: () => httpTestApi.recordResult(8, { envId: 6, result: 'PASS' }),
+  recordResults: () => httpTestApi.recordResults(5, { envId: 6, testCaseIds: [8], result: 'FAIL' }),
+  createBug: () =>
+    httpTestApi.createBug(5, { envId: 6, testCaseIds: [8], title: 'x', priority: 'HIGH', description: null }),
+  linkBug: () => httpTestApi.linkBug(5, 9, { testCaseIds: [8] }),
+  handover: () => httpTestApi.handover(5, { note: null }),
+  reopen: () => httpTestApi.reopen(5),
+  saveLayout: () => httpTestApi.saveLayout(5, { order: [], labels: {}, widths: {}, customColumns: [] }),
+  activity: () => httpTestApi.activity(5, { type: 'RESULT', testCaseId: 8, actorId: 1, moduleId: 7 }),
+  traceability: () => httpTestApi.traceability(5, 6),
+  suggest: () => httpTestApi.suggest(1, { planId: 5, refs: [] }),
+  aiApply: () => httpTestApi.aiApply(5, { items: [] }),
 }
 
 const WORK_CALLS: Calls<WorkApi> = {
@@ -203,11 +272,10 @@ const LEGACY_CALLS: Record<string, () => Promise<unknown>> = {
 const MODULE_CLIENTS: [Client, Record<string, () => Promise<unknown>>][] = [
   ['documentApi', DOC_CALLS],
   ['issueApi', ISSUE_CALLS],
-  ['testApi', TEST_CALLS],
   ['workApi', WORK_CALLS],
 ]
 
-describe.skipIf(!hasDoc)('Hợp đồng API (doc/BE-Changes-2026-10-28_30-API.md)', () => {
+describe.skipIf(!HAS_CONTRACT_DOCS)('Hợp đồng API (doc/BE-Changes-2026-10-28_30-API.md)', () => {
   it('tài liệu có header bản 1.1 và khối JSON cùng phiên bản', () => {
     expect(DOC).toMatch(/Bản 1\.1 – đã khớp FE/)
     expect(contract.version).toBe('1.1')
@@ -260,14 +328,10 @@ describe.skipIf(!hasDoc)('Hợp đồng API (doc/BE-Changes-2026-10-28_30-API.md
       IssuePriority: ISSUE_PRIORITIES,
       SprintStatus: SPRINT_STATUSES,
       IssueActivityAction: ISSUE_ACTIVITY_ACTIONS,
-      TestType: TEST_TYPES,
-      TestPriority: TEST_PRIORITIES,
-      RunResult: RUN_RESULTS,
-      CycleStatus: CYCLE_STATUSES,
     }
-    expect(Object.keys(contract.enums).sort()).toEqual(Object.keys(fe).sort())
-    for (const [name, values] of Object.entries(contract.enums))
-      expect([...fe[name]].sort(), name).toEqual([...values].sort())
+    const v1 = Object.entries(contract.enums).filter(([name]) => !LEGACY_TEST_ENUMS.includes(name))
+    expect(v1.map(([name]) => name).sort()).toEqual(Object.keys(fe).sort())
+    for (const [name, values] of v1) expect([...fe[name]].sort(), name).toEqual([...values].sort())
   })
 
   it('mọi mã lỗi mock FE dùng đều có trong §F / Phụ lục B', () => {
@@ -279,10 +343,65 @@ describe.skipIf(!hasDoc)('Hợp đồng API (doc/BE-Changes-2026-10-28_30-API.md
       for (const m of src.matchAll(/code:\s*'([A-Z_]+)'/g)) used.add(m[1])
     }
     expect(used.size).toBeGreaterThan(10)
-    const missing = [...used].filter((c) => !contract.errorCodes.includes(c))
+    const known = new Set([...contract.errorCodes, ...testsV2.errorCodes])
+    const missing = [...used].filter((c) => !known.has(c))
     expect(missing).toEqual([])
     // Mỗi mã trong Phụ lục B phải có trong tài liệu (bảng §F hoặc phần mã dùng lại).
     for (const code of contract.errorCodes) expect(DOC.split(`\`${code}\``).length, code).toBeGreaterThan(1)
+  })
+})
+
+describe.skipIf(!HAS_CONTRACT_DOCS)('Hợp đồng Test cases v2 (doc/Issues-Testcases-API-Contract.md, mục v2)', () => {
+  it('khối JSON v2 có id T1… liên tục, mọi endpoint thuộc testApi', () => {
+    expect(testsV2.endpoints.map((e) => e.id)).toEqual(testsV2.endpoints.map((_, i) => `T${i + 1}`))
+    expect(testsV2.endpoints.every((e) => e.client === 'testApi')).toBe(true)
+  })
+
+  it('testApi: mọi lời gọi HTTP đều có trong v2, mọi endpoint v2 đều được gọi', async () => {
+    const byFn = await record(TEST_CALLS)
+    const allowed = new Set(testsV2.endpoints.map((e) => norm(e.method, e.path)))
+    for (const [name, list] of byFn) {
+      expect(list.length, `testApi.${name} không gọi HTTP`).toBeGreaterThan(0)
+      for (const c of list) expect(allowed.has(c), `testApi.${name} gọi ${c} — không có trong v2`).toBe(true)
+    }
+    const called = new Set([...byFn.values()].flat())
+    for (const key of allowed) expect(called.has(key), `v2 có ${key} nhưng FE không gọi`).toBe(true)
+  })
+
+  it('testApi: chỉ gửi tham số query / trường body có trong v2 và đọc đúng kiểu bọc response', async () => {
+    const byKey = new Map(testsV2.endpoints.map((e) => [norm(e.method, e.path), e]))
+    for (const [name, fn] of Object.entries(TEST_CALLS)) {
+      details = []
+      const result = await fn()
+      expect(details.length, name).toBe(1)
+      const [d] = details
+      const e = byKey.get(d.key)!
+      for (const k of d.params)
+        expect(e.query ?? [], `testApi.${name}: query "${k}" không có trong ${e.id}`).toContain(k)
+      for (const k of d.body) expect(e.body ?? [], `testApi.${name}: body "${k}" không có trong ${e.id}`).toContain(k)
+      // Adapter ghi trả { items: [] }: endpoint "items" phải được bóc thành mảng, "object" giữ nguyên, "none" bỏ.
+      if (e.response === 'items') expect(Array.isArray(result), `${name}: ${e.id} trả { items }`).toBe(true)
+      else if (e.response === 'object') expect(result, `${name}: ${e.id} trả DTO`).toEqual({ items: [] })
+      else expect(result, `${name}: ${e.id} trả 204`).toBeUndefined()
+    }
+  })
+
+  it('enum FE bằng đúng enum v2; mã lỗi v2 có trong tài liệu', () => {
+    const fe: Record<string, readonly string[]> = {
+      TestResult: TEST_RESULTS,
+      RetestReason: RETEST_REASONS,
+      TestPriority: TEST_PRIORITIES,
+      TestCaseStatus: TESTCASE_STATUSES,
+      TestPlanStatus: TEST_PLAN_STATUSES,
+      ColumnKind: COLUMN_KINDS,
+      TestActivityType: TEST_ACTIVITY_TYPES,
+      TraceStatus: TRACE_STATUSES,
+      BugSeverity: BUG_SEVERITIES,
+    }
+    expect(Object.keys(testsV2.enums).sort()).toEqual(Object.keys(fe).sort())
+    for (const [name, values] of Object.entries(testsV2.enums))
+      expect([...fe[name]].sort(), name).toEqual([...values].sort())
+    for (const code of testsV2.errorCodes) expect(TESTS_DOC.split('`' + code + '`').length, code).toBeGreaterThan(1)
   })
 })
 

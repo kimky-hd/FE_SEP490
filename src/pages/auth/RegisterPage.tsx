@@ -13,6 +13,7 @@ import { GoogleAuthButton } from '@/components/ui/GoogleAuthButton'
 import { LockIcon, MailIcon, UserIcon } from '@/components/ui/icons'
 import { authApi } from '@/api/authApi'
 import { useAuth } from '@/context/AuthContext'
+import { isOnboarded } from '@/lib/onboarding'
 import { ApiError } from '@/lib/apiClient'
 import { isPasswordValid } from '@/lib/passwordStrength'
 import { useI18n } from '@/i18n'
@@ -94,13 +95,12 @@ export function RegisterPage() {
       const session = await authApi.loginWithGoogle(credential.credential)
       applySession(session)
       if (session.isNewAccount) {
-        navigate('/onboarding/account-type')
+        navigate('/onboarding/start')
       } else {
         // Tài khoản cũ đăng nhập lại qua nút Google ở trang Đăng ký: phải nạp companies/workspaces
         // trước khi vào "/" — applySession chỉ set user, không thì Dashboard hiện sai "không gian cá nhân".
         const me = await refreshMe()
-        const hasOnboarded = me.companies.length > 0 || me.workspaces.length > 0
-        navigate(hasOnboarded ? '/' : '/onboarding/account-type')
+        navigate(isOnboarded(me) ? '/' : '/onboarding/start')
       }
     } catch {
       setServerError(t('Đăng ký bằng Google thất bại, vui lòng thử lại.', 'Google sign-up failed. Please try again.'))
@@ -109,8 +109,12 @@ export function RegisterPage() {
 
   return (
     <AuthCard
-      title={t('Tạo tài khoản SSAM', 'Create your SSAM account')}
-      description={t('Dùng email công việc để tìm thấy đội của bạn.', 'Use your work email so we can find your team.')}
+      align="start"
+      title={t('Tạo tài khoản', 'Create your account')}
+      description={t(
+        'Dùng email công ty, SSAM sẽ tự tìm công ty của bạn.',
+        'Use your company email and SSAM will find your company for you.',
+      )}
       footer={
         <>
           {t('Đã có tài khoản?', 'Already have an account?')}{' '}
@@ -120,25 +124,14 @@ export function RegisterPage() {
         </>
       }
     >
-      <GoogleAuthButton
-        onSuccess={handleGoogleSuccess}
-        onError={() => setServerError(t('Đăng ký bằng Google thất bại.', 'Google sign-up failed.'))}
-        text="signup_with"
-      />
-
-      <div className="my-5 flex items-center gap-3 text-xs text-gray-500">
-        <div className="h-px flex-1 bg-gray-200" />
-        {t('hoặc', 'or')}
-        <div className="h-px flex-1 bg-gray-200" />
-      </div>
-
       {serverError && (
         <div className="mb-4">
           <Alert tone="error">{serverError}</Alert>
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
+      {/* Theo mockup B: form email trước, Google xếp sau dải "hoặc". */}
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
         <TextField
           label={t('Họ và tên', 'Full name')}
           icon={<UserIcon className="h-4 w-4" />}
@@ -189,6 +182,18 @@ export function RegisterPage() {
           {t('Tạo tài khoản', 'Create account')}
         </Button>
       </form>
+
+      <div className="my-4 flex items-center gap-3 text-xs text-gray-500">
+        <div className="h-px flex-1 bg-gray-200" />
+        {t('hoặc', 'or')}
+        <div className="h-px flex-1 bg-gray-200" />
+      </div>
+
+      <GoogleAuthButton
+        onSuccess={handleGoogleSuccess}
+        onError={() => setServerError(t('Đăng ký bằng Google thất bại.', 'Google sign-up failed.'))}
+        text="signup_with"
+      />
     </AuthCard>
   )
 }

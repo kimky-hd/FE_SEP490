@@ -56,12 +56,20 @@ export interface WorkIssueRef {
   testTotal: number
 }
 
+/**
+ * Testcase cần làm (Test cases v2: đợt test × môi trường). Giữ tên trường của bản v1 (#24) để không đổi shape:
+ * `runId` = testCaseId, `cycleId` = planId, `cycleName` = "đợt test · môi trường". Trường mới tuỳ chọn ở dưới.
+ */
 export interface WorkTestRunRef {
   runId: number
   cycleId: number
   cycleName: string
   testCaseKey: string
   title: string
+  planId?: number
+  envId?: number
+  moduleId?: number
+  testCaseId?: number
 }
 
 export interface WorkItemDto {

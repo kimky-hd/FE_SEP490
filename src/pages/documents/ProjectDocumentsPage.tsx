@@ -221,7 +221,7 @@ export function ProjectDocumentsPage() {
     <aside
       aria-label={t('Cây tài liệu', 'Document tree')}
       className={clsx(
-        'flex w-[264px] shrink-0 flex-col border-r border-gray-200 bg-gray-50',
+        'flex w-[clamp(13rem,18vw,20rem)] shrink-0 flex-col border-r border-gray-200 bg-gray-50',
         'max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-40 max-lg:w-[min(18rem,85vw)] max-lg:shadow-float',
         !treeOpen && 'hidden',
       )}

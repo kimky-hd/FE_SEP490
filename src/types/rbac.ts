@@ -150,6 +150,8 @@ export const PERMISSIONS = {
   testCaseView: 'testcase.view',
   testCaseManage: 'testcase.manage',
   testCaseExecute: 'testcase.execute',
+  // Mới (doc/Issues-Testcases-API-Contract.md v2): thiết lập đợt test, phân công, regression, bàn giao.
+  testCasePlan: 'testcase.plan',
   commentView: 'comment.view',
   commentWrite: 'comment.write',
   activityView: 'activity.view',

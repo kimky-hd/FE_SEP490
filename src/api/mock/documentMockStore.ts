@@ -45,7 +45,21 @@ import {
   type ExtractedReq,
 } from './documentContent'
 import { buildGeneratedContent, extractRequirementsFromFields, normalizeNotes } from './documentGenerator'
-import { authSrsContent, PAY_REQ, paySrsV09, paySrsV10, paySrsV11, urdContent } from './documentSeed'
+import {
+  authSrsContent,
+  PAY_REQ,
+  paySrsV09,
+  paySrsV10,
+  paySrsV11,
+  securitiesAuthSrsContent,
+  securitiesBrdContent,
+  securitiesPaySrsV09,
+  securitiesPaySrsV10,
+  securitiesPaySrsV11,
+  securitiesUrdContent,
+  urdContent,
+} from './documentSeed'
+import { SECURITIES_TEST_SPEC_DOCS, TEST_SPEC_DOCS } from './testSpecSeed'
 
 export const MOCK_STORAGE_KEY = 'ssam.mock.documents.v1'
 
@@ -141,6 +155,8 @@ export interface ReqLite {
   freshness: Freshness
   priority: Priority
   acceptanceCriteria: { text: string; checked: boolean }[]
+  /** Anchor (id heading) của REQ — để mở /documents/:id#anchor. */
+  anchorId?: string
 }
 
 export interface DocReqIndex {
@@ -205,6 +221,12 @@ const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T
 const SEED_USERS = {
   ba: { userId: 900001, fullName: 'Nguyễn Minh Anh' },
   lead: { userId: 900002, fullName: 'Trần Quốc Huy' },
+}
+
+const SECURITIES_SEED_USERS = {
+  ba: { userId: 6, fullName: 'Phạm Công Minh' },
+  lead: { userId: 4, fullName: 'Phạm Minh Lương' },
+  pm: { userId: 3, fullName: 'Vũ Kim Kỳ' },
 }
 
 export class DocumentMockStore {
@@ -558,11 +580,50 @@ export class DocumentMockStore {
     return true
   }
 
+  /**
+   * Tài liệu đặc tả mẫu cho module Test cases (SRS-014, URD-014, SRS-020 — testSpecSeed.ts). Thêm vào dự án nếu chưa có
+   * (theo mã tài liệu), đặt trong thư mục SRS mẫu nếu có. Gọi từ "Tạo dữ liệu mẫu" khi Test cases còn mock.
+   */
+  async seedTestSpecs(projectId: number): Promise<boolean> {
+    await this.delay()
+    await this.access(projectId, PERMISSIONS.documentEdit, true)
+    const db = this.load()
+    const live = db.nodes.filter((n) => n.projectId === projectId && !n.isDeleted)
+    const isSec = projectId >= 20
+    const specs = isSec ? SECURITIES_TEST_SPEC_DOCS : TEST_SPEC_DOCS
+    const missing = specs.filter((d) => !live.some((n) => n.code === d.code))
+    if (!missing.length) return false
+    const folder = live.find((n) => n.kind === 'FOLDER' && n.title.includes('SRS')) ?? null
+    const { ba, lead } = isSec ? SECURITIES_SEED_USERS : SEED_USERS
+    const day = 86_400_000
+    for (const d of missing) {
+      const at = this.iso(-10 * day)
+      const page = this.newPage(projectId, folder?.documentId ?? null, d.title, d.docType, ba, d.content(), {
+        at,
+        code: d.code,
+      })
+      this.log(page.n.documentId, page.v.versionId, 'CREATED', ba)
+      if (d.approved) {
+        this.approveSeed(page.n, page.v, lead, this.iso(-9 * day))
+        for (const r of this.reqsOf(page.v.versionId)) r.freshness = 'FRESH'
+        this.log(page.n.documentId, page.v.versionId, 'APPROVED', lead)
+      } else {
+        page.v.status = 'IN_REVIEW'
+        page.v.submittedBy = ba
+        page.v.submittedAt = this.iso(-2 * day)
+      }
+    }
+    this.persist()
+    return true
+  }
+
   private writeDemo(projectId: number, writer: UserRef = SEED_USERS.ba) {
     const db = this.load()
     if (!db.seededProjects.includes(projectId)) db.seededProjects.push(projectId)
+    const isSec = projectId >= 20
     const day = 86_400_000
     const at = (daysAgo: number, hours = 0) => this.iso(-daysAgo * day - hours * 3_600_000)
+    const { ba, lead } = isSec ? SECURITIES_SEED_USERS : SEED_USERS
     const folder = (title: string, sortOrder: number): NodeRec => {
       const f: NodeRec = {
         documentId: this.nextId(),
@@ -575,7 +636,7 @@ export class DocumentMockStore {
         sortOrder,
         currentVersionId: null,
         baselineVersionId: null,
-        createdById: SEED_USERS.ba.userId,
+        createdById: ba.userId,
         createdAt: at(12),
         updatedAt: at(12),
         isDeleted: false,
@@ -585,20 +646,59 @@ export class DocumentMockStore {
     }
     const brd = folder('01. Tài liệu nghiệp vụ (BRD/URD)', 0)
     const srs = folder('02. Đặc tả yêu cầu (SRS)', 1)
-    const { ba, lead } = SEED_USERS
+
+    if (isSec) {
+      // BRD-01 đã duyệt 1.0 cho các dự án Chứng khoán
+      const brdDoc = this.newPage(
+        projectId,
+        brd.documentId,
+        'Đề án Nâng cấp Nền tảng Giao dịch KRX & Quản trị Rủi ro Margin',
+        'BRD',
+        SECURITIES_SEED_USERS.pm,
+        securitiesBrdContent(),
+        {
+          at: at(15),
+          subtitle: 'Mục tiêu kinh doanh, chỉ tiêu độ trễ FIX 4.4 (< 3ms) và phạm vi kết nối KRX / VSD T+2.',
+        },
+      )
+      this.approveSeed(brdDoc.n, brdDoc.v, lead, at(14))
+      this.log(brdDoc.n.documentId, brdDoc.v.versionId, 'CREATED', SECURITIES_SEED_USERS.pm)
+      this.log(brdDoc.n.documentId, brdDoc.v.versionId, 'APPROVED', lead, 'Phê duyệt Đề án BRD-01 Giai đoạn 1')
+      this.backdateActivities(brdDoc.n.documentId, [at(15), at(14)])
+    }
 
     // URD-01 nháp
-    const urd = this.newPage(projectId, brd.documentId, 'Hành trình mở tài khoản eKYC', 'URD', writer, urdContent(), {
-      at: at(2, 3),
-      subtitle: 'Hành trình khách hàng từ tải app tới khi có tài khoản.',
-    })
+    const urd = this.newPage(
+      projectId,
+      brd.documentId,
+      isSec ? 'Hành trình Mở tài khoản eKYC NFC & Đặt lệnh KRX' : 'Hành trình mở tài khoản eKYC',
+      'URD',
+      writer,
+      isSec ? securitiesUrdContent() : urdContent(),
+      {
+        at: at(2, 3),
+        subtitle: isSec
+          ? 'Hành trình nhà đầu tư từ định danh NFC CCCD, ký số hợp đồng Margin tới đặt lệnh cổ phiếu KRX.'
+          : 'Hành trình khách hàng từ tải app tới khi có tài khoản.',
+      },
+    )
     this.log(urd.n.documentId, urd.v.versionId, 'CREATED', writer)
 
     // SRS-01 đã duyệt 1.0
-    const auth = this.newPage(projectId, srs.documentId, 'Xác thực & phân quyền', 'SRS', ba, authSrsContent(), {
-      at: at(9),
-      subtitle: 'Đăng nhập, làm mới phiên và khoá tài khoản tạm thời.',
-    })
+    const auth = this.newPage(
+      projectId,
+      srs.documentId,
+      isSec ? 'Xác thực SmartOTP, Đặt lệnh KRX & Kiểm tra Sức mua' : 'Xác thực & phân quyền',
+      'SRS',
+      ba,
+      isSec ? securitiesAuthSrsContent() : authSrsContent(),
+      {
+        at: at(9),
+        subtitle: isSec
+          ? 'Xác thực phiên JWT, ký lệnh cổ phiếu bằng SmartOTP 6 số (TOTP) và khoá đặt lệnh khi sai PIN.'
+          : 'Đăng nhập, làm mới phiên và khoá tài khoản tạm thời.',
+      },
+    )
     this.approveSeed(auth.n, auth.v, lead, at(7))
     for (const r of this.reqsOf(auth.v.versionId)) r.freshness = 'FRESH'
     this.log(auth.n.documentId, auth.v.versionId, 'CREATED', ba)
@@ -606,12 +706,22 @@ export class DocumentMockStore {
     this.backdateActivities(auth.n.documentId, [at(9), at(7)])
 
     // SRS-02: 1.0 (đã thay thế) → 1.1 (baseline, từng bị yêu cầu sửa 1 lần) → 1.2 đang chờ duyệt
-    const pay = this.newPage(projectId, srs.documentId, 'Thanh toán & VietQR động', 'SRS', ba, paySrsV09(), {
-      at: at(14),
-      subtitle: 'Sinh mã VietQR theo đơn hàng, xử lý webhook ngân hàng và đối soát.',
-    })
+    const pay = this.newPage(
+      projectId,
+      srs.documentId,
+      isSec ? 'Nộp tiền Chứng khoán Định danh 9688 (VietQR) & Sức mua T+0' : 'Thanh toán & VietQR động',
+      'SRS',
+      ba,
+      isSec ? securitiesPaySrsV09() : paySrsV09(),
+      {
+        at: at(14),
+        subtitle: isSec
+          ? 'Sinh mã VietQR định danh tiểu khoản 9688, xử lý webhook ngân hàng lưu ký cộng sức mua T+0 và giải tỏa Call Margin.'
+          : 'Sinh mã VietQR theo đơn hàng, xử lý webhook ngân hàng và đối soát.',
+      },
+    )
     this.approveSeed(pay.n, pay.v, lead, at(13))
-    const v11 = this.addVersion(pay.n, ba, paySrsV10(), {
+    const v11 = this.addVersion(pay.n, ba, isSec ? securitiesPaySrsV10() : paySrsV10(), {
       label: '1.1',
       status: 'IN_REVIEW',
       subtitle: pay.v.subtitle,
@@ -622,7 +732,7 @@ export class DocumentMockStore {
     this.approveSeed(pay.n, v11, lead, at(5))
     v11.submittedAt = at(6)
     for (const r of this.reqsOf(v11.versionId)) r.freshness = r.reqUid === PAY_REQ.qr ? 'FRESH' : 'STALE'
-    const v12 = this.addVersion(pay.n, ba, paySrsV11(), {
+    const v12 = this.addVersion(pay.n, ba, isSec ? securitiesPaySrsV11() : paySrsV11(), {
       label: '1.2',
       status: 'IN_REVIEW',
       subtitle: v11.subtitle,
@@ -643,7 +753,9 @@ export class DocumentMockStore {
       v11.versionId,
       'CHANGES_REQUESTED',
       lead,
-      'Bổ sung cách chống xử lý trùng khi ngân hàng gửi lại webhook.',
+      isSec
+        ? 'Bổ sung cơ chế kiểm tra Idempotency Key (bankTransId) chống cộng trùng Sức mua T+0 khi ngân hàng retry webhook.'
+        : 'Bổ sung cách chống xử lý trùng khi ngân hàng gửi lại webhook.',
     )
     this.log(pid, v11.versionId, 'SUBMITTED', ba, this.changeSummary(v11, pay.v.versionId))
     this.log(pid, v11.versionId, 'APPROVED', lead, this.changeSummary(v11, pay.v.versionId))
@@ -656,7 +768,9 @@ export class DocumentMockStore {
       versionId: v12.versionId,
       anchorId: 'b-p3',
       quote: 'đồng hồ đếm ngược',
-      body: 'Đồng hồ đếm ngược dùng giờ máy chủ hay giờ thiết bị?',
+      body: isSec
+        ? 'Đồng hồ đếm ngược 10 phút đồng bộ theo NTP Server của Sở GDCK (KRX) hay lấy giờ thiết bị của nhà đầu tư?'
+        : 'Đồng hồ đếm ngược dùng giờ máy chủ hay giờ thiết bị?',
       parentId: null,
       mentions: [],
       author: lead,
@@ -1202,6 +1316,7 @@ export class DocumentMockStore {
       freshness: r.freshness,
       priority: r.priority,
       acceptanceCriteria: clone(r.acceptanceCriteria),
+      anchorId: r.anchorId,
     })
     return db.nodes
       .filter((n) => n.projectId === projectId && n.kind === 'PAGE' && !n.isDeleted)

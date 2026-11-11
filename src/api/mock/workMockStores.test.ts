@@ -6,6 +6,8 @@ import { DocumentMockStore } from './documentMockStore'
 import { h, p, tasks } from './documentSeed'
 import { IssueMockStore } from './issueMockStore'
 import { TestMockStore } from './testMockStore'
+import { extractDocSections } from '@/lib/testplan/sections'
+import { retestIn, statsIn, statusIn } from '@/lib/testplan/status'
 
 const DOC_PERMS = ['document.view', 'document.edit', 'document.approve', 'document.revise', 'document.delete']
 const WORK_PERMS = [
@@ -90,6 +92,7 @@ const reqDoc = (
 ): TipTapDoc => ({
   type: 'doc',
   content: [
+    h('s1', 1, '2. Yêu cầu thanh toán'),
     h('r1', 2, 'Webhook ngân hàng', { uid: 'req-a' }),
     p('p1', body),
     tasks('t1', criteria),
@@ -98,7 +101,7 @@ const reqDoc = (
   ],
 })
 
-async function setup(opts: { roleId?: number; permissions?: string[] } = {}) {
+async function setup(opts: { roleId?: number; permissions?: string[]; aiEnabled?: boolean } = {}) {
   let clock = new Date('2026-10-30T08:00:00Z').getTime()
   let i = 0
   const access = { roleId: opts.roleId ?? DEV, permissions: opts.permissions ?? WORK_PERMS }
@@ -112,10 +115,11 @@ async function setup(opts: { roleId?: number; permissions?: string[] } = {}) {
   })
   const env = {
     actor: async () => me,
-    projectAccess: async () => ({ ...access, aiEnabled: true, archived: false, projectKey: 'CORE' }),
+    projectAccess: async () => ({ ...access, aiEnabled: opts.aiEnabled ?? true, archived: false, projectKey: 'CORE' }),
     workflow: async () => WORKFLOW,
     members: async () => [me, { userId: 8, fullName: 'Trần Hà' }],
     reqs: (projectId: number) => docs.reqIndex(projectId),
+    sections: async (documentId: number) => extractDocSections((await docs.getDocument(documentId)).current.content),
     now: () => new Date(clock),
     latency: () => 0,
   }
@@ -262,28 +266,23 @@ describe('IssueMockStore — sprint', () => {
 })
 
 describe('Liên kết REQ — REQ đổi sau khi duyệt bản mới (§3)', () => {
-  it('issue.reqChanged, testcase.needsReview, run.needsRerun; ack / lưu lại xoá cờ', async () => {
-    const { issues, tests, ref, approveRevision } = await setup()
+  it('issue.reqChanged; testcase → Retest REQ_CHANGED ở môi trường đã có kết quả; ack / ghi kết quả xoá cờ', async () => {
+    const { issues, tests, ref, approveRevision, node } = await setup()
     const issue = await issues.createIssue(1, { type: 'TASK', title: 'Webhook', requirementRefs: [ref('req-a')] })
     const other = await issues.createIssue(1, { type: 'TASK', title: 'Hoàn tiền', requirementRefs: [ref('req-b')] })
-    const tc = await tests.createTestCase(1, {
+    const { plan, group } = await planWithModule(tests, node.documentId)
+    const [sit, uat] = plan.environments
+    const tc = await tests.create(1, {
+      sectionId: group.sectionId,
       title: 'Không ghi có trùng',
-      type: 'INTEGRATION',
-      priority: 'HIGH',
-      steps: [{ action: 'Gửi lại', expected: 'Một lần' }],
-      requirementRefs: [ref('req-a')],
-      issueIds: [issue.issueId],
-    })
-    const notRun = await tests.createTestCase(1, {
-      title: 'Chưa chạy',
-      type: 'FUNCTIONAL',
-      priority: 'LOW',
-      steps: [{ action: 'X', expected: 'Y' }],
       requirementRefs: [ref('req-a')],
     })
-    const cycle = await tests.createCycle(1, { name: 'Đợt 1', testCaseIds: [tc.testCaseId, notRun.testCaseId] })
-    const [run, run2] = (await tests.listRuns(cycle.cycleId)).items
-    await tests.recordResult(run.runId, { result: 'PASS' })
+    const untested = await tests.create(1, {
+      sectionId: group.sectionId,
+      title: 'Chưa test',
+      requirementRefs: [ref('req-a')],
+    })
+    await tests.recordResult(tc.testCaseId, { envId: sit.envId, result: 'PASS' })
 
     // Chưa duyệt gì mới: không cờ nào.
     expect((await issues.getIssue(issue.issueId)).reqChanged).toBe(false)
@@ -296,19 +295,23 @@ describe('Liên kết REQ — REQ đổi sau khi duyệt bản mới (§3)', () 
     expect((await issues.getIssue(other.issueId)).reqChanged).toBe(false)
     expect((await issues.listIssues(1, { reqChanged: true })).items.map((x) => x.key)).toEqual([changed.key])
     expect((await issues.listActivity(issue.issueId)).items[0].action).toBe('REQ_CHANGED')
-    expect((await tests.getTestCase(tc.testCaseId)).needsReview).toBe(true)
-    const runs = await tests.listRuns(cycle.cycleId)
-    expect(runs.items.find((r) => r.runId === run.runId)).toMatchObject({ needsRerun: true, result: 'PASS' })
-    expect(runs.items.find((r) => r.runId === run2.runId)?.needsRerun).toBe(false) // NOT_RUN không cần chạy lại
 
-    // Đọc lại không đánh dấu lần nữa (idempotent); ack xoá cờ.
+    const after = await tests.get(tc.testCaseId)
+    expect(statusIn(after, sit.envId)).toBe('RETEST')
+    expect(retestIn(after, sit.envId)).toMatchObject({ reason: 'REQ_CHANGED', reqKey: 'REQ-01' })
+    expect(statusIn(after, uat.envId)).toBe('UNTEST') // chưa test ở UAT → không cần test lại
+    expect(statusIn(await tests.get(untested.testCaseId), sit.envId)).toBe('UNTEST')
+    expect(after.requirements[0].changedNote).toBe('Đổi trong bản 1.1')
+    const log = await tests.activity(plan.planId, { testCaseId: tc.testCaseId, type: 'REQ' })
+    expect(log[0].text).toContain('REQ-01 đổi')
+
+    // Đọc lại không đánh dấu lần nữa; ack issue / ghi kết quả mới xoá cờ.
     const acked = await issues.ack(issue.issueId)
     expect(acked.reqChanged).toBe(false)
-    expect(acked.requirements[0].changedNote).toBeNull()
     expect((await issues.getIssue(issue.issueId)).reqChanged).toBe(false)
-    expect((await tests.updateTestCase(tc.testCaseId, { needsReview: false })).needsReview).toBe(false)
-    await tests.recordResult(run.runId, { result: 'FAIL' })
-    expect((await tests.listRuns(cycle.cycleId, { needsRerun: true })).items).toHaveLength(0)
+    const res = await tests.recordResult(tc.testCaseId, { envId: sit.envId, result: 'PASS' })
+    expect(statusIn(res.items[0], sit.envId)).toBe('PASS')
+    expect(res.items[0].retest).toHaveLength(0)
   })
 
   it('REQ bị xoá khỏi bản mới: liên kết giữ nguyên, reqKey = null', async () => {
@@ -331,110 +334,351 @@ describe('Liên kết REQ — REQ đổi sau khi duyệt bản mới (§3)', () 
   })
 })
 
-describe('TestMockStore — cây, kết quả, bug, gợi ý', () => {
-  it('cây: tài liệu → mọi REQ (kể cả 0 test), thư mục, chưa gắn REQ', async () => {
-    const { tests, ref } = await setup()
-    const folder = await tests.createFolder(1, { name: 'Hồi quy' })
-    await tests.createTestCase(1, {
+/** Đợt test 2 môi trường (SIT, UAT), module từ tài liệu, một nhóm "Chức năng" trong mục đầu. */
+async function planWithModule(tests: TestMockStore, documentId: number) {
+  const created = await tests.createPlan(1, { name: 'SIT – R1', environments: ['SIT', 'UAT'] })
+  const m = await tests.addModule(created.planId, { documentId })
+  const top = m.sections[0]
+  const group = await tests.addSection(m.moduleId, { parentId: top.sectionId, title: 'Chức năng' })
+  const plan = await tests.plan(created.planId)
+  return { plan, module: m, top, group }
+}
+
+describe('TestMockStore v2 — đợt test, môi trường, module, phân công', () => {
+  it('tạo đợt + môi trường; module từ tài liệu (mục theo heading); mã TC_n theo module; phân công ghi lịch sử', async () => {
+    const { tests, node, me } = await setup()
+    const { plan, module, top, group } = await planWithModule(tests, node.documentId)
+    expect(plan.environments.map((e) => e.name)).toEqual(['SIT', 'UAT'])
+    expect(module).toMatchObject({ name: 'Thanh toán', documentCode: 'SRS-01' })
+    expect(top).toMatchObject({ code: '1.', title: 'Yêu cầu thanh toán', anchorId: 's1', parentId: null })
+    expect(group).toMatchObject({ code: '1.1', title: 'Chức năng', parentId: top.sectionId })
+    await expectCode(tests.addModule(plan.planId, { documentId: node.documentId }), 409, 'MODULE_EXISTS')
+
+    const a = await tests.create(1, {
+      sectionId: group.sectionId,
       title: 'A',
-      type: 'FUNCTIONAL',
-      priority: 'HIGH',
-      steps: [{ action: 'a', expected: 'b' }],
-      requirementRefs: [ref('req-a')],
+      steps: [{ action: 'Mở', expected: 'Hiện' }],
     })
-    await tests.createTestCase(1, {
-      title: 'B',
-      type: 'E2E',
-      priority: 'LOW',
-      steps: [{ action: 'a', expected: 'b' }],
-      folderId: folder.folderId,
+    const b = await tests.create(1, { sectionId: group.sectionId, title: 'B' })
+    expect([a.code, b.code]).toEqual(['TC_1', 'TC_2'])
+    expect(a.category).toBe('Chức năng')
+
+    const list = await tests.setAssignments(plan.planId, {
+      items: [{ moduleId: module.moduleId, envId: plan.environments[0].envId, assigneeId: me.userId }],
     })
-    const tree = (await tests.tree(1)).items
-    expect(tree.map((n) => [n.kind, n.label, n.testCount])).toEqual([
-      ['DOCUMENT', 'SRS-01 · Thanh toán', 1],
-      ['REQUIREMENT', 'REQ-01 · Webhook ngân hàng', 1],
-      ['REQUIREMENT', 'REQ-02 · Hoàn tiền', 0],
-      ['FOLDER', 'Hồi quy', 1],
-      ['UNLINKED', 'Chưa gắn REQ', 1],
-    ])
-    expect(tree[1].parentId).toBe(tree[0].id)
+    expect(list).toEqual([{ moduleId: module.moduleId, envId: plan.environments[0].envId, assignee: me }])
+    const log = await tests.activity(plan.planId, { type: 'ASSIGN' })
+    expect(log[0].text).toContain('giao cho Minh Anh')
     await expectCode(
-      tests.createTestCase(1, { title: 'C', type: 'FUNCTIONAL', priority: 'HIGH', steps: [] }),
-      400,
-      'VALIDATION_ERROR',
+      tests
+        .removeEnvironment(plan.environments[0].envId)
+        .then(() => tests.removeEnvironment(plan.environments[1].envId)),
+      409,
+      'LAST_ENVIRONMENT',
     )
   })
 
-  it('ghi kết quả: lịch sử, LastResult, bug từ lượt FAIL gắn REQ + testcase; đợt đóng → CYCLE_CLOSED', async () => {
-    const { issues, tests, ref, me } = await setup()
-    const tc = await tests.createTestCase(1, {
+  it('quyền: thiếu testcase.plan (và project.workflow.manage) → 403; chỉ xem → không sửa được', async () => {
+    const { tests, node, access } = await setup()
+    const { plan, group } = await planWithModule(tests, node.documentId)
+    access.permissions = WORK_PERMS.filter((k) => k !== 'project.workflow.manage')
+    await expectCode(tests.addEnvironment(plan.planId, { name: 'Staging' }), 403, 'FORBIDDEN')
+    access.permissions = ['testcase.view']
+    await expectCode(tests.create(1, { sectionId: group.sectionId, title: 'X' }), 403, 'FORBIDDEN')
+    await expectCode(
+      tests.recordResults(plan.planId, { envId: plan.environments[0].envId, testCaseIds: [1], result: 'PASS' }),
+      403,
+      'FORBIDDEN',
+    )
+    expect((await tests.plans(1)).length).toBe(1)
+  })
+})
+
+describe('TestMockStore v2 — kết quả theo môi trường, bug trên Kanban, retest', () => {
+  it('ghi thay; Fail → cần bug; tạo bug gắn REQ; deploy build có fix → Retest; Fail lại bug Done → mở lại', async () => {
+    const { tests, issues, node, ref } = await setup()
+    const { plan, module, group } = await planWithModule(tests, node.documentId)
+    const [sit, uat] = plan.environments
+    await tests.setAssignments(plan.planId, { items: [{ moduleId: module.moduleId, envId: sit.envId, assigneeId: 8 }] })
+    await tests.deployBuild(sit.envId, { version: 'v1.0.1' })
+    const tc = await tests.create(1, {
+      sectionId: group.sectionId,
       title: 'Không ghi có trùng',
-      type: 'INTEGRATION',
-      priority: 'HIGH',
-      steps: [{ action: 'Gửi lại', expected: 'Một lần' }],
+      steps: [{ action: 'Gửi lại webhook', expected: 'Ghi có 1 lần' }],
+      actual: 'Ghi có 2 lần',
       requirementRefs: [ref('req-a')],
     })
-    const cycle = await tests.createCycle(1, {
-      name: 'Đợt 1',
+
+    const r1 = await tests.recordResult(tc.testCaseId, { envId: sit.envId, result: 'FAIL' })
+    expect(r1.needBug).toEqual([tc.testCaseId])
+    expect(r1.items[0].results[0]).toMatchObject({ result: 'FAIL', build: 'v1.0.1', behalfOf: { userId: 8 } })
+    expect(statusIn(r1.items[0], uat.envId)).toBe('UNTEST') // kết quả riêng từng môi trường
+
+    const bug = await tests.createBug(plan.planId, {
+      envId: sit.envId,
       testCaseIds: [tc.testCaseId],
-      defaultAssigneeId: me.userId,
+      title: 'Ghi có trùng',
+      priority: 'HIGH',
     })
-    const [run] = (await tests.listRuns(cycle.cycleId, { assigneeId: 'me' })).items
-    expect(run).toMatchObject({ result: 'NOT_RUN', assignee: me })
-    const failed = await tests.recordResult(run.runId, {
-      result: 'FAIL',
-      note: 'Ghi có 2 lần',
-      createDefect: { title: 'Ghi có trùng', assigneeId: 8 },
+    expect(bug.items[0].bug).toMatchObject({ key: bug.issue.key, statusCategory: 'TODO' })
+    const issue = await issues.getIssue(bug.issue.issueId)
+    expect(issue).toMatchObject({ type: 'BUG', priority: 'HIGH' })
+    expect(issue.requirements.map((r) => r.reqUid)).toEqual(['req-a'])
+    expect(String(issue.description)).toContain('Ghi có 2 lần')
+    expect(issue.testCases[0]).toMatchObject({ testCaseId: tc.testCaseId, lastResult: 'FAIL' })
+
+    // Dev fix, deploy build mới có fix lên SIT → case Fail ở SIT chuyển Retest; UAT không đổi.
+    const deploy = await tests.deployBuild(sit.envId, { version: 'v1.0.2', fixedIssueIds: [bug.issue.issueId] })
+    expect(deploy.retestCount).toBe(1)
+    const flagged = await tests.get(tc.testCaseId)
+    expect(retestIn(flagged, sit.envId)).toMatchObject({
+      reason: 'BUG_FIXED',
+      build: 'v1.0.2',
+      bug: { key: bug.issue.key },
     })
-    expect(failed.defects).toHaveLength(1)
-    const bug = await issues.getIssue(failed.defects[0].issueId)
-    expect(bug).toMatchObject({ type: 'BUG', title: 'Ghi có trùng', assignee: { userId: 8 } })
-    expect(bug.requirements.map((r) => r.reqUid)).toEqual(['req-a'])
-    expect(bug.testCases).toEqual([{ testCaseId: tc.testCaseId, key: tc.key, title: tc.title, lastResult: 'FAIL' }])
-    expect(bug.tests).toMatchObject({ total: 1, fail: 1 })
-    await tests.recordResult(run.runId, { result: 'PASS' })
-    const detail = await tests.getTestCase(tc.testCaseId)
-    expect(detail.lastResult).toBe('PASS')
-    expect(detail.history.map((x) => x.result)).toEqual(['PASS', 'FAIL'])
-    expect(detail.history[1].defects.map((x) => x.key)).toEqual([bug.key])
-    expect((await tests.listCycles(1)).items[0].counts).toEqual({ pass: 1, fail: 0, blocked: 0, notRun: 0 })
-    await tests.updateCycle(cycle.cycleId, { status: 'CLOSED' })
-    await expectCode(tests.recordResult(run.runId, { result: 'PASS' }), 409, 'CYCLE_CLOSED')
+    expect(statusIn(flagged, uat.envId)).toBe('UNTEST')
+
+    // Bug Done trên Kanban, test lại vẫn Fail → bug mở lại.
+    for (const to of [2, 3, 4]) await issues.transition(bug.issue.issueId, { toStatusId: to })
+    const again = await tests.recordResult(tc.testCaseId, { envId: sit.envId, result: 'FAIL' })
+    expect(again.reopened).toEqual([bug.issue])
+    expect(again.needBug).toEqual([])
+    expect((await issues.getIssue(bug.issue.issueId)).statusId).toBe(1)
+    expect(retestIn(again.items[0], sit.envId)).toBeNull()
+    const log = await tests.activity(plan.planId, { testCaseId: tc.testCaseId, type: 'BUG' })
+    expect(log.map((x) => x.text).join(' | ')).toContain('mở lại trên Kanban')
   })
 
-  it('gợi ý: mỗi tiêu chí chưa có testcase → 1 đề xuất; AI tắt → AI_DISABLED', async () => {
-    const { tests, ref } = await setup()
-    await tests.createTestCase(1, {
-      title: 'Tiêu chí một',
-      type: 'FUNCTIONAL',
-      priority: 'HIGH',
-      steps: [{ action: 'x', expected: 'y' }],
+  it('regression; bàn giao cần ghi chú khi còn cảnh báo; sau bàn giao chỉ xem; mở lại', async () => {
+    const { tests, node } = await setup()
+    const { plan, group } = await planWithModule(tests, node.documentId)
+    const [sit] = plan.environments
+    const a = await tests.create(1, { sectionId: group.sectionId, title: 'A' })
+    await tests.recordResult(a.testCaseId, { envId: sit.envId, result: 'PASS' })
+    expect((await tests.regression(sit.envId, {})).retestCount).toBe(1)
+    expect(retestIn(await tests.get(a.testCaseId), sit.envId)?.reason).toBe('REGRESSION')
+
+    const err = await expectCode(tests.handover(plan.planId, { note: null }), 400, 'VALIDATION_ERROR')
+    expect(err.errors?.note).toBeTruthy()
+    const handed = await tests.handover(plan.planId, { note: 'UAT để Release 4' })
+    expect(handed).toMatchObject({ status: 'HANDED_OVER', handover: { note: 'UAT để Release 4' } })
+    await expectCode(tests.recordResult(a.testCaseId, { envId: sit.envId, result: 'PASS' }), 409, 'PLAN_HANDED_OVER')
+    await expectCode(tests.update(a.testCaseId, { title: 'B' }), 409, 'PLAN_HANDED_OVER')
+    expect((await tests.reopen(plan.planId)).status).toBe('OPEN')
+    expect((await tests.activity(plan.planId, { type: 'HANDOVER' })).map((x) => x.text)[0]).toBe('Mở lại đợt test')
+  })
+
+  it('sửa nhiều dòng một lần; Delete / khôi phục; danh sách mặc định bỏ case đã Delete', async () => {
+    const { tests, node, ref } = await setup()
+    const { plan, group } = await planWithModule(tests, node.documentId)
+    const a = await tests.create(1, {
+      sectionId: group.sectionId,
+      title: 'A',
+      aiSuggestedReqs: true,
       requirementRefs: [ref('req-a')],
     })
-    const items = await tests.suggest(1, { refs: [ref('req-a'), ref('req-b')] })
-    expect(items.items.map((x) => [x.title, x.fromCriterion])).toEqual([
-      ['Tiêu chí hai', 'Tiêu chí hai'],
-      ['Kiểm tra: Hoàn tiền', null],
+    const b = await tests.create(1, { sectionId: group.sectionId, title: 'B' })
+    const list = await tests.bulkUpdate(plan.planId, {
+      items: [a, b].map((c) => ({
+        testCaseId: c.testCaseId,
+        changes: { priority: 'HIGH' as const, requirementRefs: [ref('req-b')], aiSuggestedReqs: false as const },
+      })),
+    })
+    expect(list.map((c) => [c.priority, c.aiSuggestedReqs, c.requirements[0].reqUid])).toEqual([
+      ['HIGH', false, 'req-b'],
+      ['HIGH', false, 'req-b'],
     ])
-    expect(items.items[0].steps).toEqual([{ action: 'Thực hiện: Tiêu chí hai', expected: 'Tiêu chí hai' }])
-    expect(items.items[0].requirementRef).toEqual(ref('req-a'))
+    await tests.remove(b.testCaseId)
+    expect((await tests.list(1)).map((c) => c.code)).toEqual(['TC_1'])
+    expect((await tests.list(1, { includeDeleted: true })).find((c) => c.code === 'TC_2')?.status).toBe('DELETED')
+    expect((await tests.update(b.testCaseId, { status: 'ACTIVE' })).status).toBe('ACTIVE')
   })
 
-  it('dữ liệu mẫu: issue + testcase + đợt chạy theo câu chuyện mockup', async () => {
+  it('bố cục bảng dùng chung: lưu thứ tự / tên / cột riêng; cột chọn không có giá trị → VALIDATION_ERROR', async () => {
+    const { tests, node } = await setup()
+    const { plan } = await planWithModule(tests, node.documentId)
+    const saved = await tests.saveLayout(plan.planId, {
+      order: ['title', 'code'],
+      labels: { title: ' Tên ' },
+      widths: { title: 9999 },
+      customColumns: [
+        { columnId: 'c1', label: 'Thiết bị', kind: 'SELECT', options: [{ optionId: 'o1', label: 'iOS', color: 0 }] },
+      ],
+    })
+    expect(saved).toMatchObject({ order: ['title', 'code'], labels: { title: 'Tên' }, widths: { title: 600 } })
+    await expectCode(
+      tests.saveLayout(plan.planId, {
+        ...saved,
+        customColumns: [{ columnId: 'c2', label: 'Rỗng', kind: 'SELECT', options: [] }],
+      }),
+      400,
+      'VALIDATION_ERROR',
+    )
+    expect((await tests.plan(plan.planId)).layout.customColumns).toHaveLength(1)
+  })
+})
+
+describe('TestMockStore v2 — đối chiếu REQ, AI, dữ liệu mẫu', () => {
+  it('đối chiếu theo môi trường: một tình trạng cho mỗi REQ', async () => {
+    const { tests, node, ref } = await setup()
+    const { plan, group } = await planWithModule(tests, node.documentId)
+    const [sit, uat] = plan.environments
+    const a = await tests.create(1, { sectionId: group.sectionId, title: 'A', requirementRefs: [ref('req-a')] })
+    await tests.recordResult(a.testCaseId, { envId: sit.envId, result: 'PASS' })
+    const rows = await tests.traceability(plan.planId, sit.envId)
+    expect(rows.map((r) => [r.reqKey, r.status])).toEqual([
+      ['REQ-01', 'PASSED'],
+      ['REQ-02', 'NO_TESTS'],
+    ])
+    expect((await tests.traceability(plan.planId, uat.envId))[0].status).toBe('IN_PROGRESS')
+  })
+
+  it('AI: đề xuất có chỗ đặt; áp dụng tạo nhóm còn thiếu + case ✦; AI tắt → AI_DISABLED', async () => {
+    const { tests, node, ref } = await setup()
+    const { plan, module, top } = await planWithModule(tests, node.documentId)
+    const items = await tests.suggest(1, { planId: plan.planId, refs: [ref('req-a')] })
+    expect(items.map((x) => [x.title, x.category])).toEqual([
+      ['Tiêu chí một', 'Chức năng'],
+      ['Tiêu chí hai', 'Chức năng'],
+      ['Webhook ngân hàng — dữ liệu không hợp lệ', 'Validate'],
+    ])
+    expect(items[0].placement).toMatchObject({
+      moduleId: module.moduleId,
+      sectionId: top.sectionId,
+      category: 'Chức năng',
+    })
+    expect(items[0].placement.groupId).not.toBeNull()
+    expect(items[2].placement.groupId).toBeNull() // nhóm Validate sẽ tạo mới
+
+    const created = await tests.aiApply(plan.planId, {
+      items: items.map((x) => ({
+        title: x.title,
+        steps: x.steps,
+        priority: x.priority,
+        category: x.category,
+        requirementRef: x.requirementRef,
+      })),
+    })
+    expect(created.every((c) => c.aiSuggestedReqs)).toBe(true)
+    const after = await tests.plan(plan.planId)
+    expect(after.modules[0].sections.map((s) => `${s.code} ${s.title}`)).toEqual([
+      '1. Yêu cầu thanh toán',
+      '1.1 Chức năng',
+      '1.2 Validate',
+    ])
+  })
+
+  it('AI tắt → AI_DISABLED; thiếu ai.use → FORBIDDEN', async () => {
+    const { tests, node, ref, access } = await setup({ aiEnabled: false })
+    const { plan } = await planWithModule(tests, node.documentId)
+    await expectCode(tests.suggest(1, { planId: plan.planId, refs: [ref('req-a')] }), 409, 'AI_DISABLED')
+    access.permissions = WORK_PERMS.filter((k) => k !== 'ai.use')
+    await expectCode(tests.suggest(1, { planId: plan.planId, refs: [ref('req-a')] }), 403, 'FORBIDDEN')
+  })
+
+  it('dữ liệu mẫu: 3 môi trường, 3 module từ SRS-014 / URD-014 / SRS-020, 2 bug, kết quả ở SIT', async () => {
     const { docs, issues, tests } = await setup()
     await docs.seedDemo(2)
-    const keys = await issues.seedDemo(2)
-    expect(keys).not.toBeNull()
-    expect(await tests.seedDemo(2, keys!)).toBe(true)
-    const board = await issues.getBoard(2)
-    expect(board.activeSprint?.name).toBe('Sprint 4')
-    const webhook = (await issues.listIssues(2, { search: 'webhook' })).items[0]
-    expect(webhook).toMatchObject({ key: 'CORE-104', type: 'BUG', reqChanged: true, subtaskCount: 2, subtaskDone: 1 })
-    expect(webhook.tests).toMatchObject({ total: 3, pass: 1, fail: 1, notRun: 1 })
-    const [cycle] = (await tests.listCycles(2)).items
-    expect(cycle.counts).toEqual({ pass: 6, fail: 1, blocked: 1, notRun: 2 })
-    const mine = (await tests.listRuns(cycle.cycleId, { assigneeId: 'me' })).items
-    expect(mine.filter((r) => r.result === 'NOT_RUN' || r.needsRerun)).toHaveLength(3)
-    expect(await issues.seedDemo(2)).toBeNull()
+    expect(await docs.seedTestSpecs(2)).toBe(true)
+    expect(await docs.seedTestSpecs(2)).toBe(false)
+    await issues.seedDemo(2)
+    expect(await tests.seedDemo(2)).toBe(true)
+    const [summary] = await tests.plans(2)
+    const plan = await tests.plan(summary.planId)
+    expect(plan.environments.map((e) => `${e.name} ${e.currentBuild}`)).toEqual([
+      'SIT v1.0.1',
+      'UAT v1.0.0',
+      'Staging v1.0.1',
+    ])
+    expect(plan.modules.map((m) => `${m.shortCode} ${m.documentCode}`)).toEqual([
+      'PHI SRS-014',
+      'QR URD-014',
+      'BC SRS-020',
+    ])
+    const cases = await tests.list(2, { planId: plan.planId, includeDeleted: true })
+    expect(cases).toHaveLength(15)
+    const sit = plan.environments[0].envId
+    const st = statsIn(cases, sit)
+    expect([st.PASS, st.FAIL, st.NA, st.UNTEST, st.DELETED]).toEqual([7, 2, 1, 4, 1])
+    expect(new Set(cases.filter((c) => c.bug).map((c) => c.bug!.key)).size).toBe(2)
+    expect(cases.filter((c) => c.aiSuggestedReqs).map((c) => c.code)).toEqual(['TC_5', 'TC_6'])
+    expect(await tests.seedDemo(2)).toBe(false)
+  })
+})
+
+describe('TestMockStore v2 — sửa sau review', () => {
+  it('mã TC không tái sử dụng sau khi xoá nhóm; sửa nhiều dòng nguyên khối (một lỗi → không ghi gì)', async () => {
+    const { tests, node } = await setup()
+    const { plan, module, top, group } = await planWithModule(tests, node.documentId)
+    const g2 = await tests.addSection(module.moduleId, { parentId: top.sectionId, title: 'Flow' })
+    const g3 = await tests.addSection(module.moduleId, { parentId: top.sectionId, title: 'UI' })
+    const a = await tests.create(1, { sectionId: g2.sectionId, title: 'A' })
+    await tests.remove(a.testCaseId)
+    await tests.removeSection(g2.sectionId) // xoá hẳn case A (đã Delete) cùng nhóm 1.2
+    const b = await tests.create(1, { sectionId: group.sectionId, title: 'B' })
+    expect([a.code, b.code]).toEqual(['TC_1', 'TC_2'])
+    // Còn 1.1 và 1.3: nhóm mới là 1.4 (đếm số lượng + 1 sẽ ra 1.3 trùng).
+    expect(g3.code).toBe('1.3')
+    expect((await tests.addSection(module.moduleId, { parentId: top.sectionId, title: 'Validate' })).code).toBe('1.4')
+    await expectCode(
+      tests.bulkUpdate(plan.planId, {
+        items: [
+          { testCaseId: b.testCaseId, changes: { title: 'B đổi' } },
+          { testCaseId: b.testCaseId, changes: { title: ' ' } },
+        ],
+      }),
+      400,
+      'VALIDATION_ERROR',
+    )
+    expect((await tests.get(b.testCaseId)).title).toBe('B')
+  })
+
+  it('Fail nhiều case cùng bug đã Done: mở lại bug đúng một lần; gắn bug có sẵn phải là BUG', async () => {
+    const { tests, issues, node } = await setup()
+    const { plan, group } = await planWithModule(tests, node.documentId)
+    const [sit] = plan.environments
+    const a = await tests.create(1, { sectionId: group.sectionId, title: 'A' })
+    const b = await tests.create(1, { sectionId: group.sectionId, title: 'B' })
+    await tests.recordResults(plan.planId, {
+      envId: sit.envId,
+      testCaseIds: [a.testCaseId, b.testCaseId],
+      result: 'FAIL',
+    })
+    const bug = await tests.createBug(plan.planId, {
+      envId: sit.envId,
+      testCaseIds: [a.testCaseId, b.testCaseId],
+      title: 'Lỗi chung',
+      priority: 'HIGH',
+    })
+    for (const to of [2, 3, 4]) await issues.transition(bug.issue.issueId, { toStatusId: to })
+    const res = await tests.recordResults(plan.planId, {
+      envId: sit.envId,
+      testCaseIds: [a.testCaseId, b.testCaseId],
+      result: 'FAIL',
+    })
+    expect(res.reopened).toEqual([bug.issue])
+    const log = (await issues.listActivity(bug.issue.issueId)).items.filter(
+      (x) => x.action === 'TRANSITIONED' && x.note?.includes('mở lại'),
+    )
+    expect(log).toHaveLength(1)
+    const task = await issues.createIssue(1, { type: 'TASK', title: 'Không phải bug' })
+    await expectCode(tests.linkBug(plan.planId, task.issueId, { testCaseIds: [a.testCaseId] }), 404, 'ISSUE_NOT_FOUND')
+  })
+
+  it('Kanban thấy kết quả xấu nhất qua các môi trường (Pass SIT + Fail UAT = FAIL)', async () => {
+    const { tests, issues, node } = await setup()
+    const { plan, group } = await planWithModule(tests, node.documentId)
+    const [sit, uat] = plan.environments
+    const a = await tests.create(1, { sectionId: group.sectionId, title: 'A' })
+    await tests.recordResult(a.testCaseId, { envId: uat.envId, result: 'FAIL' })
+    const bug = await tests.createBug(plan.planId, {
+      envId: uat.envId,
+      testCaseIds: [a.testCaseId],
+      title: 'X',
+      priority: 'LOW',
+    })
+    await tests.recordResult(a.testCaseId, { envId: sit.envId, result: 'PASS' })
+    const tcs = (await issues.getIssue(bug.issue.issueId)).testCases
+    expect(tcs[0]).toMatchObject({ lastResult: 'FAIL', planId: plan.planId, envId: uat.envId })
   })
 })

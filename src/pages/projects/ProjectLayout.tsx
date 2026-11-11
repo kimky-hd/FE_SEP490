@@ -28,7 +28,7 @@ export interface ProjectOutletContext {
   isArchived: boolean
   reload: () => Promise<void>
   setProject: (project: ProjectDto) => void
-  /** Chế độ toàn màn hình của tab Tài liệu (ẩn sidebar app và header dự án). */
+  /** Chế độ toàn màn hình của tab Tài liệu và bảng Test cases (ẩn sidebar app và header dự án). */
   fullscreen: boolean
   setFullscreen: (value: boolean) => void
   /** Vai trò làm việc trong dự án (BA, QA, Dev…), quyết định menu và "Việc của tôi". */
@@ -56,7 +56,11 @@ export function ProjectLayout() {
   const location = useLocation()
   const { data: project, error, isLoading, reload, setData } = useAsync(() => projectApi.get(projectId), [projectId])
   const justCreated = (location.state as { created?: boolean } | null)?.created === true
-  const isFullBleed = /^\/projects\/\d+\/(documents|tests)(\/|$)/.test(location.pathname)
+  const isDocs = /^\/projects\/\d+\/documents(\/|$)/.test(location.pathname)
+  // Trang Test cases (không gồm Thiết lập) cũng tràn sát mép và có toàn màn hình; phím F / Esc do trang tự xử lý
+  // (chỉ bật ở tab Bảng testcase).
+  const isTests = /^\/projects\/\d+\/tests\/?$/.test(location.pathname)
+  const flush = isDocs || isTests
   const [fullscreen, setFullscreen] = useState(false)
   const loadedId = project?.projectId
   const projectList = useMemo(() => (project ? [project] : null), [project])
@@ -71,16 +75,16 @@ export function ProjectLayout() {
   // "Tiếp tục" trong Ctrl K: các trang dự án đã mở (trừ Việc của tôi; tài liệu do tab Tài liệu tự ghi).
   const pageTitle = sectionTitle(section, t)
   useEffect(() => {
-    if (!user || !project || isFullBleed || section === 'my-work' || !pageTitle) return
+    if (!user || !project || isDocs || section === 'my-work' || !pageTitle) return
     rememberItem(user.id, { href: location.pathname, title: `${pageTitle} · ${project.name}`, code: project.key })
-  }, [user, project, isFullBleed, section, pageTitle, location.pathname])
+  }, [user, project, isDocs, section, pageTitle, location.pathname])
 
   useEffect(() => {
-    if (!isFullBleed) setFullscreen(false)
-  }, [isFullBleed])
+    if (!flush) setFullscreen(false)
+  }, [flush])
 
   useEffect(() => {
-    if (!isFullBleed) return
+    if (!isDocs) return
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return
       if (document.querySelector('[aria-modal="true"]')) return
@@ -95,7 +99,7 @@ export function ProjectLayout() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isFullBleed, fullscreen])
+  }, [isDocs, fullscreen])
 
   if (isLoading && !project) {
     return (
@@ -135,7 +139,7 @@ export function ProjectLayout() {
     isArchived,
     reload,
     setProject: (next) => setData(() => next),
-    fullscreen: isFullBleed && fullscreen,
+    fullscreen: flush && fullscreen,
     setFullscreen,
     role,
     work: {
@@ -179,7 +183,7 @@ export function ProjectLayout() {
       navLabel={t('Mục dự án', 'Project sections')}
       trailing={
         <>
-          {isFullBleed ? (
+          {isDocs || isTests ? (
             <IconButton
               label={t('Toàn màn hình (F)', 'Full screen (F)')}
               onClick={() => setFullscreen(true)}
@@ -211,7 +215,7 @@ export function ProjectLayout() {
       mobileTitle={project.name}
     >
       {!context.fullscreen && header}
-      {isFullBleed ? (
+      {flush ? (
         <div className="flex min-h-0 flex-1 flex-col">
           {alerts && !context.fullscreen && <div className="shrink-0 px-4 pt-3 sm:px-5">{alerts}</div>}
           <LazyOutlet context={context} />

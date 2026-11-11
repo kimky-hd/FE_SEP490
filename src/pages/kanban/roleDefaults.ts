@@ -4,8 +4,6 @@ import type { ProjectRoleKind } from '@/lib/projectRole'
 
 export type BoardChip = 'mine' | 'reqChanged' | 'bug' | 'qa' | 'blocked' | 'design'
 export type GroupBy = 'none' | 'person' | 'req'
-export type RunChip = 'mine' | 'rerun' | 'fail'
-export type RepoChip = 'mine' | 'review'
 
 export interface BoardPrefs {
   chips: BoardChip[]
@@ -28,22 +26,3 @@ export function boardDefaults(role: ProjectRoleKind): BoardPrefs {
 }
 
 export const kanbanDefaultView = (role: ProjectRoleKind): 'board' | 'backlog' => (role === 'PM' ? 'backlog' : 'board')
-
-export interface TestsDefaults {
-  view: 'repo' | 'cycles'
-  runChips: RunChip[]
-  repoChips: RepoChip[]
-}
-
-export function testsDefaults(role: ProjectRoleKind): TestsDefaults {
-  switch (role) {
-    case 'QA':
-      return { view: 'cycles', runChips: ['mine'], repoChips: [] }
-    case 'PM':
-      return { view: 'cycles', runChips: [], repoChips: [] }
-    case 'DEV':
-      return { view: 'repo', runChips: ['mine'], repoChips: ['mine'] }
-    default:
-      return { view: 'repo', runChips: [], repoChips: [] }
-  }
-}

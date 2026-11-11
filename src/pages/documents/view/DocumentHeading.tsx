@@ -5,6 +5,7 @@ import { formatDate, formatRelative } from '@/lib/format'
 import type { DocumentActivityDto, DocumentDetailDto, DocumentGenerationDto } from '@/types/document'
 import { Chip } from '../docUi'
 import { VersionPopover } from '../VersionPopover'
+import type { CommentSummary } from './commentSummary'
 
 interface Props {
   detail: DocumentDetailDto
@@ -18,6 +19,9 @@ interface Props {
   onOpenVersion: (versionId: number) => void
   onCompareVersions: (a: number, b: number) => void
   onOpenHistory: () => void
+  /** Tóm tắt góp ý của bản đang xem (null = chưa biết / không xem được bình luận). */
+  commentSummary: CommentSummary | null
+  onOpenComments: () => void
   onBackToLatest: () => void
   canRename: boolean
   editable: boolean
@@ -39,6 +43,8 @@ export function DocumentHeading({
   onOpenVersion,
   onCompareVersions,
   onOpenHistory,
+  commentSummary,
+  onOpenComments,
   onBackToLatest,
   canRename,
   editable,
@@ -108,6 +114,25 @@ export function DocumentHeading({
           </span>
         )}
         {readOnlyText && <span className="text-gray-500">· {readOnlyText}</span>}
+        {commentSummary && commentSummary.resolved + commentSummary.open > 0 && (
+          <button
+            type="button"
+            onClick={onOpenComments}
+            title={t('Mở bảng bình luận', 'Open comments')}
+            className={clsx(
+              'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium',
+              commentSummary.open > 0
+                ? 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100'
+                : 'border-success-200 bg-success-50 text-success-700 hover:bg-success-100',
+            )}
+          >
+            {t('Góp ý:', 'Comments:')}{' '}
+            {t(
+              `${commentSummary.resolved} đã xử lý · ${commentSummary.open} còn mở`,
+              `${commentSummary.resolved} resolved · ${commentSummary.open} open`,
+            )}
+          </button>
+        )}
       </div>
 
       {canRename ? (

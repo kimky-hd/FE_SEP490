@@ -3,6 +3,7 @@ import { ApiError } from '@/lib/apiClient'
 import type { TipTapDoc } from '@/types/document'
 import { DocumentMockStore, MOCK_STORAGE_KEY, type ProjectAccess } from './documentMockStore'
 import { h, p, tasks } from './documentSeed'
+import { approveBlockedBy, summarizeComments } from '@/pages/documents/view/commentSummary'
 
 const ALL = [
   'document.view',
@@ -288,6 +289,22 @@ describe('DocumentMockStore — vòng đời phiên bản', () => {
     await s.store.resolveComment(root.commentId)
     expect((await s.store.listComments(id, { versionId: v.versionId })).items).toEqual([])
     expect((await s.store.listActivity(id)).items.filter((a) => a.action === 'COMMENTED')).toHaveLength(2)
+    // includeResolved=true (§7.3): trả cả luồng đã xử lý, gốc và trả lời đều có resolvedAt.
+    const all = (await s.store.listComments(id, { versionId: v.versionId, includeResolved: true })).items
+    expect(all.map((c) => c.commentId)).toEqual([root.commentId, reply.commentId])
+    expect(all.every((c) => c.resolvedAt && c.resolvedBy)).toBe(true)
+  })
+
+  it('includeResolved + summarizeComments: "N đã xử lý · M còn mở" chỉ đếm góp ý gốc của bản đó', async () => {
+    const { id, v } = await newPage()
+    const a = await s.store.addComment(id, { versionId: v.versionId, body: 'Góp ý A' })
+    await s.store.addComment(id, { versionId: v.versionId, body: 'Trả lời A', parentId: a.commentId })
+    await s.store.addComment(id, { versionId: v.versionId, body: 'Góp ý B' })
+    await s.store.resolveComment(a.commentId)
+    const all = (await s.store.listComments(id, { versionId: v.versionId, includeResolved: true })).items
+    expect(summarizeComments(all, v.versionId)).toEqual({ resolved: 1, open: 1 })
+    expect(approveBlockedBy(summarizeComments(all, v.versionId))).toBe(1)
+    expect(summarizeComments(all, v.versionId + 1)).toEqual({ resolved: 0, open: 0 })
   })
 
   it('D08: bình luận dùng comment.view / comment.write (không phải document.*)', async () => {

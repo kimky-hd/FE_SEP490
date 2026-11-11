@@ -4,6 +4,7 @@ import { clearCachedData, onDataChanged } from '@/lib/dataEvents'
 import { clearUserLocalData, tokenStorage } from '@/lib/storage'
 import { ApiError } from '@/lib/apiClient'
 import { companyPermissionSet, hasPermission } from '@/lib/permissions'
+import { isOnboarded } from '@/lib/onboarding'
 import type { AuthSessionDto, CompanyMembershipDto, MeResponseDto, UserDto, WorkspaceSummaryDto } from '@/types/auth'
 
 interface AuthContextValue {
@@ -117,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     workspaces,
     isBootstrapping,
     isAuthenticated: user !== null,
-    hasOnboarded: companies.length > 0 || workspaces.length > 0,
+    hasOnboarded: isOnboarded({ companies, workspaces }),
     currentCompany,
     can: (permission) => hasPermission(companyPermissions, permission),
     applySession,

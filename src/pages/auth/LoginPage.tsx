@@ -11,6 +11,7 @@ import { Alert } from '@/components/ui/Alert'
 import { GoogleAuthButton } from '@/components/ui/GoogleAuthButton'
 import { authApi } from '@/api/authApi'
 import { useAuth } from '@/context/AuthContext'
+import { isOnboarded } from '@/lib/onboarding'
 import { ApiError } from '@/lib/apiClient'
 import { safeReturnTo } from '@/lib/safeReturnTo'
 import { LockIcon, MailIcon } from '@/components/ui/icons'
@@ -57,8 +58,6 @@ export function LoginPage() {
   // `from` do ProtectedRoute đặt (đường dẫn nội bộ). safeReturnTo chặn open-redirect (`//host`, dấu `\`).
   const returnTo = safeReturnTo(locationState?.from)
 
-  const isMock = import.meta.env.VITE_USE_MOCK !== 'false'
-
   const {
     register,
     handleSubmit,
@@ -66,11 +65,73 @@ export function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({ resolver: zodResolver(schema) })
 
+  const demoAccounts = [
+    {
+      name: 'Nguyễn Minh Khoa',
+      email: 'sarah@fintechcorp.com',
+      role: 'Tenant Admin · CTO Khối Chứng khoán Số',
+      badge: 'Toàn quyền Công ty & Dự án',
+    },
+    {
+      name: 'Vũ Kim Kỳ',
+      email: 'ky@fintechcorp.com',
+      role: 'Project Manager · Giám đốc Dự án OMS KRX',
+      badge: 'Quản lý Dự án, Sprint, Workflow',
+    },
+    {
+      name: 'Phạm Minh Lương',
+      email: 'luong@fintechcorp.com',
+      role: 'Tech Lead · Kiến trúc sư Core Trading FIX 4.4',
+      badge: 'Duyệt SRS, Quản lý Sprint, Code Review',
+    },
+    {
+      name: 'Phạm Công Minh',
+      email: 'minh@fintechcorp.com',
+      role: 'Lead BA · Phân tích Nghiệp vụ KRX & VSD T+2',
+      badge: 'Soạn thảo & Sinh AI BRD/URD/SRS',
+    },
+    {
+      name: 'Trương Quang Tâm',
+      email: 'tam@fintechcorp.com',
+      role: 'QA Lead · Trưởng nhóm Kiểm thử Chứng khoán',
+      badge: 'Lập Đợt Test, Deploy Build, Duyệt SRS',
+    },
+    {
+      name: 'Lê Thị Khánh Linh',
+      email: 'linh@fintechcorp.com',
+      role: 'QA / Tester · Chuyên viên Kiểm thử Tự động',
+      badge: 'Chạy Test SIT/UAT & Báo lỗi Bug',
+    },
+    {
+      name: 'Nguyễn Hoàng Nam',
+      email: 'nam@fintechcorp.com',
+      role: 'Senior Backend Dev · Core Cash & Margin Engine',
+      badge: 'Xử lý Task/Bug Kanban & Code',
+    },
+    {
+      name: 'Hoàng Minh Quân',
+      email: 'quan@fintechcorp.com',
+      role: 'Frontend Dev · Bảng giá WebSocket & Đặt lệnh',
+      badge: 'Xử lý Story/Task Giao diện',
+    },
+    {
+      name: 'Đặng Thu Trang',
+      email: 'trang@fintechcorp.com',
+      role: 'UI/UX Designer · Thiết kế Bảng giá & eKYC',
+      badge: 'Thiết kế Figma & Đặc tả UI',
+    },
+    {
+      name: 'Trần Văn Cường',
+      email: 'tran.c@fintechcorp.com',
+      role: 'Compliance Reviewer · Kiểm soát Tuân thủ UBCKNN',
+      badge: 'Chỉ xem & Nhận xét Tài liệu (Read-only)',
+    },
+  ]
+
   const goAfterAuth = async () => {
     const me = await refreshMe()
-    const hasOnboarded = me.companies.length > 0 || me.workspaces.length > 0
     // Chưa onboard thì luôn về onboarding, bất kể trước đó định vào đâu.
-    navigate(hasOnboarded ? (returnTo ?? '/') : '/onboarding/account-type')
+    navigate(isOnboarded(me) ? (returnTo ?? '/') : '/onboarding/start')
   }
 
   const onSubmit = async (values: FormValues) => {
@@ -101,7 +162,7 @@ export function LoginPage() {
       const session = await authApi.loginWithGoogle(credential.credential)
       applySession(session)
       if (session.isNewAccount) {
-        navigate('/onboarding/account-type')
+        navigate('/onboarding/start')
       } else {
         await goAfterAuth()
       }
@@ -112,13 +173,13 @@ export function LoginPage() {
 
   return (
     <AuthCard
-      title={t('Đăng nhập vào SSAM', 'Sign in to SSAM')}
-      description={t('Chào mừng bạn trở lại.', 'Welcome back.')}
+      title={t('Đăng nhập SSAM', 'Sign in to SSAM')}
+      description={t('Tiếp tục với tài khoản công việc của bạn.', 'Continue with your work account.')}
       footer={
         <>
           {t('Chưa có tài khoản?', "Don't have an account?")}{' '}
           <Link to="/register" className={authLinkClass}>
-            {t('Đăng ký ngay', 'Sign up')}
+            {t('Đăng ký', 'Sign up')}
           </Link>
         </>
       }
@@ -129,53 +190,11 @@ export function LoginPage() {
         text="continue_with"
       />
 
-      <div className="my-5 flex items-center gap-3 text-xs text-gray-500">
+      <div className="my-4 flex items-center gap-3 text-xs text-gray-500">
         <div className="h-px flex-1 bg-gray-200" />
         {t('hoặc', 'or')}
         <div className="h-px flex-1 bg-gray-200" />
       </div>
-
-      {isMock && (
-        <div className="mb-4 rounded-control border border-brand-200 bg-brand-50/70 p-3 text-xs text-brand-900">
-          <div className="flex items-center justify-between font-medium">
-            <span>{t('Tài khoản mẫu theo Vai trò & Phân quyền', 'Demo Accounts by Role & Permission')}</span>
-            <span className="rounded bg-brand-100 px-1.5 py-0.5 text-[10px] font-semibold text-brand-700">
-              Password@123
-            </span>
-          </div>
-          <p className="mt-1 text-[11px] text-brand-800/80">
-            {t(
-              'Chọn nhanh tài khoản để kiểm thử luồng dự án và phân quyền RBAC theo từng vị trí:',
-              'Click an account below to test the project workflow and RBAC permissions per role:',
-            )}
-          </p>
-          <div className="mt-2 grid grid-cols-2 gap-1.5">
-            {[
-              { email: 'sarah@fintechcorp.com', label: 'Sarah Lin', role: 'Tenant & WS Admin' },
-              { email: 'ky@fintechcorp.com', label: 'Vũ Kim Kỳ', role: 'Project Manager' },
-              { email: 'minh@fintechcorp.com', label: 'Phạm Công Minh', role: 'Business Analyst (BA)' },
-              { email: 'trang@fintechcorp.com', label: 'Đặng Thu Trang', role: 'Tech Lead' },
-              { email: 'luong@fintechcorp.com', label: 'Phạm Minh Lương', role: 'Developer' },
-              { email: 'tam@fintechcorp.com', label: 'Trương Quang Tâm', role: 'QA / Tester' },
-              { email: 'quan@fintechcorp.com', label: 'Hoàng Minh Quân', role: 'UI/UX Designer' },
-              { email: 'tran.c@fintechcorp.com', label: 'Trần Thị C', role: 'Reviewer (Chỉ xem)' },
-            ].map((acc) => (
-              <button
-                key={acc.email}
-                type="button"
-                onClick={() => {
-                  setValue('email', acc.email, { shouldValidate: true })
-                  setValue('password', 'Password@123', { shouldValidate: true })
-                }}
-                className="flex flex-col items-start rounded border border-brand-200 bg-white px-2.5 py-1.5 text-left transition-colors hover:border-brand-400 hover:bg-brand-50/60"
-              >
-                <span className="font-semibold text-gray-900">{acc.label}</span>
-                <span className="text-[10.5px] font-medium text-brand-700">{acc.role}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {resetSuccess && !serverError && (
         <div className="mb-4">
@@ -193,7 +212,7 @@ export function LoginPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
         <TextField
           label={t('Email công việc', 'Work email')}
           icon={<MailIcon className="h-4 w-4" />}
@@ -209,7 +228,7 @@ export function LoginPage() {
             <label htmlFor="password" className="text-sm font-medium text-gray-900">
               {t('Mật khẩu', 'Password')}
             </label>
-            <Link to="/forgot-password" className={`${authLinkClass} text-sm`}>
+            <Link to="/forgot-password" className={`${authLinkClass} text-[13px]`}>
               {t('Quên mật khẩu?', 'Forgot password?')}
             </Link>
           </div>
@@ -244,6 +263,41 @@ export function LoginPage() {
           {t('Đăng nhập', 'Sign in')}
         </Button>
       </form>
+
+      {import.meta.env.VITE_USE_MOCK !== 'false' && (
+        <div className="mt-5 border-t border-gray-200 pt-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-700">
+              {t('Tài khoản mẫu (Chứng khoán KRX · RBAC)', 'Demo Accounts (Securities KRX · RBAC)')}
+            </span>
+            <span className="font-mono text-[11px] text-gray-500">Password@123</span>
+          </div>
+          <div className="grid max-h-56 grid-cols-1 gap-1.5 overflow-y-auto pr-1">
+            {demoAccounts.map((acc) => (
+              <button
+                key={acc.email}
+                type="button"
+                onClick={() => {
+                  setValue('email', acc.email, { shouldValidate: true })
+                  setValue('password', 'Password@123', { shouldValidate: true })
+                }}
+                className="flex items-center justify-between rounded-md border border-gray-200 bg-gray-50/70 px-2.5 py-1.5 text-left transition hover:border-brand-500 hover:bg-brand-50/40"
+              >
+                <div className="min-w-0 flex-1 pr-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-xs font-medium text-gray-900">{acc.name}</span>
+                    <span className="truncate font-mono text-[11px] text-gray-500">({acc.email})</span>
+                  </div>
+                  <div className="truncate text-[11px] text-gray-600">{acc.role}</div>
+                </div>
+                <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-600 shadow-2xs ring-1 ring-gray-200">
+                  {acc.badge}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </AuthCard>
   )
 }

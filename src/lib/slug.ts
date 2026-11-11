@@ -3,7 +3,7 @@
 
 const MAX_SLUG_LENGTH = 50
 
-function stripVietnamese(input: string) {
+export function stripVietnamese(input: string) {
   return input.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D')
 }
 

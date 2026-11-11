@@ -1,308 +1,64 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import clsx from 'clsx'
 import { Link } from 'react-router-dom'
 import { Logo } from '@/components/ui/Logo'
 import { buttonClasses } from '@/components/ui/Button'
 import { LanguageSwitch } from '@/components/ui/LanguageSwitch'
+import { Badge } from '@/components/ui/Badge'
+import { AiSparkleIcon, ArrowRightIcon, ChevronDownIcon, FrameIcon, LinkIcon } from '@/components/ui/icons'
 import { useI18n } from '@/i18n'
 
-type T = (vi: string, en: string) => string
-
 /* ------------------------------------------------------------------------------------------------
- * Trang giới thiệu theo bản mẫu đã duyệt (doc/mockups/mockups.html): SaaS sáng, gọn, xanh thương hiệu.
- * Ảnh sản phẩm là giao diện SSAM dựng bằng JSX (nội dung minh hoạ tĩnh), không dùng ảnh chụp.
- * Id #tinh-nang được DashboardHomePage trỏ tới: giữ nguyên.
+ * Trang giới thiệu theo bản mẫu đã duyệt (doc/mockups/landing-redesign.html): cùng chất màn đăng nhập,
+ * hero trên lưới chấm, chuỗi truy vết REQ-12 → CORE-104 → TC-31 làm hình chính.
+ * Chỉ hứa điều app làm được: không "miễn phí", không số liệu / logo / lời khen bịa.
  * ---------------------------------------------------------------------------------------------- */
 
-const WRAP = 'mx-auto w-full max-w-[1160px] px-4 sm:px-6'
-const H2 = 'mt-2.5 text-[clamp(1.75rem,3.4vw,2.625rem)] font-bold leading-[1.15] tracking-[-0.02em] text-balance'
-
-function getNavLinks(t: T) {
-  return [
-    { href: '#tinh-nang', label: t('Tính năng', 'Features') },
-    { href: '#theo-vai-tro', label: t('Theo vai trò', 'By role') },
-    { href: '#cau-hoi', label: t('Câu hỏi', 'FAQ') },
-  ]
-}
+const PAD = 'mx-auto w-full px-[18px] md:px-8'
+const WRAP = `${PAD} max-w-[1160px]`
+const SECTION = 'scroll-mt-16 border-t border-gray-100 py-14 md:py-[88px]'
+// Lưới chấm: hero (chấm xám) và dải CTA (chấm xanh nhạt).
+const DOTS_GRAY =
+  'bg-[radial-gradient(#e4e7ec_1px,transparent_1px)] bg-[length:20px_20px] md:bg-[radial-gradient(#e4e7ec_1.2px,transparent_1.2px)] md:bg-[length:22px_22px]'
+const DOTS_BRAND = 'bg-[radial-gradient(rgba(47,91,234,.14)_1.2px,transparent_1.2px)] bg-[length:22px_22px]'
+const FOCUS = 'rounded focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-100'
 
 /* ------------------------------------------- Mảnh nhỏ dùng chung ------------------------------------------- */
 
-type PillTone = 'ok' | 'warn' | 'mute' | 'blue'
+type Tone = 'brand' | 'amber' | 'ok' | 'red' | 'violet'
 
-function Pill({ tone, children }: { tone: PillTone; children: ReactNode }) {
+const TONES: Record<Tone, string> = {
+  brand: 'bg-brand-50 text-brand-700',
+  amber: 'bg-amber-50 text-amber-800',
+  ok: 'bg-success-50 text-success-700',
+  red: 'bg-red-50 text-red-700',
+  violet: 'bg-violet-50 text-violet-700',
+}
+
+// Mã REQ / issue / testcase, chữ đơn cách.
+function Tag({ tone, children }: { tone: Tone; children: ReactNode }) {
   return (
-    <span
-      className={clsx(
-        'inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium',
-        tone === 'ok' && 'border-success-200 bg-success-50 text-success-700',
-        tone === 'warn' && 'border-[#fedf89] bg-[#fffaeb] text-[#b54708]',
-        tone === 'mute' && 'border-gray-200 bg-white text-gray-600',
-        tone === 'blue' && 'border-brand-200 bg-brand-50 text-brand-800',
-      )}
-    >
+    <span className={clsx('whitespace-nowrap rounded-[5px] px-1.5 py-0.5 font-mono text-xs font-medium', TONES[tone])}>
       {children}
     </span>
   )
 }
 
-function Code({ children }: { children: ReactNode }) {
+function Arrow({ children }: { children: ReactNode }) {
   return (
-    <span className="whitespace-nowrap rounded-[5px] border border-gray-200 bg-gray-50 px-1.5 text-xs font-medium text-gray-500">
+    <span aria-hidden="true" className="text-gray-400">
       {children}
     </span>
   )
 }
 
-function SectionHead({ eyebrow, title, sub, id }: { eyebrow: string; title: string; sub?: string; id: string }) {
+function SectionHead({ id, title, sub }: { id: string; title: string; sub?: string }) {
   return (
-    <div className="mx-auto max-w-[680px] text-center">
-      <p className="text-sm font-medium text-brand-600">{eyebrow}</p>
-      <h2 id={id} className={H2}>
+    <div className="mb-10 max-w-[640px]">
+      <h2 id={id} className="text-[clamp(1.625rem,3vw,2.25rem)] font-bold leading-[1.15] tracking-tight text-gray-950">
         {title}
       </h2>
-      {sub && <p className="mt-3.5 text-[17px] leading-relaxed text-gray-600 sm:text-lg">{sub}</p>}
-    </div>
-  )
-}
-
-function Icon({ d, className }: { d: string; className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className={clsx('h-[17px] w-[17px] flex-none', className)}
-    >
-      <path d={d} />
-    </svg>
-  )
-}
-
-const ICONS = {
-  home: 'M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
-  task: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0zM8 12l3 3 5-6',
-  project: 'M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM3 9h18M9 9v11',
-  doc: 'M6 3h9l4 4v14H6zM9 12h7M9 16h7',
-  updown: 'M8 9l4-4 4 4M8 15l4 4 4-4',
-  check: 'M6 12l4 4 8-8',
-  x: 'M7 7l10 10M17 7L7 17',
-}
-
-/* ---------------------------------------------- Ảnh sản phẩm ---------------------------------------------- */
-
-function AppMock() {
-  const { t } = useI18n()
-  const rows: { name: string; code: string; screen: string; tc: string; tone: PillTone; status: string }[] = [
-    {
-      name: t('Thanh toán một chạm', 'One-tap checkout'),
-      code: 'REQ-012',
-      screen: 'Checkout',
-      tc: 'TC-031',
-      tone: 'ok',
-      status: t('Đã liên kết', 'Linked'),
-    },
-    {
-      name: t('Màn xác nhận đơn', 'Order confirmation screen'),
-      code: 'REQ-013',
-      screen: 'Confirm v4',
-      tc: 'TC-032',
-      tone: 'warn',
-      status: t('Thiết kế đã đổi', 'Design changed'),
-    },
-    {
-      name: t('Lưu địa chỉ giao hàng', 'Save shipping address'),
-      code: 'REQ-014',
-      screen: 'Address',
-      tc: 'TC-033',
-      tone: 'ok',
-      status: t('Đã liên kết', 'Linked'),
-    },
-    {
-      name: t('Áp mã giảm giá', 'Apply a discount code'),
-      code: 'REQ-015',
-      screen: '—',
-      tc: '—',
-      tone: 'mute',
-      status: t('Chưa có thiết kế', 'No design yet'),
-    },
-  ]
-  const project = t('Checkout một chạm', 'One-tap checkout')
-
-  return (
-    <div className="grid min-h-[560px] bg-gray-100 p-2 text-sm md:grid-cols-[232px_1fr] md:pl-0">
-      {/* Sidebar nằm trên nền xám */}
-      <div className="hidden flex-col gap-px py-1.5 pl-3.5 pr-2.5 md:flex">
-        <div className="mb-2 flex items-center gap-2.5 rounded-control p-2">
-          <span className="grid h-7 w-7 flex-none place-items-center rounded-[7px] bg-brand-600 text-xs font-bold text-white">
-            FC
-          </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-semibold leading-tight text-gray-900">Fintech Corp</span>
-            <span className="block truncate text-xs text-gray-500">Mobile Banking Revamp</span>
-          </span>
-          <Icon d={ICONS.updown} className="ml-auto !h-4 !w-4 text-gray-500" />
-        </div>
-        {[
-          { icon: ICONS.home, label: t('Tổng quan', 'Overview') },
-          {
-            icon: ICONS.task,
-            label: t('Việc của tôi', 'My work'),
-            extra: <span className="ml-auto text-xs text-gray-500">4</span>,
-          },
-          { icon: ICONS.project, label: t('Dự án', 'Projects'), on: true },
-          {
-            icon: ICONS.doc,
-            label: t('Tài liệu', 'Documents'),
-            extra: (
-              <span className="ml-auto rounded border border-gray-300 px-1 text-[11px] text-gray-500">
-                {t('Sắp có', 'Soon')}
-              </span>
-            ),
-          },
-        ].map((it) => (
-          <div
-            key={it.label}
-            className={clsx(
-              'flex items-center gap-2.5 rounded-control px-2.5 py-[7px]',
-              it.on ? 'bg-white font-medium text-gray-900 shadow-xs ring-1 ring-gray-200' : 'text-gray-600',
-            )}
-          >
-            <Icon d={it.icon} className={it.on ? 'text-brand-600' : undefined} />
-            {it.label}
-            {it.extra}
-          </div>
-        ))}
-        <p className="mx-2.5 mb-1.5 mt-[18px] text-xs font-medium text-gray-500">
-          {t('Dự án gần đây', 'Recent projects')}
-        </p>
-        {[
-          { label: project, color: 'bg-brand-600' },
-          { label: t('Ví điện tử v2', 'E-wallet v2'), color: 'bg-[#f79009]' },
-          { label: 'eKYC', color: 'bg-success-500' },
-        ].map((p) => (
-          <div key={p.label} className="flex items-center gap-2.5 rounded-control px-2.5 py-1.5 text-gray-600">
-            <span className={clsx('mx-1 h-2 w-2 rounded-[3px]', p.color)} />
-            {p.label}
-          </div>
-        ))}
-        <div className="mt-auto flex items-center gap-2.5 p-2">
-          <span className="grid h-7 w-7 place-items-center rounded-full bg-[#dbe4ff] text-[11px] font-bold text-brand-800">
-            LN
-          </span>
-          <span className="leading-tight">
-            <span className="block text-[13px] font-medium text-gray-900">Lương Nguyễn</span>
-            <span className="block text-xs text-gray-500">Business Analyst</span>
-          </span>
-        </div>
-      </div>
-
-      {/* Tấm nội dung trắng */}
-      <div className="min-w-0 overflow-hidden rounded-card border border-gray-200 bg-white shadow-xs">
-        <div className="flex h-12 items-center justify-between gap-4 border-b border-gray-200 px-4 text-[13.5px] text-gray-500 sm:px-6">
-          <span className="truncate">
-            {t('Dự án', 'Projects')} / <span className="font-medium text-gray-900">{project}</span>
-          </span>
-          <span className="hidden min-w-[200px] items-center gap-2 rounded-control border border-gray-200 px-2.5 py-1 sm:flex">
-            {t('Tìm kiếm…', 'Search…')}
-            <span className="ml-auto rounded border border-gray-200 px-1.5 text-[11px] font-medium">Ctrl K</span>
-          </span>
-        </div>
-        <div className="px-4 py-5 sm:px-7 sm:py-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="flex flex-wrap items-center gap-2.5 text-xl font-bold tracking-[-0.02em] text-gray-900 sm:text-[22px]">
-                {project} <Pill tone="ok">{t('Đang chạy', 'Active')}</Pill>
-              </p>
-              <p className="mt-1 text-sm text-gray-500">
-                {t('Scrum · 6 thành viên · Cập nhật 2 phút trước', 'Scrum · 6 members · Updated 2 minutes ago')}
-              </p>
-            </div>
-            <div className="hidden gap-2 sm:flex">
-              <span className="inline-flex h-9 items-center rounded-control border border-gray-300 bg-white px-3.5 font-medium text-gray-800 shadow-xs">
-                {t('Mời thành viên', 'Invite members')}
-              </span>
-              <span className="inline-flex h-9 items-center rounded-control bg-brand-600 px-3.5 font-medium text-white shadow-xs">
-                {t('Tạo yêu cầu', 'New requirement')}
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-[18px] flex gap-6 overflow-hidden border-b border-gray-200 text-gray-500">
-            {[
-              t('Truy xuất', 'Traceability'),
-              t('Tài liệu', 'Documents'),
-              t('Quy trình', 'Workflow'),
-              t('Thành viên', 'Members'),
-              t('Cài đặt', 'Settings'),
-            ].map((tab, i) => (
-              <span
-                key={tab}
-                className={clsx(
-                  'whitespace-nowrap py-2.5',
-                  i === 0 && 'font-medium text-gray-900 shadow-[inset_0_-2px_0_#2f5bea]',
-                  i >= 3 && 'hidden sm:inline',
-                )}
-              >
-                {tab}
-              </span>
-            ))}
-          </div>
-
-          <div className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
-            {[
-              {
-                k: t('Yêu cầu', 'Requirements'),
-                v: '24',
-                note: t('18 đã liên kết đủ', '18 fully linked'),
-                c: 'text-success-700',
-              },
-              { k: 'Testcase', v: '61', note: t('3 cần cập nhật', '3 need updating'), c: 'text-[#b54708]' },
-              {
-                k: t('Màn hình Figma', 'Figma screens'),
-                v: '12',
-                note: t('Đồng bộ 2 phút trước', 'Synced 2 minutes ago'),
-                c: 'text-gray-500',
-              },
-            ].map((s) => (
-              <div key={s.k} className="min-w-0 rounded-[10px] border border-gray-200 px-3 py-3 sm:px-4 sm:py-3.5">
-                <p className="truncate text-[13px] text-gray-500">{s.k}</p>
-                <p className="mt-0.5 text-2xl font-semibold tracking-[-0.02em] text-gray-900">{s.v}</p>
-                <p className={clsx('text-xs sm:text-[12.5px]', s.c)}>{s.note}</p>
-              </div>
-            ))}
-          </div>
-
-          <table className="mt-5 w-full border-collapse text-left">
-            <thead>
-              <tr className="border-b border-gray-200 text-[12.5px] text-gray-500">
-                <th className="px-2 py-2 font-medium sm:px-3">{t('Yêu cầu', 'Requirement')}</th>
-                <th className="hidden px-3 py-2 font-medium sm:table-cell">{t('Màn hình', 'Screen')}</th>
-                <th className="hidden px-3 py-2 font-medium sm:table-cell">Testcase</th>
-                <th className="px-2 py-2 font-medium sm:px-3">{t('Trạng thái', 'Status')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 text-gray-600">
-              {rows.map((r) => (
-                <tr key={r.code}>
-                  <td className="px-2 py-3 sm:px-3">
-                    <span className="mr-2 font-medium text-gray-900">{r.name}</span>
-                    <Code>{r.code}</Code>
-                  </td>
-                  <td className="hidden px-3 py-3 sm:table-cell">{r.screen}</td>
-                  <td className="hidden px-3 py-3 sm:table-cell">{r.tc}</td>
-                  <td className="px-2 py-3 sm:px-3">
-                    <Pill tone={r.tone}>{r.status}</Pill>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {sub && <p className="mt-3 text-base leading-relaxed text-gray-600">{sub}</p>}
     </div>
   )
 }
@@ -311,33 +67,31 @@ function AppMock() {
 
 function Nav() {
   const { t } = useI18n()
+  const links = [
+    { href: '#tinh-nang', label: t('Tính năng', 'Features') },
+    { href: '#cach-hoat-dong', label: t('Cách hoạt động', 'How it works') },
+    { href: '#vai-tro', label: t('Vai trò', 'Roles') },
+    { href: '#hoi-dap', label: t('Hỏi đáp', 'FAQ') },
+  ]
   return (
-    <header className="sticky top-0 z-50 border-b border-gray-200 bg-white/85 backdrop-blur-md">
-      <div className={clsx(WRAP, 'flex h-16 items-center gap-4 md:gap-10')}>
-        <Link
-          to="/"
-          aria-label="SSAM"
-          className="rounded-control focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-100"
-        >
+    <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/90 backdrop-blur-md">
+      <div className={clsx(WRAP, 'flex h-16 items-center gap-7')}>
+        <Link to="/" aria-label="SSAM" className={clsx(FOCUS, 'rounded-control')}>
           <Logo />
         </Link>
-        <nav
-          aria-label={t('Mục trên trang', 'On this page')}
-          className="hidden gap-7 text-[15px] text-gray-600 md:flex"
-        >
-          {getNavLinks(t).map((l) => (
-            <a key={l.href} href={l.href} className="rounded transition-colors hover:text-gray-900">
+        <nav aria-label={t('Mục trên trang', 'On this page')} className="hidden gap-6 text-sm text-gray-600 md:flex">
+          {links.map((l) => (
+            <a key={l.href} href={l.href} className={clsx(FOCUS, 'transition-colors hover:text-gray-950')}>
               {l.label}
             </a>
           ))}
         </nav>
-        <div className="ml-auto flex items-center gap-1 sm:gap-2">
-          <LanguageSwitch className="mr-2 hidden md:inline-flex" />
-          <Link to="/login" className={clsx(buttonClasses({ variant: 'ghost', inline: true }), 'px-3')}>
+        <div className="ml-auto flex items-center gap-2.5">
+          <Link to="/login" className={clsx(FOCUS, 'hidden px-2 text-sm text-gray-700 hover:text-gray-950 md:inline')}>
             {t('Đăng nhập', 'Log in')}
           </Link>
-          <Link to="/register" className={clsx(buttonClasses({ variant: 'primary', inline: true }), 'px-3 sm:px-3.5')}>
-            {t('Dùng thử miễn phí', 'Try it free')}
+          <Link to="/register" className={buttonClasses({ inline: true })}>
+            {t('Bắt đầu', 'Get started')}
           </Link>
         </div>
       </div>
@@ -347,393 +101,415 @@ function Nav() {
 
 /* -------------------------------------------------- Hero -------------------------------------------------- */
 
+// Con trỏ của đội trôi nhẹ trên lưới chấm (trang trí). Tắt chuyển động khi người dùng giảm chuyển động.
+const CURSOR_CSS = `
+@keyframes landing-drift{from{transform:translate(0,0)}to{transform:translate(var(--dx),var(--dy))}}
+.landing-cur{animation:landing-drift var(--t) ease-in-out infinite alternate}
+@media (prefers-reduced-motion:reduce){.landing-cur{animation:none}}
+`
+
+const CURSOR_PATH = 'M2 2 L2 16.5 L6.3 12.6 L9.2 18.6 L11.7 17.4 L8.9 11.6 L14.6 11.4 Z'
+
+function Cursor({ name, color, style }: { name: string; color: string; style: CSSProperties }) {
+  return (
+    <div aria-hidden="true" className="landing-cur absolute z-[3] hidden h-0 w-0 md:block" style={style}>
+      <svg
+        viewBox="0 0 20 20"
+        className="absolute -left-0.5 -top-0.5 h-5 w-5 overflow-visible drop-shadow-[0_2px_3px_rgba(16,24,40,.25)]"
+      >
+        <path d={CURSOR_PATH} fill={color} stroke="#fff" strokeWidth="1.6" strokeLinejoin="round" />
+      </svg>
+      <span
+        className="absolute left-3.5 top-4 whitespace-nowrap rounded-full px-[9px] py-[5px] text-xs font-medium leading-none text-white"
+        style={{ background: color }}
+      >
+        {name}
+      </span>
+    </div>
+  )
+}
+
+function ChainCard({
+  tag,
+  tagTone,
+  meta,
+  title,
+  status,
+  changed,
+}: {
+  tag: string
+  tagTone: Tone
+  meta: string
+  title: string
+  status: string
+  changed?: boolean
+}) {
+  return (
+    <div
+      className={clsx(
+        'flex w-full flex-col gap-2 rounded-card border bg-white px-4 py-3.5 text-left md:w-[260px]',
+        changed ? 'border-amber-200 shadow-pop ring-4 ring-amber-50' : 'border-gray-200 shadow-pop',
+      )}
+    >
+      <div className="flex items-center gap-2 text-xs text-gray-500">
+        <Tag tone={tagTone}>{tag}</Tag>
+        {meta}
+      </div>
+      <p className="text-base font-medium text-gray-900">{title}</p>
+      <span className="self-start">
+        <Badge tone="amber">{status}</Badge>
+      </span>
+    </div>
+  )
+}
+
+// Đoạn nối giữa hai thẻ: dọc trên điện thoại, ngang từ md.
+function ChainLink() {
+  return (
+    <span aria-hidden="true" className="relative h-6 w-0.5 flex-none bg-amber-200 md:h-0.5 md:w-14">
+      <span className="absolute -bottom-px left-1/2 -translate-x-1/2 border-x-[5px] border-t-[5px] border-x-transparent border-t-amber-200 md:hidden" />
+      <span className="absolute -right-px -top-1 hidden border-y-[5px] border-l-[5px] border-y-transparent border-l-amber-200 md:block" />
+    </span>
+  )
+}
+
 function Hero() {
   const { t } = useI18n()
   return (
     <section
       aria-labelledby="hero-title"
-      className="bg-[radial-gradient(60%_50%_at_50%_0%,#e8eeff_0%,rgba(255,255,255,0)_100%)] pt-16 text-center sm:pt-[88px]"
+      className={clsx('relative overflow-hidden bg-white pb-14 pt-11 md:pb-[88px] md:pt-[72px]', DOTS_GRAY)}
     >
-      <div className={WRAP}>
-        <span className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-white py-1 pl-1 pr-3 text-[13.5px] text-gray-600">
-          <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[12.5px] font-medium text-brand-800">
-            {t('Mới', 'New')}
-          </span>
-          {t('Theo dõi thay đổi trên Figma', 'Track changes in Figma')}
-        </span>
+      <style>{CURSOR_CSS}</style>
+      <div className={clsx(PAD, 'relative z-[2] max-w-[820px] text-center')}>
         <h1
           id="hero-title"
-          className="mx-auto mt-[22px] max-w-[820px] text-[clamp(2.25rem,5vw,3.75rem)] font-bold leading-[1.08] tracking-[-0.02em] text-balance text-gray-900"
+          className="text-[clamp(2.125rem,4.6vw,3.5rem)] font-bold leading-[1.08] tracking-tight text-gray-950"
         >
-          {t('Từ ghi chú họp đến testcase, ', 'From meeting notes to test cases, ')}
-          <span className="text-brand-600">{t('không đứt một mắt xích', 'without a broken link')}</span>
+          {t('Quản lý đặc tả & truy xuất nguồn gốc tài liệu, ', 'Specification management & document traceability, ')}
+          <span className="text-brand-600">{t('hỗ trợ bởi AI', 'powered by AI')}</span>
         </h1>
-        <p className="mx-auto mt-5 max-w-[620px] text-[17px] leading-relaxed text-gray-600 sm:text-[19px]">
+        <p className="mx-auto mt-[18px] max-w-[620px] text-base leading-relaxed text-gray-600 md:text-lg">
           {t(
-            'SSAM dùng AI viết tài liệu yêu cầu từ ghi chú thô, theo dõi thiết kế trên Figma và giữ mọi testcase bám đúng yêu cầu mới nhất.',
-            'SSAM uses AI to turn rough notes into requirement documents, watches your Figma designs, and keeps every test case tied to the latest requirement.',
+            'Từ ghi chú họp đến URD, khung Figma và bộ testcase — một luồng, không đứt truy vết. Sửa một yêu cầu, cả đội biết ngay việc nào bị ảnh hưởng.',
+            'From meeting notes to the URD, Figma frames and test suites — one flow, no broken traces. Change a requirement and the whole team sees which work is affected.',
           )}
         </p>
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <Link to="/login" className={clsx(buttonClasses({ size: 'lg', inline: true }), 'rounded-[10px]')}>
-            {t('Vào SSAM', 'Go to SSAM')}
+        <div className="mt-7 flex flex-wrap justify-center gap-2.5">
+          <Link to="/register" className={buttonClasses({ size: 'lg', inline: true })}>
+            {t('Tạo tài khoản', 'Create an account')} <ArrowRightIcon aria-hidden="true" className="h-4 w-4" />
           </Link>
-          <Link
-            to="/register"
-            className={clsx(buttonClasses({ variant: 'secondary', size: 'lg', inline: true }), 'rounded-[10px]')}
-          >
-            {t('Bắt đầu miễn phí', 'Start for free')}
-          </Link>
-          <a
-            href="#tinh-nang"
-            className={clsx(buttonClasses({ variant: 'ghost', size: 'lg', inline: true }), 'rounded-[10px]')}
-          >
+          <a href="#cach-hoat-dong" className={buttonClasses({ variant: 'secondary', size: 'lg', inline: true })}>
             {t('Xem cách hoạt động', 'See how it works')}
           </a>
         </div>
-        <p className="mt-4 text-sm text-gray-500">
-          {t('Miễn phí cho đội nhỏ · Không cần thẻ', 'Free for small teams · No card needed')}
+        <p className="mt-3 text-[13px] text-gray-500">
+          {t('Dùng email công ty để đồng nghiệp tìm thấy bạn.', 'Use your work email so colleagues can find you.')}
         </p>
-
-        <div className="mt-12 rounded-[18px] border border-gray-200 bg-white/60 p-1.5 text-left shadow-float sm:mt-16 sm:p-2.5">
-          <div
-            role="img"
-            aria-label={t(
-              'Giao diện SSAM: bảng truy xuất của dự án nối yêu cầu với màn hình Figma và testcase, kèm trạng thái liên kết.',
-              'SSAM interface: a project traceability table linking requirements to Figma screens and test cases, with link status.',
-            )}
-            className="overflow-hidden rounded-card border border-gray-200"
-          >
-            <AppMock />
-          </div>
-        </div>
-        <div className="h-16 sm:h-24" />
       </div>
-    </section>
-  )
-}
 
-/* ------------------------------------------------- Vấn đề ------------------------------------------------- */
-
-function Problem() {
-  const { t } = useI18n()
-  const before = [
-    {
-      title: t('Ghi chú nằm trong chat', 'Notes live in chat'),
-      body: t(
-        'BA chép tay sang tài liệu, làm lại mỗi lần yêu cầu đổi.',
-        'The BA copies them into a document by hand, again every time a requirement changes.',
-      ),
-    },
-    {
-      title: t('Thiết kế đổi lặng lẽ trên Figma', 'Designs change quietly in Figma'),
-      body: t(
-        'Tài liệu không hay biết, QA phát hiện khi sát deadline.',
-        'The spec never hears about it, and QA finds out right before the deadline.',
-      ),
-    },
-    {
-      title: t('Testcase ở file Excel riêng', 'Test cases sit in a separate spreadsheet'),
-      body: t(
-        'Chạy theo bản cũ, pass hết mà vẫn sai yêu cầu.',
-        'They follow the old version: everything passes and still misses the requirement.',
-      ),
-    },
-  ]
-  const after = [
-    {
-      title: t('AI viết bản nháp yêu cầu', 'AI drafts the requirements'),
-      body: t(
-        'Dán ghi chú họp, nhận yêu cầu có mã và tiêu chí chấp nhận.',
-        'Paste your meeting notes, get requirements with IDs and acceptance criteria.',
-      ),
-    },
-    {
-      title: t('Thiết kế đổi là được báo', 'Design changes get flagged'),
-      body: t(
-        'Biết ngay yêu cầu nào bị ảnh hưởng bởi màn hình mới.',
-        'See right away which requirements a new screen affects.',
-      ),
-    },
-    {
-      title: t('Testcase nối với yêu cầu gốc', 'Test cases stay linked to the source'),
-      body: t(
-        'Yêu cầu đổi, testcase liên quan được đánh dấu cần cập nhật.',
-        'When a requirement changes, its test cases are marked for update.',
-      ),
-    },
-  ]
-
-  return (
-    <section aria-labelledby="van-de-title" className="border-y border-gray-200 bg-gray-50 py-20 lg:py-28">
-      <div className={WRAP}>
-        <SectionHead
-          id="van-de-title"
-          eyebrow={t('Vấn đề', 'The problem')}
-          title={t(
-            'Yêu cầu, thiết kế và kiểm thử đang nằm ở ba nơi',
-            'Requirements, designs and tests live in three different places',
-          )}
-          sub={t(
-            'Yêu cầu đổi một chữ, và không ai biết testcase nào phải sửa theo.',
-            'Change one word in a requirement, and nobody knows which test cases need to follow.',
-          )}
+      <div
+        role="group"
+        aria-label={t('Ví dụ truy vết', 'Traceability example')}
+        className={clsx(
+          PAD,
+          'relative z-[2] mt-9 flex max-w-[980px] flex-col items-center justify-center md:mt-14 md:flex-row',
+        )}
+      >
+        <ChainCard
+          changed
+          tag="REQ-12"
+          tagTone="amber"
+          meta={t('URD · bản 1.2', 'URD · v1.2')}
+          title={t('Đăng nhập bằng Google', 'Sign in with Google')}
+          status={t('Vừa đổi', 'Just changed')}
         />
-        <div className="mt-12 grid gap-6 md:mt-14 md:grid-cols-2">
-          {[
-            { key: 'before', heading: t('Cách làm hiện tại', 'The usual way'), items: before },
-            { key: 'after', heading: t('Với SSAM', 'With SSAM'), items: after },
-          ].map((col) => {
-            const isAfter = col.key === 'after'
-            return (
-              <div
-                key={col.key}
-                className={clsx(
-                  'rounded-2xl border bg-white p-5 sm:p-7',
-                  isAfter ? 'border-brand-200 shadow-[0_0_0_4px_#eef2ff]' : 'border-gray-200',
-                )}
-              >
-                <h3 className="flex items-center gap-2.5 text-lg font-bold tracking-[-0.02em] text-gray-900">
-                  <span className={clsx('h-2.5 w-2.5 rounded-full', isAfter ? 'bg-brand-600' : 'bg-[#b42318]')} />
-                  {col.heading}
-                </h3>
-                <ul className="mt-5 grid gap-3">
-                  {col.items.map((it) => (
-                    <li
-                      key={it.title}
-                      className={clsx(
-                        'flex items-start gap-3.5 rounded-[10px] border border-gray-200 px-4 py-3.5',
-                        isAfter ? 'bg-white' : 'bg-gray-50',
-                      )}
-                    >
-                      <span
-                        className={clsx(
-                          'grid h-7 w-7 flex-none place-items-center rounded-control',
-                          isAfter ? 'bg-brand-50 text-brand-600' : 'bg-[#fef3f2] text-[#b42318]',
-                        )}
-                      >
-                        <Icon d={isAfter ? ICONS.check : ICONS.x} className="!h-4 !w-4 [stroke-width:2.6]" />
-                      </span>
-                      <span>
-                        <span className="block text-[15px] font-medium text-gray-900">{it.title}</span>
-                        <span className="text-[14.5px] text-gray-600">{it.body}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )
-          })}
-        </div>
+        <ChainLink />
+        <ChainCard
+          tag="CORE-104"
+          tagTone="brand"
+          meta={t('Kanban · Đang làm', 'Kanban · In progress')}
+          title={t('Làm nút đăng nhập Google', 'Build the Google sign-in button')}
+          status={t('REQ đổi · cần xem', 'REQ changed · review')}
+        />
+        <ChainLink />
+        <ChainCard
+          tag="TC-31"
+          tagTone="ok"
+          meta="Test case"
+          title={t('Đăng nhập Google thành công', 'Google sign-in succeeds')}
+          status={t('Cần xem lại', 'Needs review')}
+        />
       </div>
+
+      <Cursor
+        name="Hà · BA"
+        color="#7a5af8"
+        style={{ left: '9%', top: '58%', '--t': '8s', '--dx': '12px', '--dy': '-8px' } as CSSProperties}
+      />
+      <Cursor
+        name="Minh · Dev"
+        color="#2f5bea"
+        style={{ left: '50%', top: '94%', '--t': '7s', '--dx': '-10px', '--dy': '-6px' } as CSSProperties}
+      />
+      <Cursor
+        name="Lan · QA"
+        color="#079455"
+        style={{ right: '12%', top: '62%', '--t': '10s', '--dx': '-12px', '--dy': '8px' } as CSSProperties}
+      />
     </section>
   )
 }
 
 /* ------------------------------------------------ Tính năng ------------------------------------------------ */
 
-function Card({ children, className }: { children: ReactNode; className?: string }) {
+// Thẻ chiếm 4 hàng của lưới cha (subgrid): icon / tiêu đề / mô tả / ô ví dụ thẳng hàng giữa 3 thẻ,
+// 3 ô ví dụ cao bằng nhau. Trên điện thoại lưới 1 cột nên thẻ xếp chồng.
+const SUBGRID_CARD =
+  'row-span-4 grid grid-rows-subgrid content-start border border-gray-200 bg-white rounded-card shadow-xs'
+const EXAMPLE_BOX = 'flex flex-col justify-center gap-1.5 rounded-control border border-gray-200 bg-gray-50'
+
+function Pillar({ icon, title, body, demo }: { icon: ReactNode; title: string; body: string; demo: ReactNode }) {
   return (
-    <div
-      className={clsx(
-        'rounded-card border border-gray-200 bg-white px-4 py-4 text-[14.5px] text-gray-900 shadow-xs sm:px-[18px]',
-        className,
-      )}
+    <article className={clsx(SUBGRID_CARD, 'gap-y-3 p-6')}>
+      {icon}
+      <h3 className="text-lg font-bold text-gray-950">{title}</h3>
+      <p className="text-sm leading-relaxed text-gray-600">{body}</p>
+      <div className={clsx(EXAMPLE_BOX, 'p-3 text-[13px] text-gray-700')}>{demo}</div>
+    </article>
+  )
+}
+
+function PillarIcon({ tone, children }: { tone: Tone; children: ReactNode }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={clsx('flex h-10 w-10 items-center justify-center rounded-control', TONES[tone])}
     >
       {children}
-    </div>
+    </span>
   )
 }
 
-function Lbl({ children }: { children: ReactNode }) {
-  return <p className="text-[12.5px] font-medium text-gray-500">{children}</p>
-}
-
-function FeatureRow({
-  eyebrow,
-  title,
-  body,
-  points,
-  reverse,
-  panel,
-  panelLabel,
-}: {
-  eyebrow: string
-  title: string
-  body: string
-  points: string[]
-  reverse?: boolean
-  panel: ReactNode
-  panelLabel: string
-}) {
-  return (
-    <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
-      <div className={clsx(reverse && 'lg:order-2')}>
-        <p className="text-sm font-medium text-brand-600">{eyebrow}</p>
-        <h3 className="mt-2.5 text-2xl font-bold leading-tight tracking-[-0.02em] text-gray-900 sm:text-[28px]">
-          {title}
-        </h3>
-        <p className="mt-3.5 text-base leading-relaxed text-gray-600 sm:text-[17px]">{body}</p>
-        <ul className="mt-[22px] grid gap-2.5">
-          {points.map((p) => (
-            <li key={p} className="flex gap-2.5 text-[15.5px] text-gray-600">
-              <span className="mt-0.5 grid h-[18px] w-[18px] flex-none place-items-center rounded-full bg-brand-50 text-brand-600">
-                <Icon d={ICONS.check} className="!h-3 !w-3 [stroke-width:3]" />
-              </span>
-              {p}
-            </li>
-          ))}
-        </ul>
-      </div>
-      <div role="img" aria-label={panelLabel} className="rounded-2xl border border-gray-200 bg-gray-100 p-4 sm:p-8">
-        {panel}
-      </div>
-    </div>
-  )
-}
+const Row = ({ children, className }: { children: ReactNode; className?: string }) => (
+  <div className={clsx('flex items-center gap-2', className)}>{children}</div>
+)
 
 function Features() {
   const { t } = useI18n()
   return (
-    <section id="tinh-nang" aria-labelledby="tinh-nang-title" className="scroll-mt-16 py-20 lg:py-28">
+    <section id="tinh-nang" aria-labelledby="tinh-nang-title" className={SECTION}>
       <div className={WRAP}>
         <SectionHead
           id="tinh-nang-title"
-          eyebrow={t('Tính năng', 'Features')}
-          title={t('Những việc lặp lại, SSAM làm thay bạn', 'SSAM handles the repetitive work for you')}
+          title={t(
+            'Ba thứ đội phần mềm hay làm rơi, SSAM giữ lại.',
+            'Three things software teams tend to drop. SSAM keeps them.',
+          )}
         />
-        <div className="mt-14 grid gap-20 lg:mt-16 lg:gap-[88px]">
-          <FeatureRow
-            eyebrow={t('Viết yêu cầu', 'Writing requirements')}
-            title={t('Từ ghi chú thô thành tài liệu yêu cầu', 'From rough notes to a requirements document')}
+        <div className="grid gap-5 md:grid-cols-3">
+          <Pillar
+            icon={
+              <PillarIcon tone="brand">
+                <AiSparkleIcon className="h-[18px] w-[18px]" />
+              </PillarIcon>
+            }
+            title={t('AI tạo tài liệu từ ghi chú họp', 'AI drafts documents from meeting notes')}
             body={t(
-              'Dán nguyên ghi chú cuộc họp. AI tách thành từng yêu cầu, BA chỉ cần rà lại và sửa.',
-              'Paste your meeting notes as they are. AI splits them into individual requirements; the BA just reviews and edits.',
+              'Dán ghi chú thô, AI tách thành các yêu cầu có cấu trúc. Bạn xem lại rồi mới tạo trang.',
+              'Paste rough notes and AI splits them into structured requirements. You review before any page is created.',
             )}
-            points={[
-              t(
-                'Mỗi yêu cầu có mã, mô tả và tiêu chí chấp nhận',
-                'Every requirement gets an ID, a description and acceptance criteria',
-              ),
-              t('Lưu phiên bản, xem lại ai sửa gì', 'Version history shows who changed what'),
-            ]}
-            panelLabel={t(
-              'Ví dụ: ghi chú họp được AI chuyển thành yêu cầu REQ-013',
-              'Example: meeting notes turned into requirement REQ-013 by AI',
-            )}
-            panel={
+            demo={
               <>
-                <Card>
-                  <Lbl>{t('Ghi chú họp 14/10', 'Meeting notes, Oct 14')}</Lbl>
-                  <p className="mt-1.5 text-gray-600">
-                    {t('khách muốn thanh toán 1 chạm, ', 'client wants one-tap checkout, ')}
-                    <mark className="rounded-[3px] bg-[#fff3c4] px-0.5 text-inherit">
-                      {t('màn xác nhận phải hiện phí ship', 'confirm screen must show shipping fee')}
-                    </mark>
-                    {t(', nhớ lưu địa chỉ…', ', remember to save the address…')}
-                  </p>
-                </Card>
-                <p className="my-3 text-center text-[13px] font-semibold text-brand-600">
-                  ↓ {t('AI tạo 3 yêu cầu', 'AI creates 3 requirements')}
-                </p>
-                <Card className="flex items-center justify-between gap-3">
-                  <div>
-                    <Lbl>REQ-013</Lbl>
-                    <p className="font-medium">
-                      {t('Màn xác nhận hiển thị phí giao hàng', 'Confirmation screen shows the shipping fee')}
-                    </p>
-                  </div>
-                  <Pill tone="blue">{t('Bản nháp', 'Draft')}</Pill>
-                </Card>
+                <Row className="text-gray-500">
+                  {t('“khách muốn quét QR, trên 5tr phải OTP…”', '“client wants QR scan, OTP above 5M…”')}
+                </Row>
+                <Row>
+                  <Arrow>↓</Arrow>
+                </Row>
+                <Row>
+                  <Tag tone="brand">REQ-1</Tag>
+                  {t('Quét QR khởi tạo', 'Scan QR to start')}
+                </Row>
+                <Row>
+                  <Tag tone="brand">REQ-2</Tag>
+                  {t('Xác thực OTP > 5.000.000đ', 'OTP check above 5,000,000 VND')}
+                </Row>
               </>
             }
           />
-          <FeatureRow
-            reverse
-            eyebrow={t('Theo dõi thiết kế', 'Design tracking')}
-            title={t('Figma đổi, bạn biết ngay', 'Figma changes, you know right away')}
+          <Pillar
+            icon={
+              <PillarIcon tone="violet">
+                <FrameIcon className="h-[18px] w-[18px]" />
+              </PillarIcon>
+            }
+            title={t('Thiết kế nằm ngay trong tài liệu', 'Designs live right in the document')}
             body={t(
-              'SSAM so sánh từng phiên bản màn hình và chỉ ra yêu cầu, testcase nào bị ảnh hưởng.',
-              'SSAM compares each version of a screen and points out which requirements and test cases are affected.',
+              'Gắn khung Figma và sơ đồ cạnh đúng yêu cầu. Dev đọc REQ là thấy luôn màn hình cần làm.',
+              'Attach Figma frames and diagrams next to the right requirement. Devs reading a REQ see the screen to build.',
             )}
-            points={[
-              t('So sánh phiên bản thiết kế', 'Compare design versions'),
-              t('Báo đúng người phụ trách', 'Notify the right owner'),
-            ]}
-            panelLabel={t(
-              'Ví dụ: màn Confirm đổi từ v3 sang v4, ảnh hưởng REQ-013 và TC-032',
-              'Example: the Confirm screen changes from v3 to v4, affecting REQ-013 and TC-032',
-            )}
-            panel={
+            demo={
               <>
-                <Card>
-                  <div className="flex justify-between gap-3">
-                    <span className="font-medium">Confirm · v3 → v4</span>
-                    <Lbl>{t('2 phút trước', '2 minutes ago')}</Lbl>
-                  </div>
-                  <div className="mt-2.5 grid gap-1.5 text-sm">
-                    <p className="rounded-md bg-success-50 px-2 py-1 text-success-700">
-                      + {t('Thêm dòng phí giao hàng', 'Added a shipping fee line')}
-                    </p>
-                    <p className="rounded-md bg-[#fef3f2] px-2 py-1 text-[#b42318]">
-                      − {t('Bỏ ô nhập mã giảm giá', 'Removed the discount code field')}
-                    </p>
-                  </div>
-                </Card>
-                <Card className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                  <span>
-                    {t('Ảnh hưởng', 'Affects')}: <span className="font-medium">REQ-013, TC-032</span>
-                  </span>
-                  <Pill tone="warn">{t('Cần xem lại', 'Needs review')}</Pill>
-                </Card>
+                <Row>
+                  <Tag tone="brand">REQ-14.1</Tag>
+                  {t('Quét QR khởi tạo', 'Scan QR to start')}
+                </Row>
+                <div className="flex h-16 items-center justify-center rounded-control bg-[repeating-linear-gradient(45deg,#fff,#fff_8px,#f2f4f7_8px,#f2f4f7_16px)] text-gray-400">
+                  {t('Khung Figma · Payment / Confirm', 'Figma frame · Payment / Confirm')}
+                </div>
               </>
             }
           />
-          <FeatureRow
-            eyebrow={t('Quy trình & phân quyền', 'Workflow & permissions')}
-            title={t('Làm theo cách đội bạn đã quen', 'Work the way your team already does')}
+          <Pillar
+            icon={
+              <PillarIcon tone="ok">
+                <LinkIcon className="h-[18px] w-[18px]" />
+              </PillarIcon>
+            }
+            title={t('Truy vết REQ ↔ issue ↔ testcase', 'Trace REQ ↔ issue ↔ test case')}
             body={t(
-              'Chọn Scrum, Kanban hoặc tự đặt giai đoạn. Vai trò riêng ở cấp công ty, workspace và dự án.',
-              'Pick Scrum, Kanban or define your own stages. Separate roles at the company, workspace and project level.',
+              'Mỗi issue và testcase gắn với REQ. Biết ngay REQ nào chưa có testcase, testcase nào lỗi thời.',
+              'Every issue and test case links to a REQ. See at once which REQs lack test cases and which tests are outdated.',
             )}
-            points={[
-              t('Luồng chuyển trạng thái tuỳ chỉnh', 'Custom status transitions'),
-              t('Quyền chi tiết theo từng cấp', 'Fine-grained permissions at every level'),
-            ]}
-            panelLabel={t(
-              'Ví dụ: quy trình dự án bốn giai đoạn và hai vai trò',
-              'Example: a four-stage project workflow and two roles',
-            )}
-            panel={
+            demo={
               <>
-                <Card>
-                  <Lbl>{t('Quy trình dự án', 'Project workflow')}</Lbl>
-                  <div className="mt-2.5 flex flex-wrap gap-1.5">
-                    <Pill tone="mute">Backlog</Pill>
-                    <Pill tone="mute">{t('Đang làm', 'In progress')}</Pill>
-                    <Pill tone="blue">Review</Pill>
-                    <Pill tone="ok">{t('Hoàn thành', 'Done')}</Pill>
-                  </div>
-                </Card>
-                <Card className="mt-3">
-                  <Lbl>{t('Vai trò', 'Roles')}</Lbl>
-                  <div className="mt-2.5 grid gap-2">
-                    <div className="flex justify-between gap-3">
-                      <span>Business Analyst</span>
-                      <span className="text-right text-gray-500">
-                        {t('Viết, duyệt yêu cầu', 'Writes, approves requirements')}
-                      </span>
-                    </div>
-                    <div className="flex justify-between gap-3">
-                      <span>QA</span>
-                      <span className="text-right text-gray-500">{t('Quản lý testcase', 'Manages test cases')}</span>
-                    </div>
-                  </div>
-                </Card>
+                <Row className="flex-wrap">
+                  <Tag tone="brand">REQ-14.3</Tag>
+                  <Arrow>→</Arrow>CORE-104<Arrow>→</Arrow>TC-41, TC-42
+                </Row>
+                <Row>
+                  <Tag tone="red">REQ-14.4</Tag>
+                  {t('Chưa có testcase', 'No test case yet')}
+                </Row>
               </>
             }
           />
         </div>
+      </div>
+    </section>
+  )
+}
+
+/* --------------------------------------------- Cách hoạt động --------------------------------------------- */
+
+// Vai trò cạnh tiêu đề bước: dùng Badge chung của app.
+function Who({ tone, children }: { tone: 'neutral' | 'blue' | 'success'; children: ReactNode }) {
+  return (
+    <span className="ml-2 inline-flex align-middle">
+      <Badge tone={tone}>{children}</Badge>
+    </span>
+  )
+}
+
+function Step({ n, title, body, example }: { n: number; title: ReactNode; body: string; example: ReactNode }) {
+  return (
+    <li className={clsx(SUBGRID_CARD, 'gap-y-0 p-[22px]')}>
+      <span
+        aria-hidden="true"
+        className="flex h-7 w-7 items-center justify-center rounded-full border border-brand-200 bg-brand-50 text-[13px] font-semibold text-brand-700"
+      >
+        {n}
+      </span>
+      <h3 className="mb-1.5 mt-3.5 text-base font-bold text-gray-950">{title}</h3>
+      <p className="mb-3.5 text-sm leading-[1.55] text-gray-600">{body}</p>
+      <div className={clsx(EXAMPLE_BOX, 'px-3 py-2.5 text-[13px] text-gray-900')}>{example}</div>
+    </li>
+  )
+}
+
+function HowItWorks() {
+  const { t } = useI18n()
+  return (
+    <section id="cach-hoat-dong" aria-labelledby="cach-hoat-dong-title" className={clsx(SECTION, 'bg-gray-25')}>
+      <div className={WRAP}>
+        <SectionHead
+          id="cach-hoat-dong-title"
+          title={t('Một yêu cầu đổi, chuyện gì xảy ra?', 'A requirement changes. What happens next?')}
+          sub={t(
+            'Không cần họp lại để báo cho nhau. Thay đổi đi theo đường truy vết.',
+            'No extra meeting to tell each other. The change travels along the trace.',
+          )}
+        />
+        <ol className="grid gap-5 md:grid-cols-3">
+          <Step
+            n={1}
+            title={
+              <>
+                {t('BA sửa REQ, gửi duyệt', 'The BA edits the REQ and sends it for review')}
+                <Who tone="neutral">BA</Who>
+              </>
+            }
+            body={t(
+              'Bản mới chỉ đánh dấu phần đổi, người duyệt không phải đọc lại cả tài liệu.',
+              'The new version highlights only what changed, so reviewers don’t reread the whole document.',
+            )}
+            example={
+              <>
+                <b className="text-xs font-bold text-gray-500">REQ-12 · {t('bản 1.2', 'v1.2')}</b>
+                <span>
+                  <del className="text-gray-400">{t('Đăng nhập bằng Google.', 'Sign in with Google.')}</del>
+                </span>
+                <span>
+                  {t('Đăng nhập Google ', 'Google sign-in ')}
+                  <ins className="rounded-[3px] bg-success-100 px-0.5 no-underline">
+                    {t('chỉ cho email công ty', 'for work emails only')}
+                  </ins>
+                  .
+                </span>
+              </>
+            }
+          />
+          <Step
+            n={2}
+            title={
+              <>
+                {t('Dev thấy cờ trên Kanban', 'The dev sees a flag on Kanban')}
+                <Who tone="blue">Dev</Who>
+              </>
+            }
+            body={t(
+              'Issue gắn REQ đó hiện “REQ đổi”. Bấm vào xem đổi gì rồi xác nhận.',
+              'Issues linked to that REQ show “REQ changed”. Click to see what changed, then confirm.',
+            )}
+            example={
+              <>
+                <Row>
+                  <Tag tone="brand">CORE-104</Tag>
+                  {t('Làm nút Google', 'Build Google button')}
+                </Row>
+                <Row>
+                  <Tag tone="amber">{t('REQ đổi', 'REQ changed')}</Tag>
+                  <span className="text-xs text-gray-500">{t('Xem đổi gì', 'See what changed')}</span>
+                </Row>
+              </>
+            }
+          />
+          <Step
+            n={3}
+            title={
+              <>
+                {t('QA biết test nào cần xem lại', 'QA knows which tests to revisit')}
+                <Who tone="success">QA</Who>
+              </>
+            }
+            body={t(
+              'Testcase gắn REQ đó được đánh dấu cần xem lại, QA sửa bước test rồi chạy lại.',
+              'Test cases linked to that REQ are marked for review; QA updates the steps and reruns them.',
+            )}
+            example={
+              <>
+                <Row>
+                  <Tag tone="ok">TC-31</Tag>
+                  {t('Đăng nhập Google', 'Google sign-in')}
+                </Row>
+                <Row>
+                  <Tag tone="amber">{t('Cần xem lại', 'Needs review')}</Tag>
+                </Row>
+              </>
+            }
+          />
+        </ol>
       </div>
     </section>
   )
@@ -745,65 +521,50 @@ function Roles() {
   const { t } = useI18n()
   const roles = [
     {
-      av: 'BA',
-      tone: 'bg-brand-50 text-brand-800',
-      title: 'Business Analyst',
+      name: 'BA',
+      dot: 'bg-violet-500',
       body: t(
-        'Không gõ lại ghi chú. Gửi duyệt theo quy trình, có phiên bản rõ ràng.',
-        'No more retyping notes. Send for approval through your workflow, with clear versions.',
+        'Viết URD/SRS, đánh dấu REQ, gửi duyệt theo phiên bản.',
+        'Write the URD/SRS, tag REQs, send versions for review.',
       ),
     },
     {
-      av: 'DE',
-      tone: 'bg-[#fef0c7] text-[#93370d]',
-      title: 'Designer',
+      name: 'Dev',
+      dot: 'bg-brand-600',
       body: t(
-        'Cứ làm trong Figma. SSAM tự thấy thay đổi và báo đúng người.',
-        'Keep working in Figma. SSAM spots the changes and tells the right people.',
+        'Nhận issue gắn REQ, biết ngay khi yêu cầu đổi.',
+        'Pick up issues linked to REQs, know right away when one changes.',
       ),
     },
     {
-      av: 'QA',
-      tone: 'bg-success-100 text-success-800',
-      title: 'QA',
-      body: t(
-        'Testcase bám yêu cầu mới nhất. Biết test gì và vì sao.',
-        'Test cases follow the latest requirement. Know what to test and why.',
-      ),
+      name: 'QA',
+      dot: 'bg-success-600',
+      body: t('Chạy test theo đợt, lượt lỗi tạo bug cho Dev.', 'Run tests in rounds; failed runs create bugs for Dev.'),
     },
     {
-      av: 'DEV',
-      tone: 'bg-[#f4ebff] text-[#6941c6]',
-      title: 'Dev / Tech Lead',
+      name: 'PM',
+      dot: 'bg-amber-500',
       body: t(
-        'Cập nhật tiến độ ngay trên yêu cầu, không cần họp sync.',
-        'Update progress right on the requirement, no sync meeting needed.',
+        'Xem tiến độ, REQ chưa có testcase, việc đang kẹt.',
+        'See progress, REQs without test cases, and blocked work.',
       ),
     },
   ]
   return (
-    <section
-      id="theo-vai-tro"
-      aria-labelledby="theo-vai-tro-title"
-      className="scroll-mt-16 border-y border-gray-200 bg-gray-50 py-20 lg:py-28"
-    >
+    <section id="vai-tro" aria-labelledby="vai-tro-title" className={SECTION}>
       <div className={WRAP}>
         <SectionHead
-          id="theo-vai-tro-title"
-          eyebrow={t('Theo vai trò', 'By role')}
-          title={t('Mỗi người bớt một việc lặp', 'One less repetitive task for everyone')}
+          id="vai-tro-title"
+          title={t('Mỗi người mở SSAM là thấy đúng việc của mình.', 'Everyone opens SSAM and sees their own work.')}
         />
-        <ul className="mt-12 grid gap-4 sm:grid-cols-2 md:mt-14 lg:grid-cols-4">
+        <ul className="grid grid-cols-2 gap-4 md:grid-cols-4">
           {roles.map((r) => (
-            <li key={r.av} className="rounded-[14px] border border-gray-200 bg-white p-6 shadow-xs">
-              <span
-                aria-hidden="true"
-                className={clsx('grid h-10 w-10 place-items-center rounded-[10px] text-sm font-bold', r.tone)}
-              >
-                {r.av}
-              </span>
-              <h3 className="mt-4 text-[17px] font-bold tracking-[-0.02em] text-gray-900">{r.title}</h3>
-              <p className="mt-2 text-[14.5px] leading-relaxed text-gray-600">{r.body}</p>
+            <li key={r.name} className="rounded-card border border-gray-200 bg-white p-[18px]">
+              <h3 className="flex items-center gap-2 text-base font-bold text-gray-950">
+                <span aria-hidden="true" className={clsx('h-2.5 w-2.5 rounded-full', r.dot)} />
+                {r.name}
+              </h3>
+              <p className="mt-2 text-sm leading-[1.55] text-gray-600">{r.body}</p>
             </li>
           ))}
         </ul>
@@ -812,59 +573,60 @@ function Roles() {
   )
 }
 
-/* ------------------------------------------------- Câu hỏi ------------------------------------------------- */
+/* ------------------------------------------------- Hỏi đáp ------------------------------------------------- */
 
 function Faq() {
   const { t } = useI18n()
   const items = [
     {
-      q: t('SSAM có miễn phí không?', 'Is SSAM free?'),
+      q: t('Đồng nghiệp tham gia công ty thế nào?', 'How do colleagues join our company?'),
       a: t(
-        'Có, trong giai đoạn đồ án SSAM miễn phí cho đội nhỏ.',
-        'Yes. While SSAM is a graduation project, it is free for small teams.',
+        'Ai đăng ký bằng email cùng domain với công ty sẽ được gợi ý tham gia và gửi yêu cầu; quản trị viên duyệt từng người. Bạn cũng có thể mời trực tiếp qua email.',
+        'Anyone who signs up with an email on your company’s domain is suggested to join and sends a request; an admin approves each one. You can also invite people directly by email.',
       ),
     },
     {
-      q: t('Dữ liệu công ty có bị lẫn với công ty khác không?', 'Can our company data mix with another company’s?'),
+      q: t('AI có tự sửa tài liệu của tôi không?', 'Does the AI edit my documents on its own?'),
       a: t(
-        'Không. Mỗi công ty là một không gian riêng, dữ liệu được cô lập.',
-        'No. Each company gets its own space, and its data is isolated.',
+        'Không. AI chỉ đề xuất (tách yêu cầu từ ghi chú, vẽ sơ đồ); nội dung chỉ vào tài liệu khi bạn bấm Áp dụng.',
+        'No. AI only suggests (splitting requirements from notes, drawing diagrams); content enters the document only when you click Apply.',
       ),
     },
     {
-      q: t('Không dùng Figma thì có dùng được không?', 'Can we use it without Figma?'),
+      q: t('Xuất tài liệu ra file được không?', 'Can I export documents to a file?'),
       a: t(
-        'Được. Viết yêu cầu và testcase vẫn hoạt động; theo dõi thiết kế là phần thêm.',
-        'Yes. Requirements and test cases work on their own; design tracking is an add-on.',
+        'Được, mỗi trang tài liệu xuất được PDF / in.',
+        'Yes, every document page can be exported to PDF or printed.',
       ),
     },
     {
-      q: t('Đội tôi làm Kanban, không làm Scrum?', 'Our team uses Kanban, not Scrum?'),
+      q: t('Ai được sửa, ai chỉ được xem?', 'Who can edit and who can only view?'),
       a: t(
-        'Chọn mẫu Kanban hoặc tự định nghĩa giai đoạn khi tạo dự án.',
-        'Pick the Kanban template or define your own stages when you create a project.',
+        'Quản trị viên công ty tự định nghĩa vai trò và quyền; mỗi người chỉ thấy và làm được những gì vai trò cho phép.',
+        'Company admins define their own roles and permissions; each person only sees and does what their role allows.',
       ),
     },
   ]
   return (
-    <section id="cau-hoi" aria-labelledby="cau-hoi-title" className="scroll-mt-16 py-20 lg:py-28">
-      <div className={WRAP}>
-        <SectionHead
-          id="cau-hoi-title"
-          eyebrow={t('Câu hỏi', 'FAQ')}
-          title={t('Câu hỏi thường gặp', 'Frequently asked questions')}
-        />
-        <div className="mx-auto mt-12 max-w-[760px]">
+    <section id="hoi-dap" aria-labelledby="hoi-dap-title" className={SECTION}>
+      <div className={clsx(WRAP, 'grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] md:gap-12')}>
+        <SectionHead id="hoi-dap-title" title={t('Câu hỏi thường gặp', 'Frequently asked questions')} />
+        <div>
           {items.map((it, i) => (
-            <details key={it.q} open={i === 0} className="group border-b border-gray-200 px-1 py-5">
-              <summary className="flex cursor-pointer list-none justify-between gap-4 rounded text-[17px] font-medium text-gray-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-100 [&::-webkit-details-marker]:hidden">
+            <details key={it.q} open={i === 0} className="group border-b border-gray-200 py-4">
+              <summary
+                className={clsx(
+                  FOCUS,
+                  'flex cursor-pointer list-none justify-between gap-4 text-base font-medium text-gray-900 [&::-webkit-details-marker]:hidden',
+                )}
+              >
                 {it.q}
-                <span aria-hidden="true" className="text-[22px] leading-none text-gray-500">
-                  <span className="group-open:hidden">+</span>
-                  <span className="hidden group-open:inline">–</span>
-                </span>
+                <ChevronDownIcon
+                  aria-hidden="true"
+                  className="mt-0.5 h-5 w-5 flex-none text-gray-500 transition-transform group-open:rotate-180"
+                />
               </summary>
-              <p className="mt-2.5 text-[15.5px] leading-relaxed text-gray-600">{it.a}</p>
+              <p className="mt-2.5 text-sm leading-relaxed text-gray-600">{it.a}</p>
             </details>
           ))}
         </div>
@@ -875,46 +637,29 @@ function Faq() {
 
 /* -------------------------------------------------- CTA -------------------------------------------------- */
 
+// Dải CTA sáng (brand-50, viền brand-100, lưới chấm xanh nhạt), chữ tối, nút chính thường.
 function Cta() {
   const { t } = useI18n()
   return (
-    <section aria-labelledby="cta-title" className="pb-20 lg:pb-28">
-      <div className={WRAP}>
-        <div className="relative overflow-hidden rounded-[20px] bg-brand-600 px-6 py-14 text-center text-white sm:px-12 sm:py-16">
-          <div
-            aria-hidden="true"
-            className="absolute inset-0 bg-[radial-gradient(50%_80%_at_50%_0%,rgba(255,255,255,.18),transparent)]"
-          />
-          <h2
-            id="cta-title"
-            className="relative text-[clamp(1.75rem,3vw,2.25rem)] font-bold leading-tight tracking-[-0.02em] text-balance"
-          >
-            {t('Mở workspace cho đội bạn', 'Open a workspace for your team')}
-          </h2>
-          <p className="relative mt-2.5 text-[17px] text-white/85 sm:text-lg">
-            {t(
-              'Hai phút để bắt đầu. Không cần thẻ, không cần cài đặt.',
-              'Two minutes to get started. No card, nothing to install.',
-            )}
-          </p>
-          <div className="relative mt-7 flex flex-wrap justify-center gap-3">
-            <Link
-              to="/register"
-              className={clsx(buttonClasses({ variant: 'inverted', size: 'lg', inline: true }), 'rounded-[10px]')}
-            >
-              {t('Bắt đầu miễn phí', 'Start for free')}
-            </Link>
-            <Link
-              to="/login"
-              className={clsx(
-                buttonClasses({ variant: 'invertedOutline', size: 'lg', inline: true }),
-                'rounded-[10px]',
-              )}
-            >
-              {t('Đăng nhập', 'Log in')}
-            </Link>
-          </div>
-        </div>
+    <section aria-labelledby="cta-title" className="px-3 pb-3 md:px-8 md:pb-8">
+      <div
+        className={clsx(
+          'mx-auto flex max-w-[1376px] flex-wrap items-center gap-6 rounded-card border border-brand-100 bg-brand-50 px-[22px] py-8 text-gray-950 md:p-14',
+          DOTS_BRAND,
+        )}
+      >
+        <h2
+          id="cta-title"
+          className="flex-[1_1_360px] text-[clamp(1.5rem,3vw,2.125rem)] font-bold leading-tight tracking-tight"
+        >
+          {t(
+            'Đưa tài liệu, việc và kiểm thử của đội về một chỗ.',
+            'Bring your team’s docs, work and testing into one place.',
+          )}
+        </h2>
+        <Link to="/register" className={buttonClasses({ size: 'lg', inline: true })}>
+          {t('Tạo tài khoản', 'Create an account')} <ArrowRightIcon aria-hidden="true" className="h-4 w-4" />
+        </Link>
       </div>
     </section>
   )
@@ -923,81 +668,19 @@ function Cta() {
 /* ------------------------------------------------- Footer ------------------------------------------------- */
 
 function Footer() {
-  const { t, lang, setLang } = useI18n()
-  const link = 'rounded transition-colors hover:text-gray-900'
+  const { t } = useI18n()
+  const link = clsx(FOCUS, 'transition-colors hover:text-gray-900')
   return (
-    <footer className="border-t border-gray-200 pb-8 pt-12 text-sm text-gray-500">
-      <div className={WRAP}>
-        <div className="grid gap-8 sm:grid-cols-3 md:grid-cols-[2fr_1fr_1fr_1fr]">
-          <div className="sm:col-span-3 md:col-span-1">
-            <Logo />
-            <p className="mt-3 max-w-[300px]">
-              {t(
-                'Nền tảng đặc tả phần mềm cho đội nhỏ. Đồ án SEP490-G65, Đại học FPT.',
-                'A software specification platform for small teams. Graduation project SEP490-G65, FPT University.',
-              )}
-            </p>
-          </div>
-          <nav aria-label={t('Sản phẩm', 'Product')}>
-            <h2 className="mb-1 text-sm font-semibold text-gray-900">{t('Sản phẩm', 'Product')}</h2>
-            <ul>
-              {getNavLinks(t).map((l) => (
-                <li key={l.href} className="mt-2.5">
-                  <a href={l.href} className={link}>
-                    {l.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
-          <nav aria-label={t('Tài khoản', 'Account')}>
-            <h2 className="mb-1 text-sm font-semibold text-gray-900">{t('Tài khoản', 'Account')}</h2>
-            <ul>
-              <li className="mt-2.5">
-                <Link to="/login" className={link}>
-                  {t('Đăng nhập', 'Log in')}
-                </Link>
-              </li>
-              <li className="mt-2.5">
-                <Link to="/register" className={link}>
-                  {t('Tạo tài khoản', 'Create account')}
-                </Link>
-              </li>
-              <li className="mt-2.5">
-                <Link to="/forgot-password" className={link}>
-                  {t('Quên mật khẩu', 'Forgot password')}
-                </Link>
-              </li>
-            </ul>
-          </nav>
-          <div role="group" aria-label="Ngôn ngữ / Language">
-            <h2 className="mb-1 text-sm font-semibold text-gray-900">{t('Ngôn ngữ', 'Language')}</h2>
-            <ul>
-              {(
-                [
-                  ['vi', 'Tiếng Việt'],
-                  ['en', 'English'],
-                ] as const
-              ).map(([code, name]) => (
-                <li key={code} className="mt-2.5">
-                  <button
-                    type="button"
-                    lang={code}
-                    aria-pressed={lang === code}
-                    onClick={() => setLang(code)}
-                    className={clsx(link, lang === code && 'font-medium text-gray-900')}
-                  >
-                    {name}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-        <div className="mt-10 flex flex-wrap justify-between gap-2 border-t border-gray-200 pt-5">
-          <span>© 2026 SSAM</span>
-          <span>{t('Ảnh minh hoạ là giao diện SSAM', 'Illustrations show the SSAM interface')}</span>
-        </div>
+    <footer className="border-t border-gray-100 py-7 text-[13px] text-gray-500">
+      <div className={clsx(WRAP, 'flex flex-wrap items-center gap-5')}>
+        <span className="mr-auto">© SSAM</span>
+        <Link to="/login" className={link}>
+          {t('Đăng nhập', 'Log in')}
+        </Link>
+        <Link to="/register" className={link}>
+          {t('Đăng ký', 'Sign up')}
+        </Link>
+        <LanguageSwitch />
       </div>
     </footer>
   )
@@ -1011,8 +694,8 @@ export function LandingPage() {
       <Nav />
       <main>
         <Hero />
-        <Problem />
         <Features />
+        <HowItWorks />
         <Roles />
         <Faq />
         <Cta />

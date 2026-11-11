@@ -64,6 +64,12 @@ const ERRORS: Record<string, () => string> = {
   OPEN_VERSION_EXISTS: () => tr('Trang đang có một bản chưa duyệt.', 'This page already has an open version.'),
   NO_BASELINE: () => tr('Trang chưa có bản đã duyệt.', 'This page has no approved version yet.'),
   SELF_APPROVAL_NOT_ALLOWED: () => tr('Bạn không thể tự duyệt bản mình gửi.', "You can't approve your own submission."),
+  // Đề xuất BE (doc/Documents-API-Contract.md §7.2): chặn phê duyệt khi bản còn góp ý gốc chưa xử lý.
+  OPEN_COMMENTS: () =>
+    tr(
+      'Bản này còn góp ý chưa xử lý — xử lý hết rồi mới phê duyệt được.',
+      'This version still has open comments — resolve them before approving.',
+    ),
   AI_DISABLED: () => tr('Dự án đang tắt module AI.', 'The AI module is off for this project.'),
   AI_UNAVAILABLE: () => tr('Dịch vụ AI đang lỗi, thử lại sau.', 'The AI service is unavailable. Try again later.'),
   INVALID_PARENT: () => tr('Không thể chuyển vào vị trí này.', "Can't move it there."),

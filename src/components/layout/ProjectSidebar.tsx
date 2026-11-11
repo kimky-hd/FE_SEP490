@@ -191,7 +191,7 @@ export function ProjectSidebar({
           project={project}
           userId={user?.id}
           companyId={currentCompany?.companyId ?? null}
-          companyName={currentCompany?.companyName ?? t('Không gian cá nhân', 'Personal space')}
+          companyName={currentCompany?.companyName ?? t('Chưa có công ty', 'No company')}
         />
         <button
           type="button"

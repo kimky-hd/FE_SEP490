@@ -57,6 +57,7 @@ const { documentApi } = (await import('@/api/documentApi')) as unknown as {
     createNode: (pid: number, body: { kind: 'PAGE'; title: string; docType: 'URD' }) => Promise<DocumentNodeDto>
     get: (id: number) => Promise<DocumentDetailDto>
     saveContent: (id: number, versionId: number, body: SaveContentBody) => Promise<unknown>
+    addComment: (id: number, body: { versionId: number; body: string }) => Promise<unknown>
   }
 }
 
@@ -131,5 +132,28 @@ describe('DocumentView', () => {
     expect(await screen.findByText('Đã gửi duyệt.')).toBeInTheDocument()
     expect(onTreeChanged).toHaveBeenCalled()
     expect(await screen.findByRole('button', { name: 'Phê duyệt' })).toBeInTheDocument()
+  })
+
+  it('chờ duyệt: có "Yêu cầu sửa"; còn góp ý mở thì khoá "Phê duyệt", xử lý xong mới duyệt được', async () => {
+    const user = userEvent.setup()
+    const { current } = await documentApi.get(pageWithReq.documentId)
+    expect(current.status).toBe('IN_REVIEW')
+    await documentApi.addComment(pageWithReq.documentId, { versionId: current.versionId, body: 'OTP qua kênh nào?' })
+    renderView(vi.fn(), pageWithReq)
+
+    const blocked = await screen.findByRole('button', { name: 'Phê duyệt · còn 1 góp ý' })
+    expect(blocked).toBeDisabled()
+    expect(blocked).toHaveAccessibleDescription(/Còn 1 góp ý chưa xử lý/)
+    expect(screen.getByRole('button', { name: 'Yêu cầu sửa' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Góp ý: 0 đã xử lý · 1 còn mở' }))
+    await user.click(await screen.findByRole('button', { name: 'Đã xử lý' }))
+    expect(await screen.findByRole('button', { name: 'Góp ý: 1 đã xử lý · 0 còn mở' })).toBeInTheDocument()
+    const approve = screen.getByRole('button', { name: 'Phê duyệt' })
+    expect(approve).toBeEnabled()
+
+    await user.click(approve)
+    expect(await screen.findByText('Đã phê duyệt.')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Chỉnh sửa (tạo bản nháp mới)' })).toBeInTheDocument()
   })
 })

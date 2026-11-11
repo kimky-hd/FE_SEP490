@@ -41,6 +41,8 @@ function NavLinkItem({ item, active, onNavigate }: { item: NavItem; active: bool
 
 interface MainNavProps {
   items: NavItem[]
+  /** Nhóm "Quản trị công ty" — đã lọc theo quyền; rỗng thì không hiện. */
+  adminItems: NavItem[]
   isActive: (item: NavItem) => boolean
   recentProjects: ProjectDto[]
   currentProjectId: number
@@ -48,13 +50,31 @@ interface MainNavProps {
   onNavigate: () => void
 }
 
-export function MainNav({ items, isActive, recentProjects, currentProjectId, signalOf, onNavigate }: MainNavProps) {
+export function MainNav({
+  items,
+  adminItems,
+  isActive,
+  recentProjects,
+  currentProjectId,
+  signalOf,
+  onNavigate,
+}: MainNavProps) {
   const { t } = useI18n()
   return (
     <nav aria-label={t('Điều hướng chính', 'Main navigation')} className="flex-1 space-y-0.5 overflow-y-auto px-3 pt-2">
       {items.map((item) => (
         <NavLinkItem key={item.label} item={item} active={isActive(item)} onNavigate={onNavigate} />
       ))}
+      {adminItems.length > 0 && (
+        <div className="pt-5">
+          <p className="px-2.5 pb-1.5 text-xs font-medium text-gray-500">{t('Quản trị công ty', 'Company admin')}</p>
+          <div className="space-y-0.5">
+            {adminItems.map((item) => (
+              <NavLinkItem key={item.label} item={item} active={isActive(item)} onNavigate={onNavigate} />
+            ))}
+          </div>
+        </div>
+      )}
       {recentProjects.length > 0 && (
         <div className="pt-5">
           <p className="px-2.5 pb-1.5 text-xs font-medium text-gray-500">{t('Dự án gần đây', 'Recent projects')}</p>

@@ -17,13 +17,19 @@ import { draftToPhaseBody, phaseToDraft, validateDraftPhase, type DraftPhase } f
 import { PERMISSIONS, type RoleDto } from '@/types/rbac'
 import type { PhaseDto, WorkflowDto, WorkflowIssue } from '@/types/project'
 import { PhaseWorkflowEditor } from './PhaseWorkflowEditor'
+import { PhaseGatePanel, lifecycleLabel, lifecycleTone } from './PhaseGatePanel'
+import { usePhaseGateInput } from './usePhaseGateInput'
+import { FEATURES } from '@/lib/features'
+import { GATE_ORDER, normalizeGates } from '@/lib/phaseGates'
+import { evaluatePhaseGates, phaseLifecycles, reopenablePhaseId, type GateResult } from '@/lib/phaseGateEval'
 import { useI18n } from '@/i18n'
 import { useProjectContext } from './ProjectLayout'
 import { SectionBar, TabBody } from '@/components/layout/tabParts'
-import { PhasePipelineTracker } from '@/components/projects/PhasePipelineTracker'
 
 // Tab Workflow — mockup "Cấu hình Workflow" (card "Phase & trạng thái" + bảng "Luật chuyển trạng thái" Từ → Đến · Role
 // được phép · Điều kiện) · UC §II.5.8–5.13 · FR §III.6.1 (dạng bảng, không BPMN kéo-thả — LI-05).
+// Thẻ giai đoạn kiêm "pipeline" tiến độ (Đã xong / Đang chạy / Sắp tới + số điều kiện đạt); khối "Điều kiện hoàn thành"
+// của phase đang chọn nằm giữa thẻ và bảng luật chuyển (§9.2, §12.6 — đề xuất).
 export function ProjectWorkflowPage() {
   const { t } = useI18n()
   const { project, can, isArchived, reload: reloadProject } = useProjectContext()
@@ -40,10 +46,21 @@ export function ProjectWorkflowPage() {
   const [editing, setEditing] = useState<DraftPhase | null>(null)
   const [editingPhase, setEditingPhase] = useState<PhaseDto | null>(null)
   const [addOpen, setAddOpen] = useState(false)
-  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
+  const [notice, setNotice] = useState<{ tone: 'success' | 'error' | 'warning'; text: string } | null>(null)
 
-  const phases = workflow.data?.phases ?? []
+  const phases = useMemo(() => workflow.data?.phases ?? [], [workflow.data])
   const selected = phases.find((p) => p.phaseId === selectedPhaseId) ?? phases.find((p) => p.isActive) ?? phases[0]
+
+  // Điều kiện hoàn thành: tải một lần cho mọi phase (chỉ nguồn cần), kiểm từng phase bằng hàm thuần.
+  const allCriteria = GATE_ORDER.filter((c) => phases.some((p) => normalizeGates(p.exitCriteria).includes(c)))
+  const gateInput = usePhaseGateInput(project.projectId, allCriteria, can)
+  const lifecycles = useMemo(() => phaseLifecycles(phases), [phases])
+  const reopenableId = useMemo(() => reopenablePhaseId(phases, lifecycles), [phases, lifecycles])
+  const gateResults = useMemo(() => {
+    const map = new Map<number, GateResult[]>()
+    if (gateInput.data) for (const p of phases) map.set(p.phaseId, evaluatePhaseGates(p, gateInput.data))
+    return map
+  }, [phases, gateInput.data])
   // Role cho editor = role dự án đang bật + role đang được dùng trong luật (kể cả đã tắt) để không mất dữ liệu.
   const editorRoles = useMemo(() => {
     const list = [...(companyRoles.data ?? [])]
@@ -82,8 +99,6 @@ export function ProjectWorkflowPage() {
     <TabBody>
       {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
 
-      <PhasePipelineTracker projectId={project.projectId} phases={phases} sdlcMethod={wf.sdlcMethod} />
-
       {/* Phase & trạng thái */}
       <section className="space-y-3">
         <SectionBar
@@ -106,6 +121,7 @@ export function ProjectWorkflowPage() {
         <ol className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {phases.map((phase, index) => {
             const isSelected = selected?.phaseId === phase.phaseId
+            const life = lifecycles.get(phase.phaseId)
             return (
               <li
                 key={phase.phaseId}
@@ -131,6 +147,11 @@ export function ProjectWorkflowPage() {
                       {index + 1}
                     </span>
                     {!phase.isActive && t('Đã tắt', 'Disabled')}
+                    {life && (
+                      <Badge tone={lifecycleTone(life.status)} dot>
+                        {lifecycleLabel(life.status, t)}
+                      </Badge>
+                    )}
                   </span>
                   <span className="mt-2 block text-sm font-semibold text-gray-950">{phase.name}</span>
                   <span className="mt-3 flex flex-wrap gap-1.5">
@@ -152,6 +173,10 @@ export function ProjectWorkflowPage() {
                         </span>
                       ))}
                   </span>
+                  <GateSummary
+                    results={gateResults.get(phase.phaseId)}
+                    total={normalizeGates(phase.exitCriteria).length}
+                  />
                 </button>
                 {canManage && (
                   <button
@@ -168,6 +193,35 @@ export function ProjectWorkflowPage() {
           })}
         </ol>
       </section>
+
+      {/* BE chưa trả lifecycleStatus (§12.6) → tiến độ đang theo mặc định, nói rõ để không hiểu nhầm là dữ liệu thật. */}
+      {[...lifecycles.values()].some((l) => l.inferred) && (
+        <p className="-mt-3 text-xs text-gray-500">
+          {t(
+            'Máy chủ chưa lưu tiến độ giai đoạn — đang hiển thị mặc định: giai đoạn đầu tiên đang chạy.',
+            'The server does not track phase progress yet — showing the default: the first phase is in progress.',
+          )}
+        </p>
+      )}
+
+      {/* Điều kiện hoàn thành + chốt giai đoạn của phase đang chọn */}
+      {selected && (
+        <PhaseGatePanel
+          projectId={project.projectId}
+          phase={selected}
+          lifecycle={lifecycles.get(selected.phaseId)}
+          results={gateResults.get(selected.phaseId) ?? null}
+          isEvaluating={gateInput.isLoading}
+          canManage={canManage}
+          lifecycleActions={FEATURES.phaseLifecycle}
+          canReopen={reopenableId === selected.phaseId}
+          onReevaluate={() => void gateInput.reload()}
+          onChanged={async (next, message, tone = 'success') => {
+            setNotice({ tone, text: message })
+            await afterChange(next)
+          }}
+        />
+      )}
 
       {/* Luật chuyển của phase đang chọn */}
       {selected && (
@@ -498,5 +552,25 @@ function PhaseFormModal({
         )}
       </div>
     </Modal>
+  )
+}
+
+/** Dòng tóm tắt điều kiện trên thẻ giai đoạn: "2/3 điều kiện đạt" (chưa kiểm xong → chỉ số điều kiện). */
+function GateSummary({ results, total }: { results: GateResult[] | undefined; total: number }) {
+  const { t } = useI18n()
+  if (total === 0) return null
+  const met = results?.filter((r) => r.state === 'MET').length
+  const unknown = results?.some((r) => r.state === 'UNKNOWN')
+  return (
+    <span
+      className={clsx(
+        'mt-3 inline-flex items-center gap-1 text-xs',
+        met === undefined ? 'text-gray-500' : met === total ? 'text-success-700' : 'text-gray-600',
+      )}
+    >
+      {met === undefined
+        ? t(`${total} điều kiện hoàn thành`, `${total} exit criteria`)
+        : t(`${met}/${total} điều kiện đạt`, `${met}/${total} criteria met`) + (unknown ? ' · ?' : '')}
+    </span>
   )
 }

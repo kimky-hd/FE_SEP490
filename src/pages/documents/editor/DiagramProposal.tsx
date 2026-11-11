@@ -59,11 +59,11 @@ export function DiagramProposal({ state, replacing, onApply, onRetry, onDismiss 
         {state.status === 'ready' &&
           (tab === 'diagram' ? (
             // Khung cuộn bọc ngoài: đặt max-height thẳng lên khung flex sẽ ép SVG co nhỏ theo chiều cao.
-            <div className="max-h-[360px] overflow-auto">
+            <div className="max-h-[45vh] overflow-auto">
               <MermaidPreview code={state.result.mermaid} />
             </div>
           ) : (
-            <pre className="max-h-[360px] overflow-auto rounded-control bg-gray-50 px-3 py-2 font-mono text-[12.5px] leading-relaxed text-gray-800">
+            <pre className="max-h-[45vh] overflow-auto rounded-control bg-gray-50 px-3 py-2 font-mono text-[12.5px] leading-relaxed text-gray-800">
               {state.result.mermaid}
             </pre>
           ))}

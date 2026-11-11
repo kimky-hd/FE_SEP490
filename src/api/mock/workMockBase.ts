@@ -3,7 +3,7 @@
 //
 // Cách phát hiện REQ đổi: mỗi liên kết lưu `hash` = ContentHash của REQ trong bản baseline lúc liên kết / lúc ghi nhận
 // thay đổi gần nhất. Mỗi lần đọc / ghi dữ liệu một dự án, store so hash đó với baseline hiện tại của tài liệu (đọc từ
-// mock tài liệu). Khác → đánh dấu (issue.reqChanged, testcase.needsReview, run.needsRerun). Baseline chỉ đổi khi một
+// mock tài liệu). Khác → đánh dấu (issue.reqChanged, testcase: cờ test lại REQ_CHANGED theo môi trường). Baseline chỉ đổi khi một
 // bản được DUYỆT nên kết quả giống BE chạy bước §3 ngay sau khi duyệt, mà không phải móc vào luồng duyệt.
 
 import { ApiError } from '@/lib/apiClient'
@@ -11,6 +11,7 @@ import { tr } from '@/i18n'
 import type { KeyValueStorage, MockProjectAccess } from '@/api/mockSupport'
 import type { ReqRefDto, RequirementRef, UserRef } from '@/types/issue'
 import type { WorkflowDto } from '@/types/project'
+import type { DocSectionDto } from '@/types/testing'
 import type { DocReqIndex, ReqLite } from './documentMockStore'
 
 export interface WorkMockEnv {
@@ -21,6 +22,10 @@ export interface WorkMockEnv {
   members: (projectId: number) => Promise<UserRef[]>
   /** REQ của các tài liệu trong dự án (đồng bộ từ kho mock tài liệu, hoặc bất đồng bộ qua API Tài liệu thật). */
   reqs: (projectId: number) => DocReqIndex[] | Promise<DocReqIndex[]>
+  /** Mục (heading) của một tài liệu — Test cases v2 (GET /documents/{id}/sections). Mặc định: rỗng. */
+  sections?: (documentId: number) => Promise<DocSectionDto[]>
+  /** Loại vai trò (RoleKind) của thành viên theo userId — để biết ai là QA. Mặc định: không biết. */
+  memberKinds?: (projectId: number) => Promise<Record<number, string>>
   storage?: KeyValueStorage | null
   now?: () => Date
   /** Độ trễ giả (ms). Mặc định 120–250ms; test truyền 0. */
@@ -33,6 +38,8 @@ export function resolveEnv(env: WorkMockEnv): ResolvedEnv {
   return {
     ...env,
     storage: env.storage ?? null,
+    sections: env.sections ?? (async () => []),
+    memberKinds: env.memberKinds ?? (async () => ({})),
     now: env.now ?? (() => new Date()),
     latency: env.latency ?? (() => 120 + Math.round(Math.random() * 130)),
   }

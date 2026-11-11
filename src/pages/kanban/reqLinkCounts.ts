@@ -30,6 +30,7 @@ export function useReqLinkCounts(
         map.set(uid, cur)
       }
       for (const i of issues) for (const r of i.requirements) if (r.documentId === documentId) bump(r.reqUid, 'issues')
+      // Testcase của đợt test hiện tại (Test cases v2, #47 mặc định lấy đợt đang mở).
       for (const tc of tests) for (const r of tc.requirements) if (r.documentId === documentId) bump(r.reqUid, 'tests')
       setCounts(map)
     })

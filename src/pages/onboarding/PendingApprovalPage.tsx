@@ -24,7 +24,7 @@ export function PendingApprovalPage() {
   const [rejected, setRejected] = useState(false)
   const [checkError, setCheckError] = useState<string | null>(null)
 
-  if (!companyId || !requestId) return <Navigate to="/onboarding/account-type" replace />
+  if (!companyId || !requestId) return <Navigate to="/onboarding/start" replace />
 
   const handleCheck = async () => {
     setIsChecking(true)

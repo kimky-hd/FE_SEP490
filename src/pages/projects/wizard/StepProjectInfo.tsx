@@ -1,15 +1,17 @@
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import { Button } from '@/components/ui/Button'
-import { CloseIcon, PlusIcon, TrashIcon, WorkflowIcon, BoltIcon, PencilIcon } from '@/components/ui/icons'
+import { BoltIcon, PlusIcon, TrashIcon, WorkflowIcon } from '@/components/ui/icons'
 import { Card } from '@/components/layout/PageParts'
-import { blankPhase, newStatus, newTransition, type DraftPhase } from '@/lib/workflowDraft'
-import type { SdlcMethod, SdlcTemplateDto } from '@/types/project'
+import { blankPhase, newStatus, newTransition, type DraftPhase, type DraftStatus } from '@/lib/workflowDraft'
+import { DEFAULT_CATEGORY_COLOR, STATUS_CATEGORY_LABEL } from '@/lib/workflowValidation'
+import type { SdlcMethod, SdlcTemplateDto, StatusCategory } from '@/types/project'
 import type { RoleDto } from '@/types/rbac'
 import { useI18n } from '@/i18n'
 import { templateDescription, templateName } from '@/i18n/sdlc'
 import { DESCRIPTION_MAX, MAX_PHASES, NAME_MAX, type WizardState } from './wizardState'
-import { ExitCriteriaChips } from '@/components/projects/ExitCriteriaChips'
+import { GateChips, useAnchoredPopover } from '../GateChips'
 
 // Bước 1: thông tin dự án + cách đội làm việc (SDLC) + các giai đoạn. Mã dự án (tiền tố issue) không đổi được sau khi tạo.
 
@@ -43,7 +45,7 @@ export function StepProjectInfo({
   onChooseMethod,
 }: Props) {
   const { t } = useI18n()
-  const editable = state.sdlcMethod === 'CUSTOM'
+  const editable = true
 
   const setPhases = (phases: DraftPhase[]) => update({ phases, phasesTouched: true })
   const updatePhase = (key: string, patch: Partial<DraftPhase>) =>
@@ -246,28 +248,13 @@ export function StepProjectInfo({
                 <span className="mt-2 flex-1 text-sm text-gray-600">
                   {templateDescription(tpl.method, tpl.description)}
                 </span>
-                <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-2 text-xs">
-                  <span className="inline-flex items-center gap-1.5 text-gray-500">
-                    {tpl.phasesEditable ? <WorkflowIcon className="h-3.5 w-3.5" /> : <BoltIcon className="h-3.5 w-3.5" />}
-                    {t(
-                      `${tpl.phases.length} giai đoạn có sẵn${tpl.phasesEditable ? ', sửa được' : ''}`,
-                      `${tpl.phases.length} built-in ${tpl.phases.length === 1 ? 'phase' : 'phases'}${tpl.phasesEditable ? ', editable' : ''}`,
-                    )}
-                  </span>
-                  {selected && tpl.method !== 'CUSTOM' && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        update({ sdlcMethod: 'CUSTOM', phasesTouched: true })
-                      }}
-                      className="inline-flex items-center gap-1 font-semibold text-brand-700 hover:text-brand-900 hover:underline"
-                    >
-                      <PencilIcon className="h-3 w-3" />
-                      {t('Sửa mẫu', 'Edit')}
-                    </button>
+                <span className="mt-3 inline-flex items-center gap-1.5 text-xs text-gray-500">
+                  {tpl.phasesEditable ? <WorkflowIcon className="h-3.5 w-3.5" /> : <BoltIcon className="h-3.5 w-3.5" />}
+                  {t(
+                    `${tpl.phases.length} giai đoạn có sẵn${tpl.phasesEditable ? ', sửa được' : ''}`,
+                    `${tpl.phases.length} built-in ${tpl.phases.length === 1 ? 'phase' : 'phases'}${tpl.phasesEditable ? ', editable' : ''}`,
                   )}
-                </div>
+                </span>
               </button>
             )
           })}
@@ -279,45 +266,22 @@ export function StepProjectInfo({
         flush
         title={t('Các giai đoạn', 'Phases')}
         subtitle={t(
-          'Issue đi qua các giai đoạn từ trên xuống. Trạng thái và luật chuyển chỉnh ở bước 2.',
-          'Issues move through phases top to bottom. Statuses and transitions are set in step 2.',
+          'Issue đi qua các giai đoạn từ trên xuống; giai đoạn chỉ hoàn thành khi đạt đủ điều kiện. Bấm vào trạng thái để sửa; luật chuyển chỉnh ở bước 2.',
+          'Issues move through phases top to bottom; a phase completes only when its exit criteria are met. Click a status to edit it; transitions are set in step 2.',
         )}
       >
-        {!editable && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-blue-50/50 px-5 py-2.5 sm:px-6">
-            <div className="flex items-center gap-2 text-xs text-brand-900">
-              <WorkflowIcon className="h-4 w-4 shrink-0 text-brand-600" />
-              <span>
-                {t(
-                  `Đang xem mô hình chuẩn ${templateName(state.sdlcMethod, state.sdlcMethod)}. Bấm Chỉnh sửa để thêm/bớt điều kiện cổng nghiệm thu.`,
-                  `Using standard ${templateName(state.sdlcMethod, state.sdlcMethod)}. Click Edit to customize gates.`,
-                )}
-              </span>
-            </div>
-            <Button
-              type="button"
-              variant="secondary"
-              inline
-              className="!h-7 !px-2.5 !text-xs font-medium"
-              onClick={() => update({ sdlcMethod: 'CUSTOM', phasesTouched: true })}
-            >
-              <PencilIcon className="mr-1 h-3 w-3" />
-              {t('Chỉnh sửa mô hình (Custom)', 'Edit as Custom')}
-            </Button>
-          </div>
-        )}
-
         <div className="md:overflow-x-auto">
-          <table className="w-full text-sm md:min-w-[860px]">
+          <table className="w-full text-sm md:min-w-[980px]">
             <thead className="hidden md:table-header-group">
               <tr className="border-y border-gray-200 bg-gray-50 text-left text-xs font-medium text-gray-500">
-                <th className="w-24 py-2.5 pl-6 pr-3 font-medium">{t('Thứ tự', 'Order')}</th>
-                <th className="w-52 px-3 py-2.5 font-medium">{t('Tên giai đoạn', 'Phase name')}</th>
+                <th className="w-32 py-2.5 pl-6 pr-3 font-medium">{t('Thứ tự', 'Order')}</th>
+                <th className="w-56 px-3 py-2.5 font-medium">{t('Tên giai đoạn', 'Phase name')}</th>
                 <th className="px-3 py-2.5 font-medium">{t('Mô tả', 'Description')}</th>
-                <th className="w-80 px-3 py-2.5 font-medium">
-                  {t('Cổng nghiệm thu (Exit Criteria / Gate Rules)', 'Exit Criteria / Gate Rules')}
+                <th className="w-72 px-3 py-2.5 font-medium">
+                  {t('Điều kiện hoàn thành giai đoạn', 'Exit criteria')}
+                  <span className="ml-1 font-normal text-gray-400">(Exit Criteria / Gate Rules)</span>
                 </th>
-                <th className="w-44 px-3 py-2.5 font-medium">{t('Trạng thái', 'Statuses')}</th>
+                <th className="px-3 py-2.5 font-medium">{t('Trạng thái', 'Statuses')}</th>
                 {editable && <th className="w-14 px-3 py-2.5" />}
               </tr>
             </thead>
@@ -426,8 +390,8 @@ export function StepProjectInfo({
                         <span className="text-gray-500">{phase.description}</span>
                       )}
                     </td>
-                    <td className="w-full md:w-80 md:px-3 md:py-3.5">
-                      <ExitCriteriaChips
+                    <td className="w-full md:w-72 md:px-3 md:py-3.5">
+                      <GateChips
                         criteria={phase.exitCriteria}
                         editable={editable}
                         onChange={(exitCriteria) => updatePhase(phase.key, { exitCriteria })}
@@ -436,7 +400,7 @@ export function StepProjectInfo({
                     <td className="min-w-0 flex-1 md:w-auto md:px-3 md:py-3.5">
                       <StatusChips
                         phase={phase}
-                        editable={false}
+                        editable={editable}
                         projectRoles={projectRoles}
                         onChange={(next) => updatePhase(phase.key, next)}
                       />
@@ -466,8 +430,7 @@ export function StepProjectInfo({
             variant="secondary"
             inline
             className="lg:!h-8"
-            disabled={!editable || state.phases.length >= MAX_PHASES}
-            title={!editable ? t('Chuyển sang SDLC tuỳ chỉnh để thêm giai đoạn', 'Switch to Custom to add phases') : undefined}
+            disabled={state.phases.length >= MAX_PHASES}
             onClick={() =>
               setPhases([
                 ...state.phases,
@@ -490,8 +453,8 @@ export function StepProjectInfo({
   )
 }
 
-// Cột "Trạng thái trong giai đoạn": chip trạng thái + ô thêm trạng thái. Chi tiết (nhóm, trạng thái đầu, luật
-// chuyển) chỉnh ở bước 2.
+// Cột "Trạng thái trong giai đoạn": chip trạng thái + ô thêm trạng thái. Bấm chip để sửa tên, nhóm, đặt làm
+// trạng thái đầu hoặc xoá; màu, mô tả và luật chuyển chỉnh chi tiết ở bước 2.
 function StatusChips({
   phase,
   editable,
@@ -506,6 +469,8 @@ function StatusChips({
   const { t } = useI18n()
   const [adding, setAdding] = useState(false)
   const [value, setValue] = useState('')
+  const [editing, setEditing] = useState<string | null>(null)
+  const anchorRef = useRef<HTMLSpanElement>(null)
   const active = phase.statuses.filter((s) => s.isActive)
 
   const add = () => {
@@ -530,31 +495,71 @@ function StatusChips({
     setAdding(false)
   }
 
+  const updateStatus = (key: string, patch: Partial<DraftStatus>) =>
+    onChange({ statuses: phase.statuses.map((x) => (x.key === key ? { ...x, ...patch } : x)) })
+
+  const removeStatus = (key: string) => {
+    const statuses = phase.statuses.filter((x) => x.key !== key)
+    const removed = phase.statuses.find((x) => x.key === key)
+    if (removed?.isInitial && statuses.length > 0) statuses[0] = { ...statuses[0], isInitial: true }
+    onChange({ statuses, transitions: phase.transitions.filter((x) => x.from !== key && x.to !== key) })
+    setEditing(null)
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {active.map((s) => (
-        <span
-          key={s.key}
-          className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-700"
-        >
-          <span className="h-1.5 w-1.5 rounded-full" style={{ background: s.color }} />
-          {s.name || t('(chưa đặt tên)', '(unnamed)')}
-          {editable && active.length > 1 && (
+      {active.map((s) => {
+        const label = s.name || t('(chưa đặt tên)', '(unnamed)')
+        const chip = (
+          <>
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: s.color }} />
+            {label}
+            {s.isInitial && (
+              <span className="text-[10px] font-medium uppercase tracking-wide text-gray-400">{t('đầu', 'start')}</span>
+            )}
+          </>
+        )
+        if (!editable)
+          return (
+            <span
+              key={s.key}
+              className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-700"
+            >
+              {chip}
+            </span>
+          )
+        return (
+          <span key={s.key} ref={editing === s.key ? anchorRef : undefined}>
             <button
               type="button"
-              aria-label={t(`Bỏ trạng thái ${s.name}`, `Remove status ${s.name}`)}
-              className="text-gray-500 hover:text-red-700"
-              onClick={() => {
-                const statuses = phase.statuses.filter((x) => x.key !== s.key)
-                if (s.isInitial && statuses.length > 0) statuses[0] = { ...statuses[0], isInitial: true }
-                onChange({ statuses, transitions: phase.transitions.filter((x) => x.from !== s.key && x.to !== s.key) })
-              }}
+              aria-expanded={editing === s.key}
+              aria-label={t(`Sửa trạng thái ${label}`, `Edit status ${label}`)}
+              onClick={() => setEditing((k) => (k === s.key ? null : s.key))}
+              className={clsx(
+                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors',
+                editing === s.key
+                  ? 'border-brand-400 bg-brand-50 text-brand-800'
+                  : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-gray-300 hover:bg-white',
+              )}
             >
-              <CloseIcon className="h-3 w-3" />
+              {chip}
             </button>
-          )}
-        </span>
-      ))}
+            {editing === s.key && (
+              <StatusEditPopover
+                anchorRef={anchorRef}
+                status={s}
+                canRemove={active.length > 1}
+                onChange={(patch) => updateStatus(s.key, patch)}
+                onSetInitial={() =>
+                  onChange({ statuses: phase.statuses.map((x) => ({ ...x, isInitial: x.key === s.key })) })
+                }
+                onRemove={() => removeStatus(s.key)}
+                onClose={() => setEditing(null)}
+              />
+            )}
+          </span>
+        )
+      })}
       {editable &&
         (adding ? (
           <input
@@ -582,6 +587,96 @@ function StatusChips({
           </button>
         ))}
     </div>
+  )
+}
+
+/** Ô sửa nhanh một trạng thái ngay trong bảng giai đoạn (bước 1). Đóng khi bấm ra ngoài / Esc / Xong. */
+function StatusEditPopover({
+  anchorRef,
+  status,
+  canRemove,
+  onChange,
+  onSetInitial,
+  onRemove,
+  onClose,
+}: {
+  anchorRef: React.RefObject<HTMLSpanElement>
+  status: DraftStatus
+  canRemove: boolean
+  onChange: (patch: Partial<DraftStatus>) => void
+  onSetInitial: () => void
+  onRemove: () => void
+  onClose: () => void
+}) {
+  const { t } = useI18n()
+  const { ref, pos } = useAnchoredPopover(anchorRef, onClose)
+
+  return createPortal(
+    <div
+      ref={ref}
+      role="dialog"
+      aria-label={t('Sửa trạng thái', 'Edit status')}
+      style={pos ?? { visibility: 'hidden' }}
+      className="fixed z-50 w-[min(18rem,calc(100vw-1rem))] space-y-3 rounded-card border border-gray-200 bg-white p-3 text-left shadow-pop"
+    >
+      <label className="block text-xs font-medium text-gray-700">
+        {t('Tên trạng thái', 'Status name')}
+        <input
+          autoFocus
+          value={status.name}
+          maxLength={NAME_MAX}
+          onChange={(e) => onChange({ name: e.target.value })}
+          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), onClose())}
+          className="mt-1 h-9 w-full rounded-control border border-gray-300 px-2.5 text-sm font-normal text-gray-900 focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-100"
+        />
+      </label>
+      <label className="block text-xs font-medium text-gray-700">
+        {t('Nhóm', 'Category')}
+        <select
+          value={status.category}
+          onChange={(e) => {
+            const category = e.target.value as StatusCategory
+            const usesDefault = Object.values(DEFAULT_CATEGORY_COLOR).includes(status.color)
+            onChange({ category, color: usesDefault ? DEFAULT_CATEGORY_COLOR[category] : status.color })
+          }}
+          className="mt-1 h-9 w-full rounded-control border border-gray-300 bg-white px-2 text-sm font-normal text-gray-900 focus:border-brand-400 focus:outline-none focus:ring-4 focus:ring-brand-100"
+        >
+          {(Object.keys(STATUS_CATEGORY_LABEL) as StatusCategory[]).map((c) => (
+            <option key={c} value={c}>
+              {STATUS_CATEGORY_LABEL[c]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex items-center gap-2 text-sm text-gray-700">
+        <input
+          type="checkbox"
+          checked={status.isInitial}
+          disabled={status.isInitial}
+          onChange={onSetInitial}
+          className="h-4 w-4 rounded border-gray-300 accent-brand-600"
+        />
+        {t('Trạng thái đầu (issue mới vào đây)', 'Start status (new issues land here)')}
+      </label>
+      <div className="flex items-center justify-between border-t border-gray-200 pt-2.5">
+        {canRemove ? (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="inline-flex items-center gap-1 text-xs font-medium text-red-700 hover:underline"
+          >
+            <TrashIcon className="h-3.5 w-3.5" />
+            {t('Xoá trạng thái', 'Delete status')}
+          </button>
+        ) : (
+          <span />
+        )}
+        <Button type="button" inline className="lg:!h-8" onClick={onClose}>
+          {t('Xong', 'Done')}
+        </Button>
+      </div>
+    </div>,
+    document.body,
   )
 }
 

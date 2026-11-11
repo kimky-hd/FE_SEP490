@@ -22,8 +22,6 @@ import { IssueCreateModal, type IssueDefaults } from './IssueCreateModal'
 import { IssueDrawer } from './IssueDrawer'
 import { boardDefaults, kanbanDefaultView, type BoardChip, type BoardPrefs, type GroupBy } from './roleDefaults'
 import { CompleteSprintModal, CreateSprintModal, FromReqModal } from './SprintDialogs'
-import { PhasePipelineTracker } from '@/components/projects/PhasePipelineTracker'
-import { getProjectPhases } from '@/lib/phaseGateEngine'
 import {
   FilterChip,
   PersonDot,
@@ -339,7 +337,6 @@ function BoardView({
 
   const { statuses, columns, activeSprint } = data
   const canRank = !isArchived && hasWorkPermission(project.myPermissions, PERMISSIONS.issueUpdate)
-  const projectPhases = useMemo(() => getProjectPhases(projectId), [projectId])
 
   // Board = sprint đang chạy (dự án không dùng sprint: mọi issue), chỉ issue cha.
   const sprintIssues = useMemo(
@@ -347,23 +344,16 @@ function BoardView({
       data.issues.filter((i) => i.parentId === null && (activeSprint ? i.sprintId === activeSprint.sprintId : true)),
     [data.issues, activeSprint],
   )
-  const phases = useMemo(() => {
-    if (projectPhases.length > 0) {
-      return projectPhases.map((ph) => [ph.id, `P${ph.order}: ${ph.name}`] as [string | number, string])
-    }
-    return [...new Map(columns.map((c) => [c.phaseId, c.phaseName])).entries()]
-  }, [projectPhases, columns])
-
-  // Nhiều phase: mặc định 'all'
-  const currentPhase = phase ?? 'all'
-  const shownColumns = useMemo(() => {
-    if (currentPhase === 'all') return columns
-    const matchedPh = projectPhases.find((p) => String(p.id) === String(currentPhase) || Number(p.id) === Number(currentPhase))
-    if (!matchedPh) return columns.filter((c) => String(c.phaseId) === String(currentPhase))
-    const statusIds = new Set(matchedPh.statuses.map((s) => s.statusId))
-    const filtered = columns.filter((c) => String(c.phaseId) === String(matchedPh.id) || statusIds.has(c.statusId))
-    return filtered.length > 0 ? filtered : columns
-  }, [columns, currentPhase, projectPhases])
+  const phases = useMemo(() => [...new Map(columns.map((c) => [c.phaseId, c.phaseName])).entries()], [columns])
+  // Nhiều phase: mặc định mở phase có nhiều issue nhất (chọn lại được, ghi nhớ theo dự án).
+  const autoPhase = useMemo(() => {
+    if (phases.length <= 1) return 'all' as const
+    const count = (id: number) =>
+      sprintIssues.filter((i) => columns.find((c) => c.statusId === i.statusId)?.phaseId === id).length
+    return [...phases].sort((a, b) => count(b[0]) - count(a[0]))[0][0]
+  }, [phases, sprintIssues, columns])
+  const currentPhase = phase !== null && (phase === 'all' || phases.some(([id]) => id === phase)) ? phase : autoPhase
+  const shownColumns = currentPhase === 'all' ? columns : columns.filter((c) => c.phaseId === currentPhase)
 
   const counts = {
     mine: sprintIssues.filter((i) => i.assignee?.userId === me?.userId).length,
@@ -372,16 +362,6 @@ function BoardView({
   }
   const needle = search.trim().toLocaleLowerCase('vi')
   const visible = sprintIssues.filter((i) => {
-    if (currentPhase !== 'all') {
-      const matchedPh = projectPhases.find((p) => String(p.id) === String(currentPhase) || Number(p.id) === Number(currentPhase))
-      if (matchedPh) {
-        const inThisPhase =
-          (i.phaseId !== undefined && (String(i.phaseId) === String(matchedPh.id) || Number(i.phaseId) === Number(matchedPh.id))) ||
-          (i.phaseOrder !== undefined && Number(i.phaseOrder) === Number(matchedPh.order)) ||
-          matchedPh.statuses.some((s) => s.statusId === i.statusId)
-        if (!inThisPhase) return false
-      }
-    }
     if (prefs.chips.includes('mine') && i.assignee?.userId !== me?.userId) return false
     if (prefs.chips.includes('reqChanged') && !i.reqChanged) return false
     if (prefs.chips.includes('bug') && i.type !== 'BUG') return false
@@ -510,8 +490,6 @@ function BoardView({
 
   return (
     <div className="space-y-3">
-      <PhasePipelineTracker projectId={projectId} sdlcMethod={project.sdlcMethod} />
-
       {phaseSlot &&
         createPortal(
           phases.length > 1 && (
@@ -535,70 +513,8 @@ function BoardView({
           ),
           phaseSlot,
         )}
-      <div className="flex flex-col gap-2 border-y border-gray-200 py-2.5">
-        {/* Phase Filter Pills */}
-        {projectPhases.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 pb-1">
-            <span className="text-xs font-medium text-gray-500 mr-1">{t('Giai đoạn:', 'Phase:')}</span>
-            <button
-              type="button"
-              onClick={() => {
-                setPhase('all')
-                writePref(projectId, 'phase', 'all')
-              }}
-              className={clsx(
-                'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors',
-                currentPhase === 'all'
-                  ? 'bg-brand-600 text-white shadow-xs'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-              )}
-            >
-              {t('Tất cả', 'All')} ({sprintIssues.length})
-            </button>
-            {projectPhases.map((ph) => {
-              const count = sprintIssues.filter(
-                (i) =>
-                  (i.phaseId !== undefined && (String(i.phaseId) === String(ph.id) || Number(i.phaseId) === Number(ph.id))) ||
-                  (i.phaseOrder !== undefined && Number(i.phaseOrder) === Number(ph.order)) ||
-                  ph.statuses.some((s) => s.statusId === i.statusId),
-              ).length
-              const active =
-                currentPhase !== 'all' &&
-                (String(currentPhase) === String(ph.id) || Number(currentPhase) === Number(ph.id))
-              return (
-                <button
-                  key={ph.id}
-                  type="button"
-                  onClick={() => {
-                    const targetId = ph.id
-                    setPhase(targetId as any)
-                    writePref(projectId, 'phase', targetId)
-                  }}
-                  className={clsx(
-                    'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-colors',
-                    active
-                      ? 'bg-brand-600 text-white shadow-xs'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-                  )}
-                  title={ph.name}
-                >
-                  <span>P{ph.order}: {ph.name}</span>
-                  <span
-                    className={clsx(
-                      'rounded-full px-1.5 py-0.2 text-[10px]',
-                      active ? 'bg-brand-700 text-white' : 'bg-gray-200 text-gray-700',
-                    )}
-                  >
-                    {count}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        <div className="flex flex-wrap items-center gap-2.5">
-          <label className="relative">
+      <div className="flex flex-wrap items-center gap-2.5 border-y border-gray-200 py-2.5">
+        <label className="relative">
           <span className="sr-only">{t('Tìm issue', 'Search issues')}</span>
           <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
@@ -685,7 +601,6 @@ function BoardView({
             { value: 'req', label: 'REQ' },
           ]}
         />
-        </div>
       </div>
 
       <div className="relative -mx-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6 lg:mx-0 lg:rounded-card lg:bg-gray-50 lg:p-3">
@@ -793,7 +708,7 @@ function BoardView({
                     {onCreate && c.statusId === initialStatus && lane.key === 'all' && (
                       <button
                         type="button"
-                        onClick={() => onCreate({ statusId: c.statusId, defaultPhaseId: c.phaseId })}
+                        onClick={() => onCreate({ statusId: c.statusId })}
                         className="flex w-full items-center gap-1 rounded-[6px] px-1.5 py-1 text-left text-[13px] text-gray-500 hover:bg-gray-200/60 hover:text-gray-800"
                       >
                         <PlusIcon className="h-3.5 w-3.5" />
@@ -890,16 +805,6 @@ function IssueCard({
       <div className="mt-2 flex flex-wrap items-center gap-x-1 gap-y-1.5 text-xs text-gray-500">
         <TypeIcon type={i.type} />
         <span className="mr-0.5">{i.key}</span>
-        {(i.phaseOrder || i.phaseName) && (
-          <span
-            className="inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-700"
-            title={i.phaseName ?? undefined}
-          >
-            {i.phaseOrder ? `P${i.phaseOrder}` : ''}
-            {i.phaseOrder && i.phaseName ? ' · ' : ''}
-            {i.phaseName ? (i.phaseName.length > 18 ? `${i.phaseName.slice(0, 16)}…` : i.phaseName) : ''}
-          </span>
-        )}
         {i.requirements.slice(0, 2).map((r) => (
           <ReqChip key={`${r.documentId}-${r.reqUid}`} req={r} />
         ))}

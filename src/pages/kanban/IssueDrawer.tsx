@@ -1,17 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import clsx from 'clsx'
 import { issueApi } from '@/api/issueApi'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
-import { CloseIcon, TrashIcon } from '@/components/ui/icons'
+import { ArrowLeftIcon, CloseIcon, TrashIcon } from '@/components/ui/icons'
+import { ExpandIcon, ShrinkIcon } from '../documents/docUi'
 import { apiErrorMessage } from '@/lib/apiErrors'
 import { formatRelative } from '@/lib/format'
 import { onDataChanged } from '@/lib/dataEvents'
 import { useI18n } from '@/i18n'
 import { MentionText, MentionTextarea, mentionIdsIn } from '@/components/work/MentionInput'
 import type { BoardStatus } from '@/lib/workflowBoard'
-import { getProjectPhases } from '@/lib/phaseGateEngine'
 import {
   ISSUE_PRIORITIES,
   ISSUE_TYPES,
@@ -39,7 +39,10 @@ import {
 } from './workUi'
 
 // Chi tiết issue ở bảng bên phải (mockup khung 1b) — không rời board; URL `?issue=CORE-104`.
+// `variant="page"`: cùng nội dung nhưng là trang riêng /projects/:id/kanban/issues/:key (nút ⤢ trên bảng bên phải).
 // Trường sửa được theo `can`; trạng thái chỉ hiện các bước workflow cho phép (cũng là cách đổi trạng thái bằng bàn phím).
+
+const iconButton = 'flex h-9 w-9 items-center justify-center rounded-control text-gray-500 hover:bg-gray-100'
 
 export function IssueDrawer({
   projectId,
@@ -50,6 +53,7 @@ export function IssueDrawer({
   me,
   onClose,
   notify,
+  variant = 'drawer',
 }: {
   projectId: number
   issueId: number
@@ -59,6 +63,8 @@ export function IssueDrawer({
   me: UserRef | null
   onClose: () => void
   notify: (text: string, tone?: 'ok' | 'error') => void
+  /** `drawer`: bảng trượt bên phải board. `page`: trang đầy đủ, `onClose` = về board. */
+  variant?: 'drawer' | 'page'
 }) {
   const { t } = useI18n()
   const navigate = useNavigate()
@@ -90,13 +96,15 @@ export function IssueDrawer({
   useEffect(() => onDataChanged(() => void load()), [load])
 
   useEffect(() => {
+    // Trang đầy đủ không đóng bằng Esc (dễ bấm nhầm khi đang gõ), cũng không cướp focus.
+    if (variant === 'page') return
     panelRef.current?.focus()
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !document.querySelector('[role="dialog"][aria-modal="true"]')) onClose()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [onClose, issueId])
+  }, [onClose, issueId, variant])
 
   const run = async (fn: () => Promise<IssueDetailDto | void>, ok?: string) => {
     try {
@@ -111,442 +119,456 @@ export function IssueDrawer({
 
   const statusName = (id: number) => statuses.find((s) => s.statusId === id)?.name ?? '—'
   const can = issue?.can
-  const phases = useMemo(() => getProjectPhases(projectId), [projectId])
-  const currentPhase = useMemo(
-    () =>
-      phases.find((p) => String(p.id) === String(issue?.phaseId)) ||
-      phases.find((p) => p.order === issue?.phaseOrder) ||
-      phases[0],
-    [phases, issue?.phaseId, issue?.phaseOrder],
-  )
 
-  return (
-    <>
-      <div aria-hidden="true" onClick={onClose} className="fixed inset-0 z-30 bg-gray-950/10 lg:bg-transparent" />
-      <aside
+  // Ba khối của chi tiết issue; drawer xếp dọc, trang đầy đủ chia cột (nội dung trái, thuộc tính phải).
+  const renderParts = (issue: IssueDetailDto) => ({
+    title: (
+      <EditableTitle
+        value={issue.title}
+        disabled={!can?.edit}
+        onSave={(title) => run(() => issueApi.update(issue.issueId, { title }))}
+      />
+    ),
+    fields: (
+      <dl className="grid grid-cols-[96px_minmax(0,1fr)] items-center gap-x-3 gap-y-2.5 text-[13px]">
+        <dt className="text-gray-500">{t('Trạng thái', 'Status')}</dt>
+        <dd>
+          <select
+            aria-label={t('Trạng thái', 'Status')}
+            value={issue.statusId}
+            disabled={!can?.changeStatus || issue.allowedTransitions.length === 0}
+            onChange={(e) => {
+              const to = Number(e.target.value)
+              void run(
+                () => issueApi.transition(issue.issueId, { toStatusId: to }),
+                t(`Đã chuyển sang ${statusName(to)}`, `Moved to ${statusName(to)}`),
+              )
+            }}
+            className={clsx(inlineSelect, 'border-brand-200 bg-brand-50 font-medium text-brand-800')}
+          >
+            <option value={issue.statusId}>{statusName(issue.statusId)}</option>
+            {issue.allowedTransitions.map((x) => (
+              <option key={x.toStatusId} value={x.toStatusId}>
+                → {x.name}
+              </option>
+            ))}
+          </select>
+          {can?.changeStatus && issue.allowedTransitions.length === 0 && (
+            <span className="ml-2 text-xs text-gray-500">
+              {t('Vai trò của bạn không chuyển tiếp được', 'Your role has no next step here')}
+            </span>
+          )}
+        </dd>
+        <dt className="text-gray-500">{t('Người làm', 'Assignee')}</dt>
+        <dd className="flex items-center gap-2">
+          <PersonDot user={issue.assignee} />
+          <select
+            aria-label={t('Người làm', 'Assignee')}
+            value={issue.assignee?.userId ?? ''}
+            disabled={!can?.assign}
+            onChange={(e) =>
+              void run(() =>
+                issueApi.update(issue.issueId, { assigneeId: e.target.value ? Number(e.target.value) : null }),
+              )
+            }
+            className={clsx(inlineSelect, 'min-w-0 flex-1')}
+          >
+            <option value="">{t('Chưa giao', 'Unassigned')}</option>
+            {assignees.map((u) => (
+              <option key={u.userId} value={u.userId}>
+                {u.fullName}
+              </option>
+            ))}
+          </select>
+        </dd>
+        <dt className="text-gray-500">{t('Loại · Ưu tiên', 'Type · Priority')}</dt>
+        <dd className="flex flex-wrap gap-2">
+          <select
+            aria-label={t('Loại', 'Type')}
+            value={issue.type}
+            disabled={!can?.edit}
+            onChange={(e) => void run(() => issueApi.update(issue.issueId, { type: e.target.value as IssueType }))}
+            className={inlineSelect}
+          >
+            {ISSUE_TYPES.map((x) => (
+              <option key={x} value={x}>
+                {issueTypeLabel(x)}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label={t('Ưu tiên', 'Priority')}
+            value={issue.priority}
+            disabled={!can?.edit}
+            onChange={(e) =>
+              void run(() => issueApi.update(issue.issueId, { priority: e.target.value as IssuePriority }))
+            }
+            className={inlineSelect}
+          >
+            {ISSUE_PRIORITIES.map((p) => (
+              <option key={p} value={p}>
+                {priorityLabel(p)}
+              </option>
+            ))}
+          </select>
+        </dd>
+        {issue.parentId === null && (
+          <>
+            <dt className="text-gray-500">{t('Sprint · Điểm', 'Sprint · Points')}</dt>
+            <dd className="flex flex-wrap gap-2">
+              <select
+                aria-label="Sprint"
+                value={issue.sprintId ?? ''}
+                disabled={!can?.edit}
+                onChange={(e) =>
+                  void run(() =>
+                    issueApi.update(issue.issueId, { sprintId: e.target.value ? Number(e.target.value) : null }),
+                  )
+                }
+                className={inlineSelect}
+              >
+                <option value="">Backlog</option>
+                {sprints
+                  .filter((s) => s.status !== 'COMPLETED' || s.sprintId === issue.sprintId)
+                  .map((s) => (
+                    <option key={s.sprintId} value={s.sprintId}>
+                      {s.name}
+                    </option>
+                  ))}
+              </select>
+              <PointsInput
+                value={issue.points}
+                disabled={!can?.edit}
+                onSave={(points) => run(() => issueApi.update(issue.issueId, { points }))}
+              />
+            </dd>
+          </>
+        )}
+      </dl>
+    ),
+    sections: (
+      <>
+        <Section
+          title={t('Yêu cầu liên kết', 'Linked requirements')}
+          action={
+            can?.edit ? (
+              <SectionAction onClick={() => setReqOpen(true)}>{t('+ Gắn REQ', '+ Link REQ')}</SectionAction>
+            ) : null
+          }
+        >
+          {issue.requirements.length === 0 ? (
+            <Empty>{t('Chưa gắn REQ nào.', 'No REQ linked yet.')}</Empty>
+          ) : (
+            <ul className="divide-y divide-gray-200 rounded-card border border-gray-200">
+              {issue.requirements.map((r) => (
+                <li key={`${r.documentId}-${r.reqUid}`} className="px-3 py-2 text-[13px]">
+                  <div className="flex items-center gap-2">
+                    <ReqChip req={r} />
+                    <span className="min-w-0 flex-1 truncate text-gray-800">
+                      {r.title ?? t('REQ đã bị xoá khỏi tài liệu', 'REQ was removed from the document')}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={async () => navigate(await reqCompareHref(projectId, r.documentId, r.reqUid))}
+                      className="shrink-0 font-medium text-brand-700 hover:underline"
+                    >
+                      {r.changedNote ? t('Xem đổi gì', 'See what changed') : t('Mở', 'Open')}
+                    </button>
+                  </div>
+                  {r.changedNote && (
+                    <p className="mt-1 text-xs text-amber-800">
+                      {r.documentCode} · {r.changedNote}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {issue.reqChanged && can?.edit && (
+            <div className="mt-2 flex items-center gap-2 rounded-card border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
+              <span className="flex-1">
+                {t(
+                  'REQ đã đổi sau khi bạn nhận việc. Xem rồi xác nhận.',
+                  'The REQ changed after you took this on. Review, then confirm.',
+                )}
+              </span>
+              <Button
+                inline
+                variant="secondary"
+                className="lg:h-8"
+                onClick={() =>
+                  void run(
+                    () => issueApi.ackRequirements(issue.issueId),
+                    t('Đã xác nhận REQ', 'REQ change acknowledged'),
+                  )
+                }
+              >
+                {t('Đã xem', 'Got it')}
+              </Button>
+            </div>
+          )}
+        </Section>
+
+        <Section
+          title="Testcase"
+          action={
+            <Link
+              to={`/projects/${projectId}/tests`}
+              className="text-[12.5px] font-medium text-brand-700 hover:underline"
+            >
+              {t('Bảng testcase', 'Test cases')}
+            </Link>
+          }
+        >
+          {issue.testCases.length === 0 ? (
+            <Empty>{t('Chưa có testcase liên kết.', 'No linked test cases.')}</Empty>
+          ) : (
+            <ul className="divide-y divide-gray-200 rounded-card border border-gray-200">
+              {issue.testCases.map((tc) => (
+                <li key={tc.testCaseId} className="flex items-center gap-2 px-3 py-2 text-[13px]">
+                  <ResultPill result={tc.lastResult} />
+                  <Link
+                    to={`/projects/${projectId}/tests?tab=sheet&tc=${tc.testCaseId}${tc.planId ? `&plan=${tc.planId}` : ''}${tc.envId ? `&env=${tc.envId}` : ''}`}
+                    className="min-w-0 flex-1 truncate text-gray-800 hover:text-brand-700 hover:underline"
+                  >
+                    {tc.title}
+                  </Link>
+                  <CodeChip>{tc.key}</CodeChip>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+
+        {issue.parentId === null && (
+          <Section
+            title={t('Việc con', 'Subtasks')}
+            action={
+              can?.edit ? <SectionAction onClick={() => setSubOpen(true)}>{t('+ Thêm', '+ Add')}</SectionAction> : null
+            }
+          >
+            {issue.subtasks.length === 0 ? (
+              <Empty>{t('Chưa có việc con.', 'No subtasks.')}</Empty>
+            ) : (
+              <ul className="divide-y divide-gray-200 rounded-card border border-gray-200">
+                {issue.subtasks.map((s) => {
+                  const done = statuses.find((x) => x.statusId === s.statusId)?.category === 'DONE'
+                  return (
+                    <li key={s.issueId} className="flex items-center gap-2 px-3 py-2 text-[13px]">
+                      <span
+                        aria-hidden="true"
+                        className={clsx(
+                          'flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border text-[10px]',
+                          done ? 'border-success-500 bg-success-500 text-white' : 'border-gray-300',
+                        )}
+                      >
+                        {done ? '✓' : ''}
+                      </span>
+                      <span
+                        className={clsx(
+                          'min-w-0 flex-1 truncate',
+                          done ? 'text-gray-500 line-through' : 'text-gray-800',
+                        )}
+                      >
+                        {s.title}
+                      </span>
+                      <span className="sr-only">{statusName(s.statusId)}</span>
+                      <PersonDot user={s.assignee} size={22} />
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </Section>
+        )}
+
+        <Section title={t('Mô tả', 'Description')}>
+          <DescriptionField
+            value={issue.description ?? ''}
+            disabled={!can?.edit}
+            onSave={(description) => run(() => issueApi.update(issue.issueId, { description }))}
+          />
+        </Section>
+
+        <Section title={t('Bình luận', 'Comments')}>
+          {comments.length > 0 && (
+            <ul className="mb-3 space-y-3">
+              {comments.map((c) => (
+                <li key={c.commentId} className="flex gap-2.5 text-[13px]">
+                  <PersonDot user={c.author} size={24} />
+                  <div className="min-w-0">
+                    <p className="text-gray-500">
+                      <span className="font-medium text-gray-900">{c.author.fullName}</span> ·{' '}
+                      {formatRelative(c.createdAt)}
+                    </p>
+                    <p className="whitespace-pre-wrap break-words text-gray-800">
+                      <MentionText body={c.body} mentions={c.mentions} />
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <CommentBox
+            people={assignees.filter((u) => u.userId !== me?.userId)}
+            onSend={async (body, mentionUserIds) => {
+              try {
+                await issueApi.addComment(issue.issueId, { body, mentionUserIds })
+                setComments(await issueApi.comments(issue.issueId))
+                return true
+              } catch (err) {
+                notify(apiErrorMessage(err), 'error')
+                return false
+              }
+            }}
+          />
+        </Section>
+
+        <details
+          className="text-[13px]"
+          onToggle={(e) => {
+            if ((e.target as HTMLDetailsElement).open && activity === null)
+              void issueApi.activity(issue.issueId).then(setActivity, () => setActivity([]))
+          }}
+        >
+          <summary className="cursor-pointer text-gray-500 hover:text-gray-800">{t('Lịch sử', 'History')}</summary>
+          <ul className="mt-2 space-y-1.5 text-gray-600">
+            {(activity ?? []).map((a) => (
+              <li key={a.activityId}>
+                <span className="font-medium text-gray-800">{a.actor.fullName}</span> · {activityLabel(a.action, t)}
+                {a.note ? ` · ${a.note}` : ''} <span className="text-gray-400">· {formatRelative(a.createdAt)}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      </>
+    ),
+  })
+  const parts = issue ? renderParts(issue) : null
+
+  const pageHref = issue ? `/projects/${projectId}/kanban/issues/${encodeURIComponent(issue.key)}` : null
+  const deleteButton = can?.delete && (
+    <button
+      type="button"
+      onClick={() => setConfirmDelete(true)}
+      aria-label={t('Xoá issue', 'Delete issue')}
+      title={t('Xoá issue', 'Delete issue')}
+      className={clsx(iconButton, 'hover:text-red-700')}
+    >
+      <TrashIcon className="h-4 w-4" />
+    </button>
+  )
+  const loading =
+    error && !issue ? (
+      <p className="p-5 text-sm text-red-700">{error}</p>
+    ) : !issue ? (
+      <div className="space-y-3 p-5" aria-busy="true">
+        <span className="block h-6 w-3/4 rounded bg-gray-100" />
+        <span className="block h-4 w-1/2 rounded bg-gray-100" />
+      </div>
+    ) : null
+
+  const shell =
+    variant === 'page' ? (
+      <div
         ref={panelRef}
         tabIndex={-1}
-        role="complementary"
         aria-label={issue ? `${issue.key} · ${issue.title}` : t('Chi tiết issue', 'Issue details')}
-        className="fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-gray-200 bg-white shadow-[-16px_0_32px_-16px_rgba(16,24,40,0.25)] focus:outline-none sm:w-[480px]"
+        className="focus:outline-none"
       >
-        <div className="flex h-12 shrink-0 items-center gap-2 border-b border-gray-200 px-4 text-[13px] text-gray-500">
-          {issue && <TypeIcon type={issue.type} />}
-          <span className="font-medium text-gray-700">{issue?.key ?? '…'}</span>
-          <span className="flex-1" />
-          {can?.delete && (
-            <button
-              type="button"
-              onClick={() => setConfirmDelete(true)}
-              aria-label={t('Xoá issue', 'Delete issue')}
-              className="flex h-9 w-9 items-center justify-center rounded-control text-gray-500 hover:bg-gray-100 hover:text-red-700"
-            >
-              <TrashIcon className="h-4 w-4" />
-            </button>
-          )}
+        <div className="mb-4 flex items-center gap-1 text-[13px] text-gray-500">
           <button
             type="button"
             onClick={onClose}
-            aria-label={t('Đóng', 'Close')}
-            className="flex h-9 w-9 items-center justify-center rounded-control text-gray-500 hover:bg-gray-100 hover:text-gray-950"
+            className="-ml-2 flex h-9 items-center gap-1.5 rounded-control px-2 font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-950"
           >
-            <CloseIcon className="h-4 w-4" />
+            <ArrowLeftIcon className="h-4 w-4" />
+            Board
           </button>
+          <span aria-hidden="true">/</span>
+          {issue && <TypeIcon type={issue.type} />}
+          <span className="ml-1 font-medium text-gray-700">{issue?.key ?? '…'}</span>
+          <span className="flex-1" />
+          {issue && (
+            <Link
+              to={`/projects/${projectId}/kanban?issue=${encodeURIComponent(issue.key)}`}
+              aria-label={t('Thu về bảng bên phải', 'Collapse to side panel')}
+              title={t('Thu về bảng bên phải', 'Collapse to side panel')}
+              className={clsx(iconButton, 'hover:text-gray-950')}
+            >
+              <ShrinkIcon className="h-4 w-4" />
+            </Link>
+          )}
+          {deleteButton}
         </div>
-
-        {error && !issue ? (
-          <p className="p-5 text-sm text-red-700">{error}</p>
-        ) : !issue ? (
-          <div className="space-y-3 p-5" aria-busy="true">
-            <span className="block h-6 w-3/4 rounded bg-gray-100" />
-            <span className="block h-4 w-1/2 rounded bg-gray-100" />
-          </div>
-        ) : (
-          <div className="flex-1 space-y-5 overflow-y-auto p-4 sm:p-5">
-            <EditableTitle
-              value={issue.title}
-              disabled={!can?.edit}
-              onSave={(title) => run(() => issueApi.update(issue.issueId, { title }))}
-            />
-
-            <dl className="grid grid-cols-[96px_minmax(0,1fr)] items-center gap-x-3 gap-y-2.5 text-[13px]">
-              <dt className="text-gray-500">{t('Trạng thái', 'Status')}</dt>
-              <dd>
-                <select
-                  aria-label={t('Trạng thái', 'Status')}
-                  value={issue.statusId}
-                  disabled={!can?.changeStatus || issue.allowedTransitions.length === 0}
-                  onChange={(e) => {
-                    const to = Number(e.target.value)
-                    void run(
-                      () => issueApi.transition(issue.issueId, { toStatusId: to }),
-                      t(`Đã chuyển sang ${statusName(to)}`, `Moved to ${statusName(to)}`),
-                    )
-                  }}
-                  className={clsx(inlineSelect, 'border-brand-200 bg-brand-50 font-medium text-brand-800')}
+        {loading ??
+          (parts && (
+            <div className="space-y-5">
+              <div className="rounded-card border border-gray-200 bg-white px-4 py-3 sm:px-6">{parts.title}</div>
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,32%)]">
+                <section
+                  aria-label={t('Thuộc tính', 'Details')}
+                  className="rounded-card border border-gray-200 bg-white p-4 lg:sticky lg:top-4 lg:order-last lg:self-start"
                 >
-                  <option value={issue.statusId}>{statusName(issue.statusId)}</option>
-                  {issue.allowedTransitions.map((x) => (
-                    <option key={x.toStatusId} value={x.toStatusId}>
-                      → {x.name}
-                    </option>
-                  ))}
-                </select>
-                {can?.changeStatus && issue.allowedTransitions.length === 0 && (
-                  <span className="ml-2 text-xs text-gray-500">
-                    {t('Vai trò của bạn không chuyển tiếp được', 'Your role has no next step here')}
-                  </span>
-                )}
-              </dd>
-              <dt className="text-gray-500">{t('Giai đoạn SDLC', 'SDLC Phase')}</dt>
-              <dd>
-                <select
-                  aria-label={t('Giai đoạn SDLC', 'SDLC Phase')}
-                  value={currentPhase?.id ?? ''}
-                  disabled={!can?.edit}
-                  onChange={(e) => {
-                    const nextPh = phases.find((p) => String(p.id) === e.target.value)
-                    if (!nextPh) return
-                    const initialSt = nextPh.statuses.find((s) => s.isInitial) ?? nextPh.statuses[0]
-                    const cat = initialSt?.category ?? 'TODO'
-                    const mappedStatus = cat === 'DONE' ? 'DONE' : cat === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'TODO'
-                    void run(
-                      () =>
-                        issueApi.update(issue.issueId, {
-                          phaseId: nextPh.id,
-                          phaseName: nextPh.name,
-                          phaseOrder: nextPh.order,
-                          phaseStatusId: initialSt ? initialSt.statusId : undefined,
-                          phaseStatusName: initialSt ? initialSt.name : undefined,
-                          statusId: initialSt ? initialSt.statusId : undefined,
-                          status: mappedStatus,
-                        }),
-                      t(`Đã chuyển sang Giai đoạn P${nextPh.order}`, `Moved to Phase P${nextPh.order}`),
-                    )
-                  }}
-                  className={inlineSelect}
-                >
-                  {phases.map((ph) => (
-                    <option key={ph.id} value={ph.id}>
-                      P{ph.order}: {ph.name} {ph.lifecycleStatus === 'active' ? `(${t('Đang chạy', 'Active')})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </dd>
-              <dt className="text-gray-500">{t('Trạng thái Phase', 'Phase Status')}</dt>
-              <dd>
-                <select
-                  aria-label={t('Trạng thái Phase', 'Phase Status')}
-                  value={issue.phaseStatusId ?? issue.statusId}
-                  disabled={!can?.changeStatus}
-                  onChange={(e) => {
-                    const sid = Number(e.target.value)
-                    const stObj = currentPhase?.statuses.find((s) => s.statusId === sid)
-                    const cat = stObj?.category ?? 'TODO'
-                    const mappedStatus = cat === 'DONE' ? 'DONE' : cat === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'TODO'
-                    void run(
-                      () =>
-                        issueApi.update(issue.issueId, {
-                          phaseStatusId: sid,
-                          phaseStatusName: stObj?.name,
-                          statusId: sid,
-                          status: mappedStatus,
-                        }),
-                      t(`Đã đổi trạng thái sang ${stObj?.name ?? sid}`, `Updated status to ${stObj?.name ?? sid}`),
-                    )
-                  }}
-                  className={inlineSelect}
-                >
-                  {(currentPhase?.statuses || []).map((st) => (
-                    <option key={st.statusId} value={st.statusId}>
-                      {st.name} ({st.category})
-                    </option>
-                  ))}
-                </select>
-              </dd>
-              <dt className="text-gray-500">{t('Người làm', 'Assignee')}</dt>
-              <dd className="flex items-center gap-2">
-                <PersonDot user={issue.assignee} />
-                <select
-                  aria-label={t('Người làm', 'Assignee')}
-                  value={issue.assignee?.userId ?? ''}
-                  disabled={!can?.assign}
-                  onChange={(e) =>
-                    void run(() =>
-                      issueApi.update(issue.issueId, { assigneeId: e.target.value ? Number(e.target.value) : null }),
-                    )
-                  }
-                  className={clsx(inlineSelect, 'min-w-0 flex-1')}
-                >
-                  <option value="">{t('Chưa giao', 'Unassigned')}</option>
-                  {assignees.map((u) => (
-                    <option key={u.userId} value={u.userId}>
-                      {u.fullName}
-                    </option>
-                  ))}
-                </select>
-              </dd>
-              <dt className="text-gray-500">{t('Loại · Ưu tiên', 'Type · Priority')}</dt>
-              <dd className="flex flex-wrap gap-2">
-                <select
-                  aria-label={t('Loại', 'Type')}
-                  value={issue.type}
-                  disabled={!can?.edit}
-                  onChange={(e) =>
-                    void run(() => issueApi.update(issue.issueId, { type: e.target.value as IssueType }))
-                  }
-                  className={inlineSelect}
-                >
-                  {ISSUE_TYPES.map((x) => (
-                    <option key={x} value={x}>
-                      {issueTypeLabel(x)}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  aria-label={t('Ưu tiên', 'Priority')}
-                  value={issue.priority}
-                  disabled={!can?.edit}
-                  onChange={(e) =>
-                    void run(() => issueApi.update(issue.issueId, { priority: e.target.value as IssuePriority }))
-                  }
-                  className={inlineSelect}
-                >
-                  {ISSUE_PRIORITIES.map((p) => (
-                    <option key={p} value={p}>
-                      {priorityLabel(p)}
-                    </option>
-                  ))}
-                </select>
-              </dd>
-              {issue.parentId === null && (
-                <>
-                  <dt className="text-gray-500">{t('Sprint · Điểm', 'Sprint · Points')}</dt>
-                  <dd className="flex flex-wrap gap-2">
-                    <select
-                      aria-label="Sprint"
-                      value={issue.sprintId ?? ''}
-                      disabled={!can?.edit}
-                      onChange={(e) =>
-                        void run(() =>
-                          issueApi.update(issue.issueId, { sprintId: e.target.value ? Number(e.target.value) : null }),
-                        )
-                      }
-                      className={inlineSelect}
-                    >
-                      <option value="">Backlog</option>
-                      {sprints
-                        .filter((s) => s.status !== 'COMPLETED' || s.sprintId === issue.sprintId)
-                        .map((s) => (
-                          <option key={s.sprintId} value={s.sprintId}>
-                            {s.name}
-                          </option>
-                        ))}
-                    </select>
-                    <PointsInput
-                      value={issue.points}
-                      disabled={!can?.edit}
-                      onSave={(points) => run(() => issueApi.update(issue.issueId, { points }))}
-                    />
-                  </dd>
-                </>
-              )}
-            </dl>
-
-            <Section
-              title={t('Yêu cầu liên kết', 'Linked requirements')}
-              action={
-                can?.edit ? (
-                  <SectionAction onClick={() => setReqOpen(true)}>{t('+ Gắn REQ', '+ Link REQ')}</SectionAction>
-                ) : null
-              }
-            >
-              {issue.requirements.length === 0 ? (
-                <Empty>{t('Chưa gắn REQ nào.', 'No REQ linked yet.')}</Empty>
-              ) : (
-                <ul className="divide-y divide-gray-200 rounded-card border border-gray-200">
-                  {issue.requirements.map((r) => (
-                    <li key={`${r.documentId}-${r.reqUid}`} className="px-3 py-2 text-[13px]">
-                      <div className="flex items-center gap-2">
-                        <ReqChip req={r} />
-                        <span className="min-w-0 flex-1 truncate text-gray-800">
-                          {r.title ?? t('REQ đã bị xoá khỏi tài liệu', 'REQ was removed from the document')}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={async () => navigate(await reqCompareHref(projectId, r.documentId, r.reqUid))}
-                          className="shrink-0 font-medium text-brand-700 hover:underline"
-                        >
-                          {r.changedNote ? t('Xem đổi gì', 'See what changed') : t('Mở', 'Open')}
-                        </button>
-                      </div>
-                      {r.changedNote && (
-                        <p className="mt-1 text-xs text-amber-800">
-                          {r.documentCode} · {r.changedNote}
-                        </p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {issue.reqChanged && can?.edit && (
-                <div className="mt-2 flex items-center gap-2 rounded-card border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-900">
-                  <span className="flex-1">
-                    {t(
-                      'REQ đã đổi sau khi bạn nhận việc. Xem rồi xác nhận.',
-                      'The REQ changed after you took this on. Review, then confirm.',
-                    )}
-                  </span>
-                  <Button
-                    inline
-                    variant="secondary"
-                    className="lg:h-8"
-                    onClick={() =>
-                      void run(
-                        () => issueApi.ackRequirements(issue.issueId),
-                        t('Đã xác nhận REQ', 'REQ change acknowledged'),
-                      )
-                    }
-                  >
-                    {t('Đã xem', 'Got it')}
-                  </Button>
+                  <h2 className="mb-3 text-[12.5px] font-medium text-gray-500">{t('Thuộc tính', 'Details')}</h2>
+                  {parts.fields}
+                </section>
+                <div className="min-w-0 space-y-6 rounded-card border border-gray-200 bg-white p-4 sm:p-6">
+                  {parts.sections}
                 </div>
-              )}
-            </Section>
-
-            <Section
-              title="Testcase"
-              action={
-                <Link
-                  to={`/projects/${projectId}/tests`}
-                  className="text-[12.5px] font-medium text-brand-700 hover:underline"
-                >
-                  {t('Kho testcase', 'Test repository')}
-                </Link>
-              }
-            >
-              {issue.testCases.length === 0 ? (
-                <Empty>{t('Chưa có testcase liên kết.', 'No linked test cases.')}</Empty>
-              ) : (
-                <ul className="divide-y divide-gray-200 rounded-card border border-gray-200">
-                  {issue.testCases.map((tc) => (
-                    <li key={tc.testCaseId} className="flex items-center gap-2 px-3 py-2 text-[13px]">
-                      <ResultPill result={tc.lastResult} />
-                      <span className="min-w-0 flex-1 truncate text-gray-800">{tc.title}</span>
-                      <CodeChip>{tc.key}</CodeChip>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Section>
-
-            {issue.parentId === null && (
-              <Section
-                title={t('Việc con', 'Subtasks')}
-                action={
-                  can?.edit ? (
-                    <SectionAction onClick={() => setSubOpen(true)}>{t('+ Thêm', '+ Add')}</SectionAction>
-                  ) : null
-                }
+              </div>
+            </div>
+          ))}
+      </div>
+    ) : (
+      <>
+        <div aria-hidden="true" onClick={onClose} className="fixed inset-0 z-30 bg-gray-950/10 lg:bg-transparent" />
+        <aside
+          ref={panelRef}
+          tabIndex={-1}
+          role="complementary"
+          aria-label={issue ? `${issue.key} · ${issue.title}` : t('Chi tiết issue', 'Issue details')}
+          className="fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-gray-200 bg-white shadow-[-16px_0_32px_-16px_rgba(16,24,40,0.25)] focus:outline-none sm:w-[clamp(400px,38vw,640px)]"
+        >
+          <div className="flex h-12 shrink-0 items-center gap-1 border-b border-gray-200 px-4 text-[13px] text-gray-500">
+            {issue && <TypeIcon type={issue.type} />}
+            <span className="ml-1 font-medium text-gray-700">{issue?.key ?? '…'}</span>
+            <span className="flex-1" />
+            {pageHref && (
+              <Link
+                to={pageHref}
+                aria-label={t('Mở toàn trang', 'Open as full page')}
+                title={t('Mở toàn trang', 'Open as full page')}
+                className={clsx(iconButton, 'hover:text-gray-950')}
               >
-                {issue.subtasks.length === 0 ? (
-                  <Empty>{t('Chưa có việc con.', 'No subtasks.')}</Empty>
-                ) : (
-                  <ul className="divide-y divide-gray-200 rounded-card border border-gray-200">
-                    {issue.subtasks.map((s) => {
-                      const done = statuses.find((x) => x.statusId === s.statusId)?.category === 'DONE'
-                      return (
-                        <li key={s.issueId} className="flex items-center gap-2 px-3 py-2 text-[13px]">
-                          <span
-                            aria-hidden="true"
-                            className={clsx(
-                              'flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border text-[10px]',
-                              done ? 'border-success-500 bg-success-500 text-white' : 'border-gray-300',
-                            )}
-                          >
-                            {done ? '✓' : ''}
-                          </span>
-                          <span
-                            className={clsx(
-                              'min-w-0 flex-1 truncate',
-                              done ? 'text-gray-500 line-through' : 'text-gray-800',
-                            )}
-                          >
-                            {s.title}
-                          </span>
-                          <span className="sr-only">{statusName(s.statusId)}</span>
-                          <PersonDot user={s.assignee} size={22} />
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-              </Section>
+                <ExpandIcon className="h-4 w-4" />
+              </Link>
             )}
-
-            <Section title={t('Mô tả', 'Description')}>
-              <DescriptionField
-                value={issue.description ?? ''}
-                disabled={!can?.edit}
-                onSave={(description) => run(() => issueApi.update(issue.issueId, { description }))}
-              />
-            </Section>
-
-            <Section title={t('Bình luận', 'Comments')}>
-              {comments.length > 0 && (
-                <ul className="mb-3 space-y-3">
-                  {comments.map((c) => (
-                    <li key={c.commentId} className="flex gap-2.5 text-[13px]">
-                      <PersonDot user={c.author} size={24} />
-                      <div className="min-w-0">
-                        <p className="text-gray-500">
-                          <span className="font-medium text-gray-900">{c.author.fullName}</span> ·{' '}
-                          {formatRelative(c.createdAt)}
-                        </p>
-                        <p className="whitespace-pre-wrap break-words text-gray-800">
-                          <MentionText body={c.body} mentions={c.mentions} />
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <CommentBox
-                people={assignees.filter((u) => u.userId !== me?.userId)}
-                onSend={async (body, mentionUserIds) => {
-                  try {
-                    await issueApi.addComment(issue.issueId, { body, mentionUserIds })
-                    setComments(await issueApi.comments(issue.issueId))
-                    return true
-                  } catch (err) {
-                    notify(apiErrorMessage(err), 'error')
-                    return false
-                  }
-                }}
-              />
-            </Section>
-
-            <details
-              className="text-[13px]"
-              onToggle={(e) => {
-                if ((e.target as HTMLDetailsElement).open && activity === null)
-                  void issueApi.activity(issue.issueId).then(setActivity, () => setActivity([]))
-              }}
+            {deleteButton}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={t('Đóng', 'Close')}
+              title={t('Đóng', 'Close')}
+              className={clsx(iconButton, 'hover:text-gray-950')}
             >
-              <summary className="cursor-pointer text-gray-500 hover:text-gray-800">{t('Lịch sử', 'History')}</summary>
-              <ul className="mt-2 space-y-1.5 text-gray-600">
-                {(activity ?? []).map((a) => (
-                  <li key={a.activityId}>
-                    <span className="font-medium text-gray-800">{a.actor.fullName}</span> · {activityLabel(a.action, t)}
-                    {a.note ? ` · ${a.note}` : ''}{' '}
-                    <span className="text-gray-400">· {formatRelative(a.createdAt)}</span>
-                  </li>
-                ))}
-              </ul>
-            </details>
+              <CloseIcon className="h-4 w-4" />
+            </button>
           </div>
-        )}
-      </aside>
+          {loading ?? (
+            <div className="flex-1 space-y-5 overflow-y-auto p-4 sm:p-5">
+              {parts?.title}
+              {parts?.fields}
+              {parts?.sections}
+            </div>
+          )}
+        </aside>
+      </>
+    )
+
+  return (
+    <>
+      {shell}
 
       {issue && (
         <Modal

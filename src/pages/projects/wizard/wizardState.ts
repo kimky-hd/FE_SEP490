@@ -1,6 +1,7 @@
 import type { DraftPhase } from '@/lib/workflowDraft'
 import type { SdlcMethod } from '@/types/project'
 import { tr } from '@/i18n'
+import { normalizeGates } from '@/lib/phaseGates'
 
 // Trạng thái wizard tạo dự án (Figma hàng 2 frame 02–04). Lưu nháp ở localStorage — đúng ghi chú Figma
 // "Dữ liệu bản nháp được lưu tại local state (Uncommitted)", chưa gửi BE cho tới khi Submit.
@@ -36,7 +37,11 @@ const draftKey = (userId: number, workspaceId: number) => `ssam.projectDraft.${u
 export function loadDraft(userId: number, workspaceId: number): (WizardState & { savedAt: string }) | null {
   try {
     const raw = localStorage.getItem(draftKey(userId, workspaceId))
-    return raw ? (JSON.parse(raw) as WizardState & { savedAt: string }) : null
+    if (!raw) return null
+    const draft = JSON.parse(raw) as WizardState & { savedAt: string }
+    // Nháp lưu trước khi có "Điều kiện hoàn thành giai đoạn" thì chưa có trường này.
+    draft.phases = draft.phases.map((p) => ({ ...p, exitCriteria: normalizeGates(p.exitCriteria) }))
+    return draft
   } catch {
     return null
   }

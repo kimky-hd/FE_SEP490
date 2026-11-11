@@ -38,7 +38,7 @@ describe('HelpTips', () => {
     ;(document.activeElement as HTMLElement).blur()
     fireEvent.keyDown(window, { key: '?' })
     expect(await screen.findByRole('dialog', { name: 'Mẹo cho trang Việc của tôi' })).toHaveTextContent(
-      'Lượt chạy chờ bạn',
+      'Testcase chờ bạn',
     )
   })
 

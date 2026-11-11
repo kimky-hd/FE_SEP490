@@ -21,6 +21,8 @@ export interface PrimaryAction {
   key: string
   label: string
   onClick: () => void
+  /** Có giá trị → nút bị khoá, câu này hiện làm tooltip + mô tả cho trình đọc màn hình. */
+  disabledReason?: string
 }
 
 interface Props {
@@ -99,6 +101,10 @@ export function DocumentTopBar({
       {label}
     </button>
   )
+  const plainBtn =
+    'h-9 items-center rounded-control px-2.5 text-sm text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-950'
+  // Mục đã hiện thành nút trên thanh (toàn màn hình, màn đủ rộng) thì ẩn khỏi menu "…".
+  const inBarSm = fullscreen && 'sm:hidden'
   const menuAction = (fn: () => void) => () => {
     menu.setOpen(false)
     fn()
@@ -156,11 +162,46 @@ export function DocumentTopBar({
         </span>
       )}
       {panelBtn('reqs', reqLabel)}
-      {!fullscreen && panelBtn('comments', commentLabel)}
-      {primary && (
-        <Button inline isLoading={busyKey === primary.key} onClick={primary.onClick}>
-          {primary.label}
+      {panelBtn('comments', commentLabel)}
+      {/* Toàn màn hình đủ chỗ: hiện hết thao tác thay vì giấu trong "…". */}
+      {fullscreen && (
+        <>
+          {panelBtn('history', t('Lịch sử', 'History'))}
+          <button type="button" onClick={onPrint} className={clsx(plainBtn, 'hidden md:inline-flex')}>
+            {t('Xuất PDF / In', 'Export PDF / Print')}
+          </button>
+        </>
+      )}
+      {/* Người duyệt luôn thấy "Yêu cầu sửa" cạnh "Phê duyệt" (mockup màn 4); màn hẹp thì nằm trong "…". */}
+      {canRequestChanges && (
+        <Button
+          inline
+          variant="secondary"
+          isLoading={busyKey === 'changes'}
+          onClick={onRequestChanges}
+          className="hidden sm:inline-flex"
+        >
+          {t('Yêu cầu sửa', 'Request changes')}
         </Button>
+      )}
+      {primary && (
+        // Nút khoá không bắt sự kiện chuột ở một số trình duyệt → đặt tooltip lên khung bọc ngoài.
+        <span title={primary.disabledReason} className="inline-flex shrink-0">
+          <Button
+            inline
+            isLoading={busyKey === primary.key}
+            onClick={primary.onClick}
+            disabled={!!primary.disabledReason}
+            aria-describedby={primary.disabledReason ? 'doc-primary-reason' : undefined}
+          >
+            {primary.label}
+          </Button>
+          {primary.disabledReason && (
+            <span id="doc-primary-reason" className="sr-only">
+              {primary.disabledReason}
+            </span>
+          )}
+        </span>
       )}
       <div ref={menu.ref} className="relative">
         <IconButton
@@ -184,20 +225,36 @@ export function DocumentTopBar({
             <button
               type="button"
               role="menuitem"
-              className={clsx(menuItem, !fullscreen && 'sm:hidden')}
+              className={clsx(menuItem, 'sm:hidden')}
               onClick={menuAction(() => onPanel('comments'))}
             >
               {commentLabel}
             </button>
             {canRequestChanges && (
-              <button type="button" role="menuitem" className={menuItem} onClick={menuAction(onRequestChanges)}>
-                {t('Yêu cầu chỉnh sửa', 'Request changes')}
+              <button
+                type="button"
+                role="menuitem"
+                className={clsx(menuItem, 'sm:hidden')}
+                onClick={menuAction(onRequestChanges)}
+              >
+                {t('Yêu cầu sửa', 'Request changes')}
               </button>
             )}
-            <button type="button" role="menuitem" className={menuItem} onClick={menuAction(() => onPanel('history'))}>
+
+            <button
+              type="button"
+              role="menuitem"
+              className={clsx(menuItem, inBarSm)}
+              onClick={menuAction(() => onPanel('history'))}
+            >
               {t('Lịch sử', 'History')}
             </button>
-            <button type="button" role="menuitem" className={menuItem} onClick={menuAction(onPrint)}>
+            <button
+              type="button"
+              role="menuitem"
+              className={clsx(menuItem, fullscreen && 'md:hidden')}
+              onClick={menuAction(onPrint)}
+            >
               {t('Xuất PDF / In', 'Export PDF / Print')}
             </button>
             {canDelete && (

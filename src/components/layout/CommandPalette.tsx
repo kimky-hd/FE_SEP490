@@ -126,9 +126,9 @@ export function CommandPalette({
       const testRows: Row[] = tests.slice(0, 6).map((tc) => ({
         key: `t${tc.testCaseId}`,
         label: tc.title,
-        code: tc.key,
+        code: tc.moduleCode ? `${tc.moduleCode}·${tc.code}` : tc.code,
         hint: 'Testcase',
-        href: `/projects/${projectId}/tests?node=${tc.requirements[0] ? `req-${tc.requirements[0].documentId}-${tc.requirements[0].reqUid}` : tc.folderId ? `folder-${tc.folderId}` : 'unlinked'}`,
+        href: `/projects/${projectId}/tests?tab=sheet&module=${tc.moduleId}&tc=${tc.testCaseId}`,
       }))
       setResults([...issueRows, ...docs, ...reqs, ...testRows])
       setActive(0)
@@ -194,7 +194,7 @@ export function CommandPalette({
               label: `＋ ${t('Tạo testcase', 'Create test case')}`,
               code: null,
               hint: null,
-              href: `/projects/${projectId}/tests?new=1`,
+              href: `/projects/${projectId}/tests?tab=sheet&new=1`,
             },
           ]
         : []),
@@ -243,7 +243,7 @@ export function CommandPalette({
         aria-modal="true"
         aria-label={t('Tìm kiếm và lệnh', 'Search and commands')}
         onKeyDown={onKeyDown}
-        className="h-fit w-full max-w-[600px] overflow-hidden rounded-[14px] border border-gray-200 bg-white shadow-pop"
+        className="h-fit w-full max-w-[clamp(20rem,50vw,42rem)] overflow-hidden rounded-[14px] border border-gray-200 bg-white shadow-pop"
       >
         <div className="flex items-center gap-2.5 border-b border-gray-200 px-4">
           <SearchIcon className="h-[18px] w-[18px] shrink-0 text-gray-400" />

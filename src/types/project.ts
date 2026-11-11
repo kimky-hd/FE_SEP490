@@ -2,28 +2,10 @@
 
 import type { RoleRefDto, UserRefDto } from './rbac'
 
-export type SdlcMethod =
-  | 'SCRUM'
-  | 'KANBAN'
-  | 'WATERFALL'
-  | 'ITERATIVE'
-  | 'V_MODEL'
-  | 'SPIRAL'
-  | 'RAD'
-  | 'CUSTOM'
-
+export type SdlcMethod = 'SCRUM' | 'KANBAN' | 'CUSTOM'
 export type ProjectStatus = 'ACTIVE' | 'ARCHIVED'
 export type StatusCategory = 'TODO' | 'IN_PROGRESS' | 'DONE'
-
-export type PhaseExitCriterionKey =
-  | 'ISSUES_DONE'
-  | 'DOC_APPROVED'
-  | 'REQ_SEGMENTED'
-  | 'REQ_LINKED_ISSUES'
-  | 'TESTS_APPROVED'
-  | 'RTM_ZERO_STALE'
-
-export type PhaseLifecycleStatus = 'completed' | 'active' | 'upcoming'
+export type PhaseLifecycleStatus = 'UPCOMING' | 'ACTIVE' | 'COMPLETED'
 
 export interface ProjectDto {
   projectId: number
@@ -88,12 +70,16 @@ export interface PhaseDto {
   description: string | null
   position: number
   isActive: boolean
-  statuses: WorkflowStatusDto[]
-  transitions: WorkflowTransitionDto[]
-  exitCriteria?: PhaseExitCriterionKey[]
+  /** Điều kiện hoàn thành giai đoạn — đề xuất, BE chưa trả (lib/phaseGates.ts). */
+  exitCriteria?: string[]
+  /** Tiến độ giai đoạn (§12.6, đề xuất, BE chưa trả) — thiếu thì FE coi phase bật đầu tiên là đang chạy. */
   lifecycleStatus?: PhaseLifecycleStatus
   completedAt?: string | null
-  completionNote?: string | null
+  completedBy?: UserRefDto | null
+  /** Lý do khi hoàn tất mà chưa đạt hết điều kiện (Override). */
+  overrideReason?: string | null
+  statuses: WorkflowStatusDto[]
+  transitions: WorkflowTransitionDto[]
 }
 
 export interface WorkflowDto {
@@ -126,9 +112,10 @@ export interface TemplateTransition {
 export interface TemplatePhase {
   name: string
   description: string | null
+  /** Điều kiện hoàn thành mặc định của giai đoạn — đề xuất, BE chưa trả (lib/phaseGates.ts). */
+  exitCriteria?: string[]
   statuses: TemplateStatus[]
   transitions: TemplateTransition[]
-  exitCriteria?: PhaseExitCriterionKey[]
 }
 
 export interface SdlcTemplateDto {
@@ -173,9 +160,9 @@ export interface CreateProjectBody {
   phases: {
     name: string
     description: string | null
+    exitCriteria: string[]
     statuses: StatusInput[]
     transitions: TransitionInput[]
-    exitCriteria?: PhaseExitCriterionKey[]
   }[]
   members: { userId: number; roleId: number }[]
 }

@@ -15,7 +15,6 @@ import { sdlcLabel } from './ProjectTable'
 import { CodeChip, InfoRow, StatBox, tableWrap, th, theadRow } from '@/components/ui/listControls'
 import { StatusPill } from '../documents/docUi'
 import { TabBody, TabSection } from '@/components/layout/tabParts'
-import { PhasePipelineTracker } from '@/components/projects/PhasePipelineTracker'
 
 // Tab Tổng quan: 4 ô số liệu (Tài liệu · Yêu cầu · Chờ duyệt · Thành viên), rồi Tài liệu gần đây bên trái,
 // Thông tin dự án + thành viên bên phải. Giai đoạn chi tiết nằm ở tab Workflow (không lặp lại ở đây).
@@ -44,8 +43,6 @@ export function ProjectOverviewPage() {
 
   return (
     <TabBody>
-      <PhasePipelineTracker projectId={project.projectId} sdlcMethod={project.sdlcMethod} />
-
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatBox
           label={t('Tài liệu', 'Documents')}

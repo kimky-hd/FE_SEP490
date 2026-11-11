@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { registerSchema } from './auth/RegisterPage'
 import { loginSchema } from './auth/LoginPage'
 import { resetPasswordSchema } from './auth/ResetPasswordPage'
-import { companySetupSchema } from './onboarding/CompanySetupPage'
+import { companySetupSchema, composeAddress } from './onboarding/CompanySetupPage'
 
 const validRegisterInput = {
   fullName: 'Sarah Lin',
@@ -82,9 +82,10 @@ describe('companySetupSchema (ảnh Figma #4 + field bổ sung)', () => {
     adminPhone: '+84912345678',
     name: 'Acme Fintech Corp',
     taxCode: '0109876543',
-    address: 'Level 12, Landmark 81, HCMC',
+    province: 'Thành phố Hồ Chí Minh',
+    ward: 'Phường Thạnh Mỹ Tây',
+    street: 'Tầng 12, 208 Nguyễn Hữu Cảnh',
     emailDomain: 'fintechcorp.com',
-    domainAutoJoinEnabled: false,
   }
 
   it('chấp nhận dữ liệu hợp lệ', () => {
@@ -106,5 +107,15 @@ describe('companySetupSchema (ảnh Figma #4 + field bổ sung)', () => {
 
   it('từ chối khi thiếu domain công ty', () => {
     expect(companySetupSchema.safeParse({ ...validInput, emailDomain: '' }).success).toBe(false)
+  })
+
+  it('bắt buộc chọn tỉnh, phường/xã và nhập số nhà', () => {
+    expect(companySetupSchema.safeParse({ ...validInput, province: '' }).success).toBe(false)
+    expect(companySetupSchema.safeParse({ ...validInput, ward: '' }).success).toBe(false)
+    expect(companySetupSchema.safeParse({ ...validInput, street: '   ' }).success).toBe(false)
+  })
+
+  it('ghép địa chỉ theo thứ tự số nhà, phường/xã, tỉnh', () => {
+    expect(composeAddress(validInput)).toBe('Tầng 12, 208 Nguyễn Hữu Cảnh, Phường Thạnh Mỹ Tây, Thành phố Hồ Chí Minh')
   })
 })

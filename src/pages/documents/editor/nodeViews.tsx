@@ -128,11 +128,31 @@ const loadMermaid = () => {
       theme: 'neutral',
       securityLevel: 'strict',
       fontFamily: 'Roboto, sans-serif',
+      // Mã sai: không để mermaid tự vẽ khung "Syntax error" (chèn thẳng vào <body>, không tắt được) — tự báo lỗi.
+      suppressErrorRendering: true,
     })
     return m.default
   })
   return mermaidReady
 }
+
+/** Gỡ phần tử tạm mermaid có thể bỏ lại trong <body> khi vẽ hỏng (`#id` và `#d{id}`). */
+const removeMermaidLeftovers = (id: string) => {
+  for (const el of [document.getElementById(id), document.getElementById(`d${id}`)]) el?.remove()
+}
+
+/** Thông báo lỗi ngắn gọn từ lỗi parse của mermaid (bỏ dòng trống, tối đa 4 dòng). */
+const mermaidErrorText = (err: unknown): string => {
+  const raw = err instanceof Error ? err.message : typeof err === 'string' ? err : ''
+  return raw
+    .split('\n')
+    .map((l) => l.trimEnd())
+    .filter(Boolean)
+    .slice(0, 4)
+    .join('\n')
+}
+
+const isPlantUml = (code: string) => /^\s*@start(uml|mindmap|gantt|wbs|json|yaml)\b/i.test(code)
 
 interface MermaidPreviewProps {
   code: string
@@ -148,7 +168,8 @@ export function MermaidPreview({ code, className, onStatus, errorOnly = false }:
   const { t } = useI18n()
   const rawId = useId()
   const [svg, setSvg] = useState<string | null>(null)
-  const [failed, setFailed] = useState(false)
+  // null = vẽ được; chuỗi (có thể rỗng) = mã sai kèm chi tiết lỗi.
+  const [error, setError] = useState<string | null>(null)
   const statusRef = useRef(onStatus)
   statusRef.current = onStatus
   useEffect(() => {
@@ -156,20 +177,27 @@ export function MermaidPreview({ code, className, onStatus, errorOnly = false }:
     const timer = setTimeout(() => {
       if (!code.trim()) {
         setSvg(null)
+        setError(null)
         return
       }
+      const id = `mmd-${rawId.replace(/[^a-zA-Z0-9]/g, '')}-${Date.now()}`
       loadMermaid()
-        .then((m) => m.render(`mmd-${rawId.replace(/[^a-zA-Z0-9]/g, '')}-${Date.now()}`, code))
+        // parse trước: mã sai thì dừng ở đây, không đụng tới DOM.
+        .then(async (m) => {
+          await m.parse(code)
+          return m.render(id, code)
+        })
         .then((r) => {
           if (!cancelled) {
             setSvg(sanitizeSvg(r.svg))
-            setFailed(false)
+            setError(null)
             statusRef.current?.(true)
           }
         })
-        .catch(() => {
+        .catch((err: unknown) => {
+          removeMermaidLeftovers(id)
           if (cancelled) return
-          setFailed(true)
+          setError(mermaidErrorText(err))
           statusRef.current?.(false)
         })
     }, 350)
@@ -178,11 +206,26 @@ export function MermaidPreview({ code, className, onStatus, errorOnly = false }:
       clearTimeout(timer)
     }
   }, [code, rawId])
-  if (failed)
+  if (error !== null)
     return (
-      <p className={clsx('text-xs text-amber-700', className)}>
-        {t('Sơ đồ chưa hợp lệ.', 'The diagram has a syntax error.')}
-      </p>
+      <div
+        role="alert"
+        className={clsx('rounded-control border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800', className)}
+      >
+        <p className="font-medium">
+          {isPlantUml(code)
+            ? t(
+                'Đây là mã PlantUML — khối sơ đồ chỉ hỗ trợ Mermaid. Hãy chuyển sang cú pháp Mermaid.',
+                'This is PlantUML — diagram blocks only support Mermaid. Please convert it to Mermaid syntax.',
+              )
+            : t('Sơ đồ chưa hợp lệ — kiểm tra lại cú pháp Mermaid.', 'The diagram has a Mermaid syntax error.')}
+        </p>
+        {error && !isPlantUml(code) && (
+          <pre className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] text-amber-900">
+            {error}
+          </pre>
+        )}
+      </div>
     )
   if (errorOnly) return null
   if (!svg)
@@ -312,7 +355,16 @@ export function CodeBlockView({ node, editor, getPos }: NodeViewProps) {
         <NodeViewContent as="code" />
       </pre>
       {isMermaid && (
-        <div contentEditable={false} className={clsx('px-3 pb-3 empty:hidden', view === 'diagram' ? 'pt-1' : 'pt-2')}>
+        <div
+          contentEditable={false}
+          className={clsx('px-3 pb-3 empty:hidden', view === 'diagram' ? 'pt-1' : 'pt-2')}
+          // Bấm vào hình: chọn nguyên khối sơ đồ (để Ctrl/⌘+A giữ trong khối, không lan ra cả tài liệu).
+          onMouseDown={(e) => {
+            if (view !== 'diagram' || !editor.isEditable || typeof getPos !== 'function') return
+            e.preventDefault()
+            editor.chain().setNodeSelection(getPos()).focus().run()
+          }}
+        >
           <MermaidPreview
             code={code}
             errorOnly={view === 'code'}

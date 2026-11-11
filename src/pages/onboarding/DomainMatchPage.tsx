@@ -25,7 +25,7 @@ export function DomainMatchPage() {
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  if (!company) return <Navigate to="/onboarding/account-type" replace />
+  if (!company) return <Navigate to="/onboarding/start" replace />
 
   const goToPendingApproval = async () => {
     const { requestId } = await companyApi.requestToJoin(company.id)

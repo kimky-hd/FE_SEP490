@@ -100,8 +100,8 @@ export function CreateProjectWizardPage() {
       }
       return
     }
-    // Mặc định Scrum: quen thuộc nhất với đội nhỏ; pipeline vẫn sửa được ngay bên dưới.
-    const custom = templates.data!.find((x) => x.method === 'SCRUM') ?? templates.data![0]
+    // Mặc định Custom (tự tuỳ chỉnh giai đoạn); mẫu lấy từ BE GET /sdlc-templates, thiếu Custom thì lấy mẫu đầu tiên.
+    const custom = templates.data!.find((x) => x.method === 'CUSTOM') ?? templates.data![0]
     setState({
       step: 1,
       name: '',
@@ -192,8 +192,8 @@ export function CreateProjectWizardPage() {
       <DashboardLayout>
         <Alert tone="info">
           {t(
-            'Dự án trong workspace cá nhân sẽ được hỗ trợ sau — role dự án được định nghĩa ở cấp công ty.',
-            'Projects in personal workspaces are coming later — project roles are defined at the company level.',
+            'Workspace này không thuộc công ty nào nên không tạo được dự án — role dự án được định nghĩa ở cấp công ty.',
+            "This workspace isn't part of a company, so it can't hold projects — project roles are defined at the company level.",
           )}
         </Alert>
       </DashboardLayout>
@@ -285,7 +285,14 @@ export function CreateProjectWizardPage() {
     const tp = template?.phases.find((p) => p.name === phase.name)
     if (!tp) return
     const [fresh] = templateToDraft([tp], roles)
-    updatePhase({ ...fresh, key: phase.key, name: phase.name, description: phase.description })
+    // Chỉ khôi phục trạng thái & luật chuyển; điều kiện hoàn thành chọn ở bước 1 giữ nguyên.
+    updatePhase({
+      ...fresh,
+      key: phase.key,
+      name: phase.name,
+      description: phase.description,
+      exitCriteria: phase.exitCriteria,
+    })
   }
 
   const submit = async () => {
@@ -302,6 +309,7 @@ export function CreateProjectWizardPage() {
         phases: state.phases.map((p) => ({
           name: p.name.trim(),
           description: p.description?.trim() || null,
+          exitCriteria: p.exitCriteria,
           ...draftToPhaseBody(p),
         })),
         members: state.members,
@@ -497,20 +505,18 @@ export function CreateProjectWizardPage() {
               })}
             </div>
             <div className="p-5 sm:p-6">
-              {(activePhase.description || template?.phases.some((p) => p.name === activePhase.name)) && (
-                <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm text-gray-500">{activePhase.description}</p>
-                  {template?.phases.some((p) => p.name === activePhase.name) && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      inline
-                      className="!px-2 text-sm lg:!h-8"
-                      onClick={() => resetPhaseToTemplate(activePhase)}
-                    >
-                      {t('Khôi phục theo mẫu', 'Reset to template')} {templateName(template.method, template.name)}
-                    </Button>
-                  )}
+              {/* Mô tả giai đoạn đã có ở bảng bước 1 nên không lặp lại ở đây; chỉ giữ nút khôi phục theo mẫu. */}
+              {template?.phases.some((p) => p.name === activePhase.name) && (
+                <div className="mb-5 flex justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    inline
+                    className="!px-2 text-sm lg:!h-8"
+                    onClick={() => resetPhaseToTemplate(activePhase)}
+                  >
+                    {t('Khôi phục theo mẫu', 'Reset to template')} {templateName(template.method, template.name)}
+                  </Button>
                 </div>
               )}
               <PhaseWorkflowEditor

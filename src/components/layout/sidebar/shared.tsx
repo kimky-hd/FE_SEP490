@@ -1,6 +1,14 @@
 import { useEffect, useState, type ReactNode, type RefObject } from 'react'
 import { useLocation } from 'react-router-dom'
-import { BuildingIcon, FolderIcon, HomeIcon, ListChecksIcon, ShieldIcon, UsersIcon } from '@/components/ui/icons'
+import {
+  BuildingIcon,
+  FolderIcon,
+  HomeIcon,
+  ListChecksIcon,
+  MailIcon,
+  ShieldIcon,
+  UsersIcon,
+} from '@/components/ui/icons'
 import { PERMISSIONS } from '@/types/rbac'
 
 export interface NavItem {
@@ -35,7 +43,8 @@ export const getNavItems = (t: T): NavItem[] => [
     : []),
 ]
 
-// Quản trị công ty không nằm trên sidebar: mở từ menu avatar, sang khu /admin riêng. Thiếu quyền thì ẩn.
+// Nhóm "Quản trị công ty" trên sidebar chung, chia theo quyền cấp công ty (Tenant Admin / role tự định nghĩa có quyền
+// quản trị mới thấy; thành viên thường không thấy nhóm này). Trong dự án / dải icon thì vẫn mở từ menu avatar.
 export const getAdminNavItems = (t: T): NavItem[] => [
   {
     label: t('Người dùng', 'Users'),
@@ -50,6 +59,13 @@ export const getAdminNavItems = (t: T): NavItem[] => [
     to: '/admin/roles',
     activePrefix: '/admin/roles',
     permission: PERMISSIONS.roleView,
+  },
+  {
+    label: t('Mời thành viên', 'Invite members'),
+    icon: <MailIcon className={ICON} />,
+    to: '/members/invite',
+    activePrefix: '/members/invite',
+    permission: PERMISSIONS.userInvite,
   },
 ]
 

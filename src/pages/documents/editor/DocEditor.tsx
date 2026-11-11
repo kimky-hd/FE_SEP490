@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { BubbleMenu, EditorContent, useEditor, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
@@ -18,10 +18,11 @@ import { ListChecksIcon, NotesIcon, PlusIcon } from '@/components/ui/icons'
 import { newUid } from '@/api/mock/documentContent'
 import type { DiagramKind, DiagramProposalDto, DocType, GenerateDiagramBody, TipTapDoc } from '@/types/document'
 import { pageTemplate, reqStarter } from '../templates'
-import { BlockId, Callout, DocCodeBlock, FigmaFrame, ReqHeading } from './extensions'
+import { BlockId, Callout, DocCodeBlock, FigmaFrame, ReqHeading, ScopedSelectAll } from './extensions'
 import { createDocMarks, docMarksKey, type DocMarksHandlers, type DocMarksInput } from './docMarks'
 import { DEFAULT_MERMAID, type CodeBlockStorage } from './nodeViews'
 import { DiagramProposal, type DiagramProposalState } from './DiagramProposal'
+import { DocToolbar, type BlockItem } from './DocToolbar'
 import { DiagramIcon, FigmaIcon, TableIcon, docErrorMessage } from '../docUi'
 import './docEditor.css'
 
@@ -43,6 +44,12 @@ export interface DocEditorProps {
   docType?: DocType | null
   /** Nút "Từ ghi chú họp" ở trang trống (mở trình tạo từ ghi chú họp). */
   onFromNotes?: () => void
+  /** Thanh công cụ nổi ở đáy: `compact` (chế độ thường) / `full` (toàn màn hình). Chỉ hiện khi `editable`. */
+  toolbar?: 'compact' | 'full'
+  /** Nơi đặt thanh công cụ (portal) — khe ở đáy cột nội dung. */
+  toolbarSlot?: HTMLElement | null
+  /** Nút Bình luận trên thanh công cụ khi chưa bôi đen gì: mở bảng bình luận. */
+  onOpenComments?: () => void
   /** AI sinh sơ đồ (§6b). Chỉ truyền khi dự án bật AI; chỉ dùng khi `editable`. */
   generateDiagram?: (body: Omit<GenerateDiagramBody, 'documentId'>) => Promise<DiagramProposalDto>
 }
@@ -130,14 +137,7 @@ interface GutterState {
   bubbles: { top: number; anchorId: string; count: number }[]
 }
 
-interface SlashItem {
-  id: string
-  label: string
-  hint: string
-  keywords: string
-  icon: ReactNode
-  run: (editor: Editor) => void
-}
+type SlashItem = BlockItem
 
 const glyph = (text: string) => <span className="text-[11px] font-semibold leading-none">{text}</span>
 
@@ -401,6 +401,7 @@ export function DocEditor(props: DocEditorProps) {
       StarterKit.configure({ heading: false, codeBlock: false }),
       ReqHeading,
       DocCodeBlock,
+      ScopedSelectAll,
       Underline,
       Link.configure({
         openOnClick: false,
@@ -849,6 +850,19 @@ export function DocEditor(props: DocEditorProps) {
             e.preventDefault()
             focusEnd()
           }}
+        />
+      )}
+
+      {editable && props.toolbar && (
+        <DocToolbar
+          slot={props.toolbarSlot ?? null}
+          editor={editor}
+          items={slashItems}
+          variant={props.toolbar}
+          isReq={isReq}
+          onToggleReq={toggleReq}
+          canComment={canComment}
+          onComment={() => (editor.state.selection.empty ? props.onOpenComments?.() : requestComment())}
         />
       )}
 

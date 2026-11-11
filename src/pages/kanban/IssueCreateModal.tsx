@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { TextField } from '@/components/ui/TextField'
@@ -8,13 +8,11 @@ import { issueApi } from '@/api/issueApi'
 import { apiErrorMessage } from '@/lib/apiErrors'
 import { ApiError } from '@/lib/apiClient'
 import { useI18n } from '@/i18n'
-import { getProjectPhases } from '@/lib/phaseGateEngine'
 import {
   ISSUE_PRIORITIES,
   ISSUE_TYPES,
   type IssueDetailDto,
   type IssuePriority,
-  type IssueStatus,
   type IssueType,
   type RequirementRef,
   type SprintDto,
@@ -30,11 +28,9 @@ export interface IssueDefaults {
   parentId?: number | null
   assigneeId?: number | null
   requirementRefs?: RequirementRef[]
-  defaultPhaseId?: string | number
-  phaseId?: string | number
 }
 
-/** Tạo issue: loại, tiêu đề, mô tả, ưu tiên, điểm, người làm, sprint, REQ, SDLC Phase. */
+/** Tạo issue: loại, tiêu đề, mô tả, ưu tiên, điểm, người làm, sprint, REQ. */
 export function IssueCreateModal({
   open,
   onClose,
@@ -44,7 +40,6 @@ export function IssueCreateModal({
   canAssign,
   me,
   defaults,
-  defaultPhaseId,
   onCreated,
 }: {
   open: boolean
@@ -55,14 +50,9 @@ export function IssueCreateModal({
   canAssign: boolean
   me: UserRef | null
   defaults?: IssueDefaults
-  defaultPhaseId?: string | number
   onCreated: (issue: IssueDetailDto) => void
 }) {
   const { t } = useI18n()
-  const phases = useMemo(() => getProjectPhases(projectId), [projectId, open])
-  const [phaseId, setPhaseId] = useState<string | number>('')
-  const [phaseStatusId, setPhaseStatusId] = useState<string | number>('')
-
   const [type, setType] = useState<IssueType>('TASK')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -83,23 +73,6 @@ export function IssueCreateModal({
     setPriority('MEDIUM')
     setPoints('')
     setAssigneeId(defaults?.assigneeId != null ? String(defaults.assigneeId) : '')
-
-    const prefPhase = defaults?.defaultPhaseId ?? defaultPhaseId ?? defaults?.phaseId
-    const targetPhase =
-      phases.find((p) => String(p.id) === String(prefPhase)) ||
-      phases.find((p) => p.lifecycleStatus === 'active') ||
-      phases[0]
-
-    const initialPhaseId = targetPhase ? targetPhase.id : ''
-    setPhaseId(initialPhaseId)
-
-    const initialStatus =
-      defaults?.statusId !== undefined
-        ? targetPhase?.statuses.find((s) => s.statusId === defaults.statusId) ?? targetPhase?.statuses[0]
-        : targetPhase?.statuses.find((s) => s.isInitial) ?? targetPhase?.statuses[0]
-
-    setPhaseStatusId(initialStatus ? initialStatus.statusId : '')
-
     const active = sprints.find((s) => s.status === 'ACTIVE')
     setSprintId(
       defaults?.sprintId !== undefined
@@ -113,26 +86,13 @@ export function IssueCreateModal({
     setRefs(defaults?.requirementRefs ?? [])
     setError(null)
     setFieldErrors({})
-  }, [open, defaults, defaultPhaseId, sprints, phases])
-
-  const handlePhaseChange = (newPhaseId: string | number) => {
-    setPhaseId(newPhaseId)
-    const ph = phases.find((p) => String(p.id) === String(newPhaseId))
-    const initialStatus = ph?.statuses.find((s) => s.isInitial) ?? ph?.statuses[0]
-    setPhaseStatusId(initialStatus ? initialStatus.statusId : '')
-  }
-
-  const currentPhase = phases.find((p) => String(p.id) === String(phaseId))
+  }, [open, defaults, sprints])
 
   const submit = async () => {
     setBusy(true)
     setError(null)
     setFieldErrors({})
     try {
-      const currentStatusObj = currentPhase?.statuses.find((s) => String(s.statusId) === String(phaseStatusId))
-      const cat = currentStatusObj?.category ?? 'TODO'
-      const mappedStatus: IssueStatus = cat === 'DONE' ? 'DONE' : cat === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'TODO'
-
       const created = await issueApi.create(projectId, {
         type,
         title,
@@ -142,13 +102,7 @@ export function IssueCreateModal({
         assigneeId: assigneeId ? Number(assigneeId) : null,
         sprintId: defaults?.parentId ? undefined : sprintId ? Number(sprintId) : null,
         parentId: defaults?.parentId ?? null,
-        statusId: phaseStatusId ? Number(phaseStatusId) : defaults?.statusId,
-        phaseId: currentPhase?.id,
-        phaseName: currentPhase?.name,
-        phaseOrder: currentPhase?.order,
-        phaseStatusId: currentStatusObj ? currentStatusObj.statusId : undefined,
-        phaseStatusName: currentStatusObj ? currentStatusObj.name : undefined,
-        status: mappedStatus,
+        statusId: defaults?.statusId,
         requirementRefs: refs,
       })
       onCreated(created)
@@ -209,32 +163,6 @@ export function IssueCreateModal({
             onChange={(e) => setTitle(e.target.value)}
             error={fieldErrors.title?.[0]}
           />
-        </div>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <SelectField
-            label={t('Giai đoạn SDLC (Phase) *', 'SDLC Phase *')}
-            name="issue-phase"
-            value={phaseId}
-            onChange={(e) => handlePhaseChange(e.target.value)}
-          >
-            {phases.map((ph) => (
-              <option key={ph.id} value={ph.id}>
-                P{ph.order}: {ph.name} {ph.lifecycleStatus === 'active' ? `(${t('Đang chạy', 'Active')})` : ''}
-              </option>
-            ))}
-          </SelectField>
-          <SelectField
-            label={t('Trạng thái khởi đầu trong Phase *', 'Initial Status in Phase *')}
-            name="issue-phase-status"
-            value={phaseStatusId}
-            onChange={(e) => setPhaseStatusId(e.target.value)}
-          >
-            {(currentPhase?.statuses || []).map((st) => (
-              <option key={st.statusId} value={st.statusId}>
-                {st.name} ({st.category})
-              </option>
-            ))}
-          </SelectField>
         </div>
         <TextAreaField
           label={t('Mô tả', 'Description')}

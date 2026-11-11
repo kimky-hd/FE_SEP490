@@ -10,11 +10,6 @@ import { CodeChip, tableWrap, th, theadRow } from '@/components/ui/listControls'
 export const SDLC_LABEL: Record<SdlcMethod, string> = {
   SCRUM: 'Agile Scrum',
   KANBAN: 'Kanban',
-  WATERFALL: 'Thác nước (Waterfall)',
-  ITERATIVE: 'Lặp & Tăng dần (Iterative)',
-  V_MODEL: 'Mô hình chữ V (V-Model)',
-  SPIRAL: 'Mô hình Xoắn ốc (Spiral)',
-  RAD: 'Phát triển nhanh (RAD)',
   CUSTOM: 'SDLC tuỳ chỉnh',
 }
 

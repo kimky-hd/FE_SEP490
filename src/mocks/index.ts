@@ -17,7 +17,6 @@ import type {
 import type {
   CreateProjectBody,
   PhaseDto,
-  PhaseExitCriterionKey,
   ProjectDto,
   ProjectMemberDto,
   SdlcMethod,
@@ -26,6 +25,7 @@ import type {
   WorkflowDto,
   WorkflowIssue,
 } from '@/types/project'
+import type { GateCriterion } from '@/lib/phaseGates'
 import { validatePhaseWorkflow } from '@/lib/workflowValidation'
 import {
   PERMISSION_CATALOG,
@@ -39,7 +39,7 @@ import {
 } from './data'
 import { SDLC_TEMPLATES } from './sdlcTemplates'
 
-const STORAGE_KEY = 'ssam.mockdb.v4'
+const STORAGE_KEY = 'ssam.mockdb.v5'
 const TOKEN_PREFIX = 'mock-token-'
 
 type Reply = [number, unknown?]
@@ -96,7 +96,7 @@ const activeWorkspaceMembers = (workspaceId: number) =>
 const workspaceMember = (workspaceId: number, userId: number) =>
   activeWorkspaceMembers(workspaceId).find((m) => m.userId === userId)
 
-const roleRef = (r: MockRole): RoleRefDto => ({ roleId: r.id, code: r.code, name: r.name, scope: r.scope })
+const roleRef = (r: MockRole): RoleRefDto => ({ roleId: r.id, code: r.code, name: r.name, scope: r.scope, kind: r.kind })
 
 // §0.4 — quyền cấp công ty. null = không phải thành viên.
 function tenantPermissions(userId: number, companyId: number): Set<string> | null {
@@ -167,6 +167,7 @@ function toRoleDto(role: MockRole): RoleDto {
     name: role.name,
     description: role.description,
     scope: role.scope,
+    kind: role.kind,
     isSystem: role.isSystem,
     isLocked: role.isLocked,
     isActive: role.isActive,
@@ -414,7 +415,7 @@ on('get', '/companies/match', () => [
     matched: true,
     company: {
       id: 1,
-      name: 'Acme Fintech Corp',
+      name: 'SSI – Kibo Securities & FinTech Corp',
       domain: 'fintechcorp.com',
       logoUrl: null,
       autoJoinEnabled: true,
@@ -423,17 +424,17 @@ on('get', '/companies/match', () => [
 ])
 
 on('post', '/companies', ({ body }) => {
-  const name = str(body.name)?.trim() || 'Acme Fintech Corp'
+  const name = str(body.name)?.trim() || 'SSI – Kibo Securities & FinTech Corp'
   return [
     201,
     {
       id: 1,
       name,
-      code: slugify(name) || 'acme-fintech',
+      code: slugify(name) || 'ssi-kibo-securities',
       emailDomain: str(body.emailDomain) || 'fintechcorp.com',
       domainAutoJoinEnabled: Boolean(body.domainAutoJoinEnabled),
       taxCode: str(body.taxCode) || '0101234567',
-      address: str(body.address) || 'Hà Nội, Việt Nam',
+      address: str(body.address) || '72 Nguyễn Huệ, Quận 1, TP. Hồ Chí Minh',
       logoUrl: null,
     },
   ]
@@ -462,8 +463,8 @@ on(
     {
       valid: true,
       email: 'invited.member@fintechcorp.com',
-      companyName: 'Acme Fintech Corp',
-      workspaceName: 'Mobile Banking Revamp',
+      companyName: 'SSI – Kibo Securities & FinTech Corp',
+      workspaceName: 'Khối Giao dịch Chứng khoán & Core KRX',
       roleName: 'Member',
       workspaceRoleName: 'Workspace Member',
       expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(),
@@ -990,12 +991,51 @@ const userRef = (id: number) => {
   return { userId: u.id, fullName: u.fullName, email: u.email, avatarUrl: null }
 }
 
+function projectLiveMetrics(projectId: number): {
+  openIssueCount: number
+  doneIssueCount: number
+  documentCount: number
+  statusIssueCounts: Map<number, number>
+} {
+  let openIssueCount = 0
+  let doneIssueCount = 0
+  let documentCount = 0
+  const statusIssueCounts = new Map<number, number>()
+  try {
+    const rawIssues = localStorage.getItem('ssam.mock.issues.v1')
+    if (rawIssues) {
+      const parsed = JSON.parse(rawIssues) as {
+        issues?: Array<{ projectId: number; statusId: number; isDeleted?: boolean }>
+      }
+      const list = (parsed.issues ?? []).filter((i) => i.projectId === projectId && !i.isDeleted)
+      for (const issue of list) {
+        statusIssueCounts.set(issue.statusId, (statusIssueCounts.get(issue.statusId) ?? 0) + 1)
+        const cat = db.statuses.find((s) => s.id === issue.statusId)?.category
+        if (cat === 'DONE') doneIssueCount++
+        else openIssueCount++
+      }
+    }
+    const rawDocs = localStorage.getItem('ssam.mock.documents.v1')
+    if (rawDocs) {
+      const parsed = JSON.parse(rawDocs) as {
+        nodes?: Array<{ projectId: number; kind: string; isDeleted?: boolean }>
+      }
+      const list = (parsed.nodes ?? []).filter((n) => n.projectId === projectId && n.kind === 'PAGE' && !n.isDeleted)
+      documentCount = list.length
+    }
+  } catch {
+    // ignore storage read errors
+  }
+  return { openIssueCount, doneIssueCount, documentCount, statusIssueCounts }
+}
+
 function toProjectDto(project: MockProject, viewerId: number): ProjectDto {
   const ws = db.workspaces.find((w) => w.id === project.workspaceId)!
   const pmRole = db.roles.find((r) => r.code === 'PROJECT_MANAGER')
   const lead = activeProjectMembers(project.id).find((m) => m.roleId === pmRole?.id)
   const mine = projectMember(project.id, viewerId)
   const myRole = mine ? roleById(mine.roleId) : undefined
+  const metrics = projectLiveMetrics(project.id)
   return {
     projectId: project.id,
     workspaceId: ws.id,
@@ -1012,9 +1052,9 @@ function toProjectDto(project: MockProject, viewerId: number): ProjectDto {
     myPermissions: [...(projectPermissions(viewerId, project) ?? [])],
     memberCount: activeProjectMembers(project.id).length,
     phaseCount: db.phases.filter((ph) => ph.projectId === project.id && ph.isActive).length,
-    openIssueCount: 0,
-    doneIssueCount: 0,
-    documentCount: 0,
+    openIssueCount: metrics.openIssueCount,
+    doneIssueCount: metrics.doneIssueCount,
+    documentCount: metrics.documentCount,
     createdBy: userRef(project.createdBy),
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
@@ -1035,6 +1075,7 @@ function toProjectMemberDto(project: MockProject, userId: number): ProjectMember
 
 function toPhaseDto(phaseId: number): PhaseDto {
   const phase = db.phases.find((ph) => ph.id === phaseId)!
+  const metrics = projectLiveMetrics(phase.projectId)
   return {
     phaseId: phase.id,
     name: phase.name,
@@ -1053,7 +1094,7 @@ function toPhaseDto(phaseId: number): PhaseDto {
         isInitial: s.isInitial,
         position: s.position,
         isActive: s.isActive,
-        issueCount: 0,
+        issueCount: metrics.statusIssueCounts.get(s.id) ?? 0,
       })),
     transitions: db.transitions
       .filter((t) => t.phaseId === phase.id)
@@ -1067,9 +1108,10 @@ function toPhaseDto(phaseId: number): PhaseDto {
         condition: t.condition,
       })),
     exitCriteria: phase.exitCriteria ?? ['ISSUES_DONE'],
-    lifecycleStatus: phase.lifecycleStatus ?? (phase.position === 1 ? 'active' : 'upcoming'),
+    lifecycleStatus: phase.lifecycleStatus ?? (phase.position === 1 ? 'ACTIVE' : 'UPCOMING'),
     completedAt: phase.completedAt ?? null,
-    completionNote: phase.completionNote ?? null,
+    completedBy: phase.completedBy ? userRef(phase.completedBy) : null,
+    overrideReason: phase.overrideReason ?? null,
   }
 }
 
@@ -1219,7 +1261,7 @@ on('post', '/workspaces/(\\d+)/projects', ({ match, body, userId }) => {
   if (name.length < 2 || name.length > 100) errors.name = ['Tên dự án từ 2 đến 100 ký tự']
   if (!PROJECT_KEY_PATTERN.test(key)) errors.key = ['Key 2–10 ký tự, chữ HOA và số, bắt đầu bằng chữ']
   if (description && description.length > 500) errors.description = ['Mô tả tối đa 500 ký tự']
-  if (!['SCRUM', 'WATERFALL', 'ITERATIVE', 'V_MODEL', 'KANBAN', 'SPIRAL', 'RAD', 'CUSTOM'].includes(sdlcMethod)) errors.sdlcMethod = ['Chọn phương pháp SDLC']
+  if (!['SCRUM', 'KANBAN', 'CUSTOM'].includes(sdlcMethod)) errors.sdlcMethod = ['Chọn phương pháp SDLC']
   const phases = Array.isArray(body.phases) ? (body.phases as CreateProjectBody['phases']) : []
   if (phases.length === 0 || phases.length > 10) errors.phases = ['Dự án cần 1–10 phase']
   if (phases.some((ph) => !ph.name?.trim())) errors.phases = ['Phase phải có tên']
@@ -1263,8 +1305,8 @@ on('post', '/workspaces/(\\d+)/projects', ({ match, body, userId }) => {
       description: ph.description?.trim() || null,
       position: i + 1,
       isActive: true,
-      exitCriteria: ph.exitCriteria ? [...ph.exitCriteria] : ['ISSUES_DONE'],
-      lifecycleStatus: i === 0 ? 'active' : 'upcoming',
+      exitCriteria: ph.exitCriteria ? [...(ph.exitCriteria as GateCriterion[])] : ['ISSUES_DONE'],
+      lifecycleStatus: i === 0 ? 'ACTIVE' : 'UPCOMING',
     })
     writePhaseWorkflow(project.id, phaseId, { statuses: ph.statuses, transitions: ph.transitions })
   })
@@ -1454,7 +1496,7 @@ on('patch', '/projects/(\\d+)/phases/(\\d+)', ({ match, body, userId }) => {
     phase.name = name
   }
   if (body.description !== undefined) phase.description = str(body.description)?.trim() || null
-  if (Array.isArray(body.exitCriteria)) phase.exitCriteria = body.exitCriteria as PhaseExitCriterionKey[]
+  if (Array.isArray(body.exitCriteria)) phase.exitCriteria = body.exitCriteria as GateCriterion[]
   if (body.isActive !== undefined) {
     const isActive = body.isActive === true
     if (!isActive && siblings.filter((ph) => ph.isActive && ph.id !== phase.id).length === 0) {
@@ -1485,12 +1527,77 @@ on('put', '/projects/(\\d+)/phases/(\\d+)/workflow', ({ match, body, userId }) =
   }
   const issues = checkPhaseBody({ statuses, transitions }, 0, companyIdOfProject(project))
   if (issues.length) workflowInvalid(issues)
-  if (Array.isArray(body.exitCriteria)) phase.exitCriteria = body.exitCriteria as PhaseExitCriterionKey[]
+  if (Array.isArray(body.exitCriteria)) phase.exitCriteria = body.exitCriteria as GateCriterion[]
   writePhaseWorkflow(project.id, phase.id, { statuses, transitions })
   project.updatedAt = now()
   save()
   return [200, toPhaseDto(phase.id)]
 })
+
+on('post', '/projects/(\\d+)/phases/(\\d+)/complete', ({ match, body, userId }) => {
+  const { project } = requireProject(userId, num(match[1]), 'project.workflow.manage')
+  ensureProjectWritable(project)
+  const phase = db.phases.find((ph) => ph.id === num(match[2]) && ph.projectId === project.id)
+  if (!phase) throw notFound()
+  phase.lifecycleStatus = 'COMPLETED'
+  phase.completedAt = now()
+  phase.completedBy = userId
+  phase.overrideReason = str(body.overrideReason)?.trim() || null
+  const siblings = db.phases
+    .filter((ph) => ph.projectId === project.id && ph.isActive)
+    .sort((a, b) => a.position - b.position)
+  const next = siblings.find((ph) => ph.position > phase.position && ph.lifecycleStatus !== 'COMPLETED')
+  if (next) next.lifecycleStatus = 'ACTIVE'
+  project.updatedAt = now()
+  save()
+  return [200, toWorkflowDto(project)]
+})
+
+on('post', '/projects/(\\d+)/phases/(\\d+)/reopen', ({ match, userId }) => {
+  const { project } = requireProject(userId, num(match[1]), 'project.workflow.manage')
+  ensureProjectWritable(project)
+  const phase = db.phases.find((ph) => ph.id === num(match[2]) && ph.projectId === project.id)
+  if (!phase) throw notFound()
+  phase.lifecycleStatus = 'ACTIVE'
+  phase.completedAt = null
+  phase.completedBy = null
+  phase.overrideReason = null
+  const siblings = db.phases
+    .filter((ph) => ph.projectId === project.id && ph.isActive)
+    .sort((a, b) => a.position - b.position)
+  for (const ph of siblings) {
+    if (ph.position > phase.position && ph.lifecycleStatus === 'ACTIVE') {
+      ph.lifecycleStatus = 'UPCOMING'
+    }
+  }
+  project.updatedAt = now()
+  save()
+  return [200, toWorkflowDto(project)]
+})
+
+export function getSystemProjectSeedContext(projectId: number) {
+  const project = projectById(projectId)
+  if (!project) return null
+  const companyId = companyIdOfProject(project)
+  const pmRole = systemRole(companyId, 'PROJECT_MANAGER')
+  const lead = activeProjectMembers(project.id).find((m) => m.roleId === pmRole?.id)
+  const actorUser = userById(lead?.userId ?? project.createdBy) ?? db.users[0]
+  return {
+    actor: { userId: actorUser.id, fullName: actorUser.fullName },
+    access: {
+      permissions: keysOfScope('PROJECT'),
+      aiEnabled: project.aiEnabled,
+      archived: project.status === 'ARCHIVED',
+      roleId: pmRole?.id ?? null,
+      projectKey: project.key,
+    },
+    workflow: toWorkflowDto(project),
+    members: activeProjectMembers(project.id).map((m) => {
+      const u = userById(m.userId)!
+      return { userId: u.id, fullName: u.fullName }
+    }),
+  }
+}
 
 // ---------- gắn vào axios ----------
 
@@ -1548,6 +1655,14 @@ export function enableMocks() {
     reset: () => {
       db = createSeed()
       save()
+      try {
+        localStorage.removeItem('ssam.mock.documents.v1')
+        localStorage.removeItem('ssam.mock.issues.v1')
+        localStorage.removeItem('ssam.mock.tests.v2')
+        localStorage.removeItem('ssam.mockdb.v5.seeded')
+      } catch {
+        // ignore storage errors
+      }
       console.info('[mock] đã reset dữ liệu — tải lại trang để thấy thay đổi.')
     },
     accounts: () => console.table(db.users.map((u) => ({ email: u.email, password: u.password, name: u.fullName }))),

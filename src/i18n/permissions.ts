@@ -73,7 +73,13 @@ const PERMISSION_LABELS: Record<string, () => string> = {
       'Create, update and approve test cases and trace links',
     ),
   'testcase.execute': () =>
-    tr('Chạy test và ghi kết quả (Đạt / Lỗi / Bị chặn)', 'Run tests and record results (pass / fail / blocked)'),
+    tr('Chạy test và ghi kết quả, gắn bug có sẵn', 'Run tests, record results and link existing bugs'),
+  // Mới, nhóm "Kiểm thử & Truy xuất", phạm vi PROJECT.
+  'testcase.plan': () =>
+    tr(
+      'Thiết lập đợt test (môi trường, module), phân công, regression, bàn giao',
+      'Set up test plans (environments, modules), assign testers, run regression, hand over',
+    ),
   'comment.view': () =>
     tr('Xem bình luận trên issue, tài liệu và kịch bản kiểm thử', 'View comments on issues, documents and test cases'),
   'comment.write': () =>

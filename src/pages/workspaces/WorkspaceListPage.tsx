@@ -16,7 +16,7 @@ import { CreateWorkspaceModal } from './CreateWorkspaceModal'
 import { useI18n } from '@/i18n'
 import { CodeChip, SearchInput, Segmented } from '@/components/ui/listControls'
 
-// FR §III.4.1 Workspace List + wireframe "Workspace": workspace của công ty hiện tại + khu "Không gian cá nhân".
+// FR §III.4.1 Workspace List + wireframe "Workspace": workspace của công ty hiện tại (đã bỏ khu "Không gian cá nhân").
 export function WorkspaceListPage() {
   const { currentCompany, can, refreshMe } = useAuth()
   const { t } = useI18n()
@@ -31,7 +31,6 @@ export function WorkspaceListPage() {
     () => (companyId === null ? Promise.resolve([]) : workspaceApi.list({ companyId })),
     [companyId],
   )
-  const personalWorkspaces = useAsync(() => workspaceApi.list({ companyId: null }), [])
 
   const keyword = search.trim().toLowerCase()
   const all = companyWorkspaces.data ?? []
@@ -136,25 +135,14 @@ export function WorkspaceListPage() {
         </section>
       )}
 
-      {(personalWorkspaces.data?.length ?? 0) > 0 && (
-        <section className="mt-8">
-          <h2 className="text-base font-semibold text-gray-950">{t('Không gian cá nhân', 'Personal space')}</h2>
-          <div className={clsx(cardGrid, 'mt-3')}>
-            {personalWorkspaces.data!.map((w) => (
-              <WorkspaceCard key={w.workspaceId} workspace={w} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {companyId === null && personalWorkspaces.data?.length === 0 && (
+      {companyId === null && (
         <div className="mt-6">
           <DashboardEmptyState
             icon={<BuildingIcon className="h-5 w-5" />}
-            title={t('Chưa có workspace', 'No workspaces yet')}
+            title={t('Bạn chưa thuộc công ty nào', "You're not in a company yet")}
             description={t(
-              'Tài khoản cá nhân chỉ có 1 workspace cá nhân, tạo ở bước onboarding.',
-              'Personal accounts have one personal workspace, created during onboarding.',
+              'Tạo hoặc tham gia công ty để dùng workspace.',
+              'Create or join a company to use workspaces.',
             )}
           />
         </div>

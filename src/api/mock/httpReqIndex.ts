@@ -36,6 +36,7 @@ const lite = (r: RequirementItemDto): ReqLite => ({
   freshness: r.freshness,
   priority: r.priority,
   acceptanceCriteria: r.acceptanceCriteria.map((c) => ({ ...c })),
+  anchorId: r.anchorId,
 })
 
 export async function loadHttpReqIndex(api: ReqIndexSource, projectId: number): Promise<DocReqIndex[]> {

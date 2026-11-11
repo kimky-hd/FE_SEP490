@@ -213,6 +213,10 @@
 .doc-code.is-mermaid {
   background: #fff;
 }
+.doc-code.ProseMirror-selectednode {
+  outline: 2px solid theme('colors.brand.400');
+  outline-offset: 2px;
+}
 .doc-code.is-mermaid pre {
   border-top: 1px solid theme('colors.gray.100');
   background: theme('colors.gray.50');

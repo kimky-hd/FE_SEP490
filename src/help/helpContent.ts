@@ -127,8 +127,8 @@ export const HELP_TOPICS: HelpTopic[] = [
         '↗',
         L('Bấm để làm ngay', 'Click to act'),
         L(
-          'Mỗi dòng mở thẳng đúng tài liệu, issue hoặc lượt chạy cần làm.',
-          'Each row opens the exact document, issue or test run to work on.',
+          'Mỗi dòng mở thẳng đúng tài liệu, issue hoặc testcase cần làm (đúng môi trường test).',
+          'Each row opens the exact document, issue or test case to work on (in the right environment).',
         ),
       ),
       TIP_CTRL_K,
@@ -147,8 +147,8 @@ export const HELP_TOPICS: HelpTopic[] = [
           '⚑',
           L('REQ thay đổi cần báo đội', 'Changed REQs ripple out'),
           L(
-            'Khi bản mới được duyệt, issue và testcase liên kết REQ đó sẽ được đánh dấu xem lại.',
-            'Once a new version is approved, issues and test cases linked to that REQ get flagged for review.',
+            'Khi bản mới được duyệt, issue liên kết REQ đó được đánh dấu xem lại và testcase chuyển "Retest · REQ đổi".',
+            'Once a new version is approved, linked issues get flagged and linked test cases become "Retest · REQ changed".',
           ),
         ),
         TIP_CTRL_K,
@@ -156,26 +156,26 @@ export const HELP_TOPICS: HelpTopic[] = [
       QA: [
         tip(
           '▶',
-          L('Lượt chạy chờ bạn', 'Runs waiting for you'),
+          L('Testcase chờ bạn', 'Test cases waiting for you'),
           L(
-            '"Chạy" và "Chạy lại" mở thẳng chế độ chạy từng test của đợt đang mở.',
-            '"Run" and "Re-run" open the step-by-step runner for the open cycle.',
+            '"Test" / "Test lại" mở bảng testcase đúng module và môi trường được giao cho bạn.',
+            '"Test" / "Retest" open the sheet on the module and environment assigned to you.',
           ),
         ),
         tip(
           '⚑',
-          L('Testcase cần xem lại', 'Test cases to review'),
+          L('Retest khi REQ đổi', 'Retest when a REQ changes'),
           L(
-            'REQ vừa đổi thì testcase liên kết cần xem lại trước khi chạy tiếp.',
-            'When a REQ changes, its linked test cases need a review before the next run.',
+            'REQ vừa đổi thì testcase liên kết hiện "Retest · REQ đổi" ở môi trường đã test; xem lại bước rồi ghi kết quả mới.',
+            'When a REQ changes, linked test cases show "Retest · REQ changed"; review the steps, then record a new result.',
           ),
         ),
         tip(
           '＋',
           L('REQ chưa có testcase', 'REQs without tests'),
           L(
-            'Bấm "+ Testcase" để tạo nhanh, có thể nhờ gợi ý từ tiêu chí nghiệm thu.',
-            'Use "+ Test case" to add one quickly, optionally suggested from acceptance criteria.',
+            'Mở tab Đối chiếu REQ: nút Thao tác → Sinh testcase bằng AI, hoặc thêm tay ở dòng nhóm của bảng.',
+            'Open the REQ trace tab: Actions → Generate with AI, or add one from a group row in the sheet.',
           ),
         ),
       ],
@@ -198,10 +198,10 @@ export const HELP_TOPICS: HelpTopic[] = [
         ),
         tip(
           '✕',
-          L('Lỗi từ lượt test FAIL', 'Bugs from failed runs'),
+          L('Bug từ testcase Fail', 'Bugs from failed tests'),
           L(
-            'Bug sinh từ lượt chạy lỗi đã gắn sẵn REQ và testcase để bạn tái hiện.',
-            'Bugs created from failed runs already link the REQ and test case so you can reproduce.',
+            'Bug tạo từ testcase Fail có sẵn REQ, các bước, kết quả thực tế, môi trường và build để bạn tái hiện.',
+            'Bugs from failed tests carry the REQ, steps, actual result, environment and build so you can reproduce.',
           ),
         ),
       ],
@@ -389,8 +389,8 @@ export const HELP_TOPICS: HelpTopic[] = [
           '◷',
           L('Xem REQ vừa đổi', 'See what just changed'),
           L(
-            'So sánh phiên bản để biết testcase nào cần xem lại.',
-            'Compare versions to know which test cases need a review.',
+            'So sánh phiên bản để biết testcase nào chuyển "Retest · REQ đổi".',
+            'Compare versions to know which test cases became "Retest · REQ changed".',
           ),
         ),
         tip(
@@ -623,16 +623,16 @@ export const HELP_TOPICS: HelpTopic[] = [
           '✓',
           L('Cột Review/QA là của bạn', 'Review/QA is your column'),
           L(
-            'Mở thẻ để xem testcase liên kết và kết quả lượt chạy gần nhất.',
-            'Open a card to see linked test cases and their latest results.',
+            'Mở thẻ để xem testcase liên kết và kết quả xấu nhất qua các môi trường test.',
+            'Open a card to see linked test cases and their worst result across environments.',
           ),
         ),
         tip(
           '✕',
-          L('Bug từ lượt chạy lỗi', 'Bugs from failed runs'),
+          L('Bug từ testcase Fail', 'Bugs from failed tests'),
           L(
-            'Bug tạo khi ghi FAIL đã gắn sẵn REQ và testcase.',
-            'Bugs created when you record FAIL already link the REQ and test case.',
+            'Bug tạo khi ghi Fail đã gắn sẵn REQ và testcase; Fail lại trên bug đã Done thì bug tự mở lại.',
+            'Bugs created on Fail link the REQ and test case; failing again on a Done bug reopens it.',
           ),
         ),
         tip(
@@ -670,63 +670,35 @@ export const HELP_TOPICS: HelpTopic[] = [
     },
   },
   {
-    id: 'project.cycles',
-    title: L('Đợt chạy', 'Test cycles'),
-    pattern: proj('/tests/cycles(/\\d+)?'),
+    id: 'project.testSetup',
+    title: L('Thiết lập đợt test', 'Test plan setup'),
+    pattern: proj('/tests/setup'),
     tips: [
       tip(
-        '▶',
-        L('Bấm Chạy để test từng bước', 'Run step by step'),
+        '▤',
+        L('Module theo tài liệu đặc tả', 'Module = one spec document'),
         L(
-          'Chế độ chạy hiện từng testcase; ghi P (đạt), F (lỗi) hoặc B (bị chặn).',
-          'The runner shows one test at a time; record P (pass), F (fail) or B (blocked).',
+          'Mục lớn của bảng lấy theo các mục (heading) của tài liệu; nhóm con là loại test.',
+          "The sheet's sections come from the document's headings; groups are test categories.",
         ),
       ),
       tip(
-        '✕',
-        L('Lỗi → tạo bug ngay', 'Fail → file a bug'),
+        '🔑',
+        L('Cần quyền testcase.plan', 'Needs testcase.plan'),
         L(
-          'Khi ghi FAIL, chọn tạo bug: bug được gắn sẵn REQ và testcase.',
-          'When recording FAIL, choose to create a bug already linked to the REQ and test case.',
+          'Quyền mới; BE chưa cấp thì tạm tính theo "Quản lý workflow" (thường chỉ PM). QA Lead cần được Tenant Admin cấp testcase.plan.',
+          'New key; until the backend grants it, "Manage workflow" counts instead (usually PM only). QA Leads need testcase.plan from the Tenant Admin.',
         ),
       ),
       tip(
-        '↻',
-        L('Lượt cần chạy lại', 'Runs to re-run'),
+        '◉',
+        L('Phân công module × môi trường', 'Assign module × environment'),
         L(
-          'REQ đổi trong lúc đợt đang mở sẽ đánh dấu lượt cần chạy lại, kết quả cũ vẫn giữ.',
-          'If a REQ changes while the cycle is open, runs are marked to re-run; old results stay.',
+          'Mỗi ô chọn một người; "← Giống môi trường đầu" chép phân công sang môi trường khác.',
+          'One tester per cell; "← Same as first environment" copies the assignment.',
         ),
       ),
     ],
-    roles: {
-      PM: [
-        tip(
-          '＋',
-          L('Tạo đợt theo sprint', 'One cycle per sprint'),
-          L(
-            'Chọn sprint và testcase; mỗi testcase thành một lượt chạy.',
-            'Pick a sprint and test cases; each test case becomes one run.',
-          ),
-        ),
-        tip(
-          '◉',
-          L('Giao cho nhiều tester', 'Assign several testers'),
-          L(
-            'Đổi người chạy từng lượt hoặc đặt người chạy mặc định cho cả đợt.',
-            'Change the runner per run or set a default runner for the cycle.',
-          ),
-        ),
-        tip(
-          '◔',
-          L('Theo dõi tỉ lệ đạt', 'Track the pass rate'),
-          L(
-            'Thanh tiến độ của đợt tách PASS, FAIL, BLOCKED và chưa chạy.',
-            "The cycle's progress bar splits pass, fail, blocked and not run.",
-          ),
-        ),
-      ],
-    },
   },
   {
     id: 'project.tests',
@@ -734,72 +706,65 @@ export const HELP_TOPICS: HelpTopic[] = [
     pattern: proj('/tests'),
     tips: [
       tip(
-        '▤',
-        L('Cây nhóm theo thư mục', 'Folders on the left'),
+        '◎',
+        L('Chọn môi trường ở đầu trang', 'Pick the environment at the top'),
         L(
-          'Kéo testcase giữa các thư mục; thư mục có thể lồng nhau.',
-          'Drag test cases between folders; folders can be nested.',
+          'Kết quả, cần test lại và người test tính riêng từng môi trường; chip hiện build và % đã có kết quả.',
+          'Results, retests and testers are per environment; each chip shows the build and % with a result.',
         ),
       ),
       tip(
-        '⚑',
-        L('Testcase cần xem lại', 'Test cases to review'),
+        '▦',
+        L('Bảng như Excel', 'Spreadsheet-like'),
         L(
-          'Cờ vàng nghĩa là REQ liên kết vừa đổi; sửa rồi lưu để bỏ cờ.',
-          'An amber flag means the linked REQ changed; edit and save to clear it.',
+          'Bấm ô Kết quả để ghi; ↑↓←→ di chuyển, Enter / F2 sửa, Esc huỷ. Tick nhiều dòng rồi sửa một ô = áp dụng cho tất cả.',
+          'Click a Result cell to record; arrows move, Enter / F2 edits, Esc cancels. Tick rows, edit one cell = apply to all.',
         ),
       ),
       tip(
-        '▶',
-        L('Chạy trong Đợt chạy', 'Run inside a cycle'),
+        '↻',
+        L('Cần test lại', 'Retest'),
         L(
-          'Kết quả được ghi theo đợt chạy, không ghi thẳng vào testcase.',
-          'Results are recorded per test cycle, not directly on the test case.',
+          'Bug đã fix + build mới, REQ đổi hoặc Regression → ô Kết quả hiện "Retest" kèm lý do.',
+          'A fixed bug + new build, a changed REQ or a regression shows "Retest" with the reason.',
         ),
       ),
     ],
     roles: {
       QA: [
         tip(
+          '✕',
+          L('Fail → bug trên Kanban', 'Fail → bug on Kanban'),
+          L(
+            'Chọn Fail: tạo bug mới (tự điền bước, mong đợi, thực tế, build) hoặc gắn bug đang mở.',
+            'Pick Fail: create a bug (steps, expected, actual, build prefilled) or link an open bug.',
+          ),
+        ),
+        tip(
           '✦',
-          L('Gợi ý testcase từ REQ', 'Suggest tests from REQs'),
+          L('Sinh testcase bằng AI', 'Generate tests with AI'),
           L(
-            'Chọn REQ → Gợi ý; mỗi tiêu chí nghiệm thu chưa có test thành một đề xuất.',
-            'Pick REQs → Suggest; each untested acceptance criterion becomes a proposal.',
+            'Ở tab Đối chiếu REQ, bấm nút Thao tác của REQ (hoặc tick nhiều REQ) → Sinh testcase bằng AI.',
+            'In the REQ trace tab, use Actions on a REQ (or tick several) → Generate with AI.',
           ),
         ),
-        tip(
-          '⚑',
-          L('Testcase cần xem lại', 'Test cases to review'),
-          L(
-            'Cờ vàng nghĩa là REQ liên kết vừa đổi; sửa rồi lưu để bỏ cờ.',
-            'An amber flag means the linked REQ changed; edit and save to clear it.',
-          ),
-        ),
-        tip(
-          '▶',
-          L('Gom vào Đợt chạy', 'Group into a cycle'),
-          L(
-            'Tạo đợt chạy cho sprint rồi bấm Chạy để ghi kết quả.',
-            'Create a cycle for the sprint, then click Run to record results.',
-          ),
-        ),
+        TIP_CTRL_K,
       ],
       DEV: [
         tip(
           '↗',
           L('Tái hiện lỗi từ testcase', 'Reproduce from the test'),
           L(
-            'Mở testcase liên kết bug để xem các bước và kết quả mong đợi.',
-            'Open the test case linked to a bug to see steps and expected results.',
+            'Bug tạo từ testcase có sẵn bước, mong đợi, kết quả thực tế và build trong mô tả.',
+            'Bugs created from a test case carry the steps, expected, actual result and build.',
           ),
         ),
         tip(
-          '✓',
-          L('Biết issue đã đạt test', 'Know when tests pass'),
+          '⬆',
+          L('Deploy build mới', 'Deploy a new build'),
           L(
-            'Issue có mọi testcase PASS sẽ hiện "Chuyển Xong" trong Việc của tôi.',
-            'Issues whose test cases all pass show "Move to Done" in My work.',
+            'Ghi build mới cho môi trường (Tổng quan → Build): case Fail có bug đã Done tự chuyển "Retest".',
+            'Record a new build for an environment (Overview → Builds): failed cases with Done bugs become "Retest".',
           ),
         ),
         TIP_CTRL_K,
@@ -1104,13 +1069,18 @@ const GO_BACKLOG: HelpAction = {
 }
 const GO_TESTS: HelpAction = {
   kind: 'navigate',
-  label: L('Mở kho testcase', 'Open test cases'),
-  to: projectPath('/tests'),
+  label: L('Mở bảng testcase', 'Open test cases'),
+  to: projectPath('/tests?tab=sheet'),
 }
-const GO_CYCLES: HelpAction = {
+const GO_TRACE: HelpAction = {
   kind: 'navigate',
-  label: L('Mở Đợt chạy', 'Open test cycles'),
-  to: projectPath('/tests/cycles'),
+  label: L('Mở Đối chiếu REQ', 'Open REQ trace'),
+  to: projectPath('/tests?tab=trace'),
+}
+const GO_TEST_SETUP: HelpAction = {
+  kind: 'navigate',
+  label: L('Mở Thiết lập đợt test', 'Open test plan setup'),
+  to: projectPath('/tests/setup'),
 }
 const GO_MEMBERS: HelpAction = {
   kind: 'navigate',
@@ -1473,17 +1443,17 @@ export const HELP_QA: HelpQA[] = [
   },
   {
     id: 'run-test',
-    q: L('Làm sao chạy test?', 'How do I run tests?'),
-    title: L('Chạy test', 'Run tests'),
+    q: L('Làm sao ghi kết quả test?', 'How do I record test results?'),
+    title: L('Ghi kết quả test', 'Record results'),
     answer: L(
-      'Vào Đợt chạy, mở đợt đang mở → bấm Chạy. Chế độ chạy hiện từng testcase; ghi P (đạt), F (lỗi) hoặc B (bị chặn) rồi sang test tiếp.',
-      'Open Test cycles, pick the open cycle → Run. The runner shows one test at a time; record P (pass), F (fail) or B (blocked) and move on.',
+      'Mở Test cases, chọn môi trường ở đầu trang, bấm một lần vào ô Kết quả của testcase rồi chọn Pass / Fail / N/A. Mỗi lần ghi lưu kèm môi trường, build, người ghi và giờ.',
+      'Open Test cases, pick the environment at the top, click a Result cell once and choose Pass / Fail / N/A. Each record keeps the environment, build, who and when.',
     ),
-    variants: ['chạy test', 'chạy testcase', 'kiểm thử', 'thực hiện test', 'run test', 'execute test', 'test runner'],
-    keywords: ['chạy', 'run', 'execute'],
+    variants: ['chạy test', 'ghi kết quả', 'kiểm thử', 'thực hiện test', 'run test', 'execute test', 'record result'],
+    keywords: ['chạy', 'ghi', 'run', 'execute'],
     actions: [
-      GO_CYCLES,
-      { ...GO_MY_WORK, label: L('Xem lượt chạy của tôi', 'See my test runs'), hint: L('Việc của tôi', 'My work') },
+      GO_TESTS,
+      { ...GO_MY_WORK, label: L('Xem testcase của tôi', 'See my test cases'), hint: L('Việc của tôi', 'My work') },
     ],
     related: ['test-fail', 'cycle-create'],
   },
@@ -1492,8 +1462,8 @@ export const HELP_QA: HelpQA[] = [
     q: L('Ghi kết quả lỗi thế nào?', 'How do I record a failed test?'),
     title: L('Ghi kết quả lỗi', 'Record a failure'),
     answer: L(
-      'Trong chế độ chạy bấm F (Lỗi), ghi chú ngắn và chọn Tạo bug: bug được gắn sẵn REQ và testcase, Dev nhận trong Việc của tôi.',
-      "In the runner press F (Fail), add a short note and choose Create bug: the bug links the REQ and test case and lands in the dev's My work.",
+      'Chọn Fail ở ô Kết quả: tạo bug mới trên Kanban (tự điền bước, mong đợi, kết quả thực tế, build) hoặc gắn vào bug đang mở. Fail lại trên bug đã Done thì bug tự mở lại.',
+      'Pick Fail in the Result cell: create a Kanban bug (steps, expected, actual and build prefilled) or link an open bug. Failing again on a Done bug reopens it.',
     ),
     variants: [
       'ghi lỗi',
@@ -1506,55 +1476,55 @@ export const HELP_QA: HelpQA[] = [
       'create defect',
     ],
     keywords: ['lỗi', 'fail', 'bug', 'defect'],
-    actions: [GO_CYCLES],
+    actions: [GO_TESTS],
     related: ['run-test', 'test-blocked'],
   },
   {
     id: 'test-blocked',
-    q: L('Khi nào ghi Bị chặn (B)?', 'When do I mark a test Blocked?'),
-    title: L('Kết quả Bị chặn', 'Blocked result'),
+    q: L('Khi nào ghi N/A?', 'When do I mark a test N/A?'),
+    title: L('Kết quả N/A', 'N/A result'),
     answer: L(
-      'Khi không thể chạy test (thiếu dữ liệu, môi trường hỏng, tính năng chưa xong). Ghi lý do để người khác gỡ chặn rồi chạy lại.',
-      "When the test can't be executed (missing data, broken environment, unfinished feature). Note why so someone can unblock it, then re-run.",
+      'Khi không test được ở môi trường này (thiếu dữ liệu, tính năng không áp dụng). Ghi lý do vào cột Kết quả thực tế.',
+      'When the test cannot run in this environment (missing data, not applicable). Write why in the Actual column.',
     ),
-    variants: ['bị chặn', 'blocked', 'không chạy được test', 'test blocked'],
-    keywords: ['chặn', 'blocked'],
-    actions: [GO_CYCLES],
+    variants: ['n/a', 'không áp dụng', 'bị chặn', 'blocked', 'không chạy được test'],
+    keywords: ['na', 'chặn', 'blocked'],
+    actions: [GO_TESTS],
     related: ['test-fail', 'rerun'],
   },
   {
     id: 'test-review',
-    q: L('Testcase cần xem lại là gì?', 'What does "needs review" on a test case mean?'),
-    title: L('Testcase cần xem lại', 'Test case needs review'),
+    q: L('Testcase cần xem lại là gì?', 'What do the AI mark and "REQ changed" on a test case mean?'),
+    title: L('REQ do AI gắn / REQ đổi', 'AI-linked or changed REQ'),
     answer: L(
-      'REQ liên kết vừa đổi trong một bản tài liệu được duyệt, nên các bước có thể không còn đúng. Mở testcase, sửa nếu cần rồi lưu để bỏ cờ.',
-      'Its linked REQ changed in an approved document version, so the steps may be outdated. Open the test case, update it if needed and save to clear the flag.',
+      'Dấu AI (ngôi sao tím) ở cột REQ nghĩa là REQ do AI gắn, chưa ai kiểm tra: bấm nút bút chì để xem, sửa rồi Lưu. REQ đổi sau khi duyệt tài liệu thì testcase gắn REQ đó chuyển "Retest · REQ đổi".',
+      'A purple AI star in the REQ column means AI linked the REQ and nobody checked it yet: click the pencil, fix, Save. When a REQ changes in an approved document, linked test cases show "Retest · REQ changed".',
     ),
-    variants: ['cần xem lại', 'testcase cờ vàng', 'needs review', 'test case outdated', 'testcase lỗi thời'],
+    variants: ['cần xem lại', 'testcase cờ vàng', 'needs review', 'test case outdated', 'testcase lỗi thời', 'dấu sao'],
     keywords: ['xem', 'lại', 'review'],
     actions: [GO_TESTS],
     related: ['rerun', 'req-changed'],
   },
   {
     id: 'rerun',
-    q: L('Lượt cần chạy lại là gì?', 'What is a run to re-run?'),
-    title: L('Lượt cần chạy lại', 'Runs to re-run'),
+    q: L('Retest là gì?', 'What does Retest mean?'),
+    title: L('Cần test lại', 'Retest'),
     answer: L(
-      'REQ đổi trong lúc đợt chạy đang mở thì các lượt đã có kết quả được đánh dấu chạy lại; kết quả cũ vẫn được giữ trong lịch sử.',
-      'If a REQ changes while the cycle is open, runs with results are marked to re-run; old results stay in the history.',
+      'Testcase chuyển Retest khi: bug đã fix và có build mới trên môi trường đó, REQ liên kết đổi, hoặc người lập kế hoạch bấm Regression. Ghi kết quả mới là hết Retest; kết quả cũ vẫn ở lịch sử.',
+      'A test case becomes Retest when its bug is fixed and a new build hits that environment, its REQ changes, or a regression is started. Recording a new result clears it; old results stay in the history.',
     ),
-    variants: ['chạy lại', 'rerun', 're-run', 'needs rerun', 'test lại'],
-    keywords: ['rerun'],
-    actions: [GO_CYCLES],
+    variants: ['chạy lại', 'rerun', 're-run', 'retest', 'test lại', 'regression'],
+    keywords: ['rerun', 'retest'],
+    actions: [GO_TESTS],
     related: ['run-test', 'test-review'],
   },
   {
     id: 'suggest-tests',
     q: L('Làm sao tạo testcase từ REQ?', 'How do I create test cases from a REQ?'),
-    title: L('Tạo testcase từ REQ', 'Test cases from a REQ'),
+    title: L('Sinh testcase từ REQ', 'Test cases from a REQ'),
     answer: L(
-      'Trong kho testcase chọn REQ → Gợi ý: mỗi tiêu chí nghiệm thu chưa có test thành một đề xuất, bạn chọn, sửa rồi lưu. Cần bật tiện ích AI của dự án.',
-      'In Test cases pick REQs → Suggest: each untested acceptance criterion becomes a proposal you can select, edit and save. Requires the project AI helpers.',
+      'Mở tab Đối chiếu REQ, bấm nút Thao tác của REQ → Sinh testcase bằng AI (hoặc tick nhiều REQ). Đề xuất được xếp chỗ theo module › mục › loại test; chỗ chưa có sẽ tạo mới. Cần bật tiện ích AI của dự án.',
+      'Open the REQ trace tab, use Actions on a REQ → Generate with AI (or tick several REQs). Proposals are placed by module › section › category; missing places are created. Requires the project AI helpers.',
     ),
     variants: [
       'tạo testcase',
@@ -1566,20 +1536,20 @@ export const HELP_QA: HelpQA[] = [
       'generate tests',
     ],
     keywords: ['testcase', 'gợi', 'ý', 'suggest'],
-    actions: [GO_TESTS],
+    actions: [GO_TRACE],
     related: ['cycle-create', 'run-test'],
   },
   {
     id: 'cycle-create',
-    q: L('Làm sao tạo đợt chạy?', 'How do I create a test cycle?'),
-    title: L('Tạo đợt chạy', 'Create a test cycle'),
+    q: L('Làm sao tạo đợt test?', 'How do I set up a test plan?'),
+    title: L('Thiết lập đợt test', 'Set up a test plan'),
     answer: L(
-      'Vào Đợt chạy → Tạo đợt: đặt tên, chọn sprint và các testcase; mỗi testcase thành một lượt chạy giao cho tester.',
-      'Open Test cycles → New cycle: name it, pick a sprint and test cases; each test case becomes a run assigned to a tester.',
+      'Test cases → Thiết lập đợt test: đặt tên, thời gian, thêm môi trường (SIT / UAT…), tạo module từ tài liệu đặc tả và phân công module × môi trường. Cần quyền testcase.plan.',
+      'Test cases → Test plan setup: name and dates, add environments (SIT / UAT…), create modules from spec documents and assign module × environment. Needs testcase.plan.',
     ),
-    variants: ['tạo đợt chạy', 'test cycle', 'đợt test', 'create cycle', 'test plan', 'giao test'],
-    keywords: ['đợt', 'cycle'],
-    actions: [GO_CYCLES],
+    variants: ['tạo đợt test', 'test cycle', 'đợt test', 'create cycle', 'test plan', 'giao test', 'phân công test'],
+    keywords: ['đợt', 'cycle', 'plan'],
+    actions: [GO_TEST_SETUP],
     related: ['run-test'],
   },
   {

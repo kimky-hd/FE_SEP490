@@ -14,7 +14,9 @@ import type {
   RequirementItemDto,
 } from '@/types/document'
 import { Chip, DiagramIcon, FigmaIcon, IconButton, TableIcon, priorityLabel } from './docUi'
+import { AiSparkleIcon } from '@/components/ui/icons'
 import { MentionText, MentionTextarea, mentionIdsIn, type MentionPerson } from '@/components/work/MentionInput'
+import type { CommentSummary } from './view/commentSummary'
 
 export type PanelTab = 'reqs' | 'comments' | 'history'
 
@@ -49,10 +51,14 @@ interface PanelProps {
   onPriority: (req: RequirementItemDto, p: Priority) => void
   onConfirmFresh: (req: RequirementItemDto) => void
   onSelectReq: (req: RequirementItemDto) => void
+  onOpenAiLayout?: (req: RequirementItemDto) => void
   /** Số issue / testcase gắn với từng REQ (khi bật Kanban / Test cases). */
   linkCounts?: Map<string, { issues: number; tests: number }> | null
   // Bình luận
+  /** Chỉ góp ý còn mở (đã xử lý không hiện). */
   comments: DocumentCommentDto[]
+  /** "N đã xử lý · M còn mở" của bản đang xem; null = chưa biết. */
+  commentSummary?: CommentSummary | null
   canComment: boolean
   pending: { anchorId: string; quote: string } | null
   activeCommentId: number | null
@@ -126,6 +132,7 @@ function RequirementsTab({
   onPriority,
   onConfirmFresh,
   onSelectReq,
+  onOpenAiLayout,
   linkCounts,
 }: PanelProps) {
   const { t } = useI18n()
@@ -212,11 +219,22 @@ function RequirementsTab({
               {r.hasFigma && (
                 <FigmaIcon className="h-3.5 w-3.5" aria-label={t('Có khung Figma', 'Has a Figma frame')} />
               )}
+            </div>
+            <div className="mt-2.5 flex items-center justify-between border-t border-gray-100 pt-2">
+              <button
+                type="button"
+                onClick={() => onOpenAiLayout?.(r)}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50/80 hover:bg-blue-100 border border-blue-200/60 shadow-2xs transition"
+                title={t('Mở đề xuất khung giao diện mẫu do AI phác thảo', 'Open AI Layout Proposal')}
+              >
+                <AiSparkleIcon className="h-3 w-3 text-blue-600" />
+                <span>{t('✨ Đề xuất Giao diện mẫu', '✨ AI Layout Proposal')}</span>
+              </button>
               {stale && canConfirm && (
                 <button
                   type="button"
                   onClick={() => onConfirmFresh(r)}
-                  className="ml-auto font-medium text-brand-700 hover:underline"
+                  className="font-medium text-brand-700 hover:underline text-xs"
                 >
                   {t('Xác nhận đã cập nhật', 'Mark up to date')}
                 </button>
@@ -348,6 +366,7 @@ function CommentComposer({
 
 function CommentsTab({
   comments,
+  commentSummary,
   canComment,
   pending,
   activeCommentId,
@@ -369,6 +388,17 @@ function CommentsTab({
   )
   return (
     <div className="space-y-3">
+      {commentSummary && commentSummary.resolved + commentSummary.open > 0 && (
+        <p className="flex items-center gap-2 px-1 text-xs text-gray-500">
+          <span className="font-medium text-gray-700">{t('Góp ý', 'Comments')}</span>
+          <span className="tabular-nums">
+            {t(`${commentSummary.resolved} đã xử lý`, `${commentSummary.resolved} resolved`)} ·{' '}
+            <span className={clsx(commentSummary.open > 0 && 'font-medium text-amber-700')}>
+              {t(`${commentSummary.open} còn mở`, `${commentSummary.open} open`)}
+            </span>
+          </span>
+        </p>
+      )}
       {canComment && (
         <div className="rounded-card border border-gray-200 p-2.5">
           {pending && (
@@ -396,7 +426,11 @@ function CommentsTab({
         </div>
       )}
       {roots.length === 0 && (
-        <p className="px-1 py-4 text-center text-sm text-gray-500">{t('Chưa có bình luận.', 'No comments yet.')}</p>
+        <p className="px-1 py-4 text-center text-sm text-gray-500">
+          {commentSummary?.resolved
+            ? t('Mọi góp ý đã được xử lý.', 'All comments are resolved.')
+            : t('Chưa có bình luận.', 'No comments yet.')}
+        </p>
       )}
       {roots.map((c) => {
         const replies = repliesOf(c.commentId)

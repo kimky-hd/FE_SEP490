@@ -61,8 +61,21 @@ const MESSAGES: Record<string, () => string> = {
       'Dự án đang có một sprint chạy — hoàn tất sprint đó trước.',
       'The project already has an active sprint — complete it first.',
     ),
-  CYCLE_CLOSED: () =>
-    tr('Đợt chạy đã đóng, không ghi kết quả được.', "The test cycle is closed; results can't be recorded."),
+  // Test cases v2 (doc/Issues-Testcases-API-Contract.md, v2.7).
+  PLAN_HANDED_OVER: () =>
+    tr(
+      'Đợt test đã bàn giao, chỉ xem. Mở lại đợt test ở tab Tổng quan để sửa.',
+      'The test plan was handed over and is read-only. Reopen it in Overview to edit.',
+    ),
+  TEST_PLAN_NOT_FOUND: () => tr('Không tìm thấy đợt test.', 'Test plan not found.'),
+  ENVIRONMENT_NOT_FOUND: () => tr('Không tìm thấy môi trường test.', 'Test environment not found.'),
+  LAST_ENVIRONMENT: () => tr('Đợt test cần ít nhất một môi trường.', 'A test plan needs at least one environment.'),
+  MODULE_EXISTS: () =>
+    tr('Tài liệu này đã là một module của đợt test.', 'This document is already a module of the plan.'),
+  MODULE_NOT_EMPTY: () =>
+    tr('Module còn testcase, không xoá được.', "The module still has test cases and can't be removed."),
+  SECTION_NOT_EMPTY: () =>
+    tr('Mục / nhóm còn testcase, không xoá được.', "The section still has test cases and can't be removed."),
   INVALID_REQUIREMENT: () =>
     tr('REQ không thuộc dự án hoặc không còn tồn tại.', "The REQ isn't in this project or no longer exists."),
   STATUS_IN_USE: () =>

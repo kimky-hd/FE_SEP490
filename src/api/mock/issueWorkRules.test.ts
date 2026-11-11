@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BoardColumnDto, IssueSummaryDto } from '@/types/issue'
-import type { TestCaseSummaryDto, TestRunDto, TestTreeNodeDto } from '@/types/testing'
+import type { TestCaseDto, TestPlanDto, TestResult, TraceRowDto } from '@/types/testing'
 import { kanbanSignal, testsSignal, toWorkItem, type WorkItem } from '@/lib/myWorkRules'
 import { buildIssueWorkItems as buildDtos, type IssueWorkInput, type IssueWorkData } from './issueWorkRules'
 
@@ -57,53 +57,83 @@ const issue = (issueId: number, patch: Partial<IssueSummaryDto> = {}): IssueSumm
   ...patch,
 })
 
-const tc = (key: string): TestCaseSummaryDto => ({
-  testCaseId: Number(key.slice(3)),
-  key,
-  title: `Test ${key}`,
-  type: 'FUNCTIONAL',
-  priority: 'HIGH',
-  folderId: null,
-  requirements: [],
-  issues: [],
-  stepCount: 1,
-  needsReview: false,
-  lastResult: null,
-  lastRunAt: null,
-  lastRunBy: null,
-  updatedAt: '2026-10-30T08:00:00Z',
-})
-
-const run = (runId: number, patch: Partial<TestRunDto> = {}): TestRunDto => ({
-  runId,
-  cycleId: 50,
-  testCase: tc(`TC-${runId}`),
-  assignee: me,
-  result: 'NOT_RUN',
-  note: null,
-  executedAt: null,
-  executedBy: null,
-  defects: [],
-  needsRerun: false,
-  ...patch,
-})
-
-const data = (patch: Partial<IssueWorkData> = {}): IssueWorkData => ({
-  columns: COLUMNS,
-  issues: [],
-  cycles: [
-    {
-      cycleId: 50,
-      name: 'Sprint 4 · hồi quy',
-      sprintId: null,
-      status: 'OPEN',
-      counts: { pass: 0, fail: 0, blocked: 0, notRun: 0 },
-      createdAt: '2026-10-29T08:00:00Z',
-    },
+// Đợt test: 2 môi trường (SIT 1, UAT 2), 2 module; tôi được giao module 10 ở SIT.
+const PLAN = {
+  planId: 50,
+  name: 'SIT – R3',
+  status: 'OPEN',
+  createdAt: '2026-10-29T08:00:00Z',
+  environments: [
+    { envId: 1, name: 'SIT' },
+    { envId: 2, name: 'UAT' },
   ],
-  runs: [],
-  tree: null,
-  ...patch,
+  modules: [
+    { moduleId: 10, name: 'Cấu hình phí', shortCode: 'PHI' },
+    { moduleId: 11, name: 'Thanh toán QR', shortCode: 'QR' },
+  ],
+  assignments: [
+    { moduleId: 10, envId: 1, assignee: me },
+    { moduleId: 11, envId: 1, assignee: other },
+  ],
+} as unknown as TestPlanDto
+
+const tc = (
+  testCaseId: number,
+  patch: { moduleId?: number; result?: TestResult; retest?: boolean; bug?: number } = {},
+): TestCaseDto =>
+  ({
+    testCaseId,
+    planId: 50,
+    moduleId: patch.moduleId ?? 10,
+    sectionId: 1,
+    code: `TC_${testCaseId}`,
+    title: `Test ${testCaseId}`,
+    status: 'ACTIVE',
+    requirements: [],
+    bug: patch.bug
+      ? {
+          issueId: patch.bug,
+          key: `CORE-${patch.bug}`,
+          title: 'Bug',
+          priority: 'HIGH',
+          statusName: 'Đang làm',
+          statusCategory: 'IN_PROGRESS',
+        }
+      : null,
+    results: patch.result
+      ? [
+          {
+            resultId: 1,
+            envId: 1,
+            build: 'v1',
+            result: patch.result,
+            by: me,
+            at: '2026-10-30T08:00:00Z',
+            behalfOf: null,
+          },
+        ]
+      : [],
+    retest: patch.retest
+      ? [
+          {
+            envId: 1,
+            reason: 'BUG_FIXED',
+            bug: { issueId: 9, key: 'CORE-9' },
+            build: 'v1.0.2',
+            reqKey: null,
+            at: '2026-10-31T08:00:00Z',
+          },
+        ]
+      : [],
+    updatedAt: '2026-10-30T08:00:00Z',
+  }) as unknown as TestCaseDto
+
+const data = (
+  patch: Partial<Omit<IssueWorkData, 'tests'>> & { cases?: TestCaseDto[]; trace?: TraceRowDto[] | null } = {},
+): IssueWorkData => ({
+  columns: COLUMNS,
+  issues: patch.issues ?? [],
+  tests: { plan: PLAN, cases: patch.cases ?? [], trace: patch.trace ?? null },
 })
 
 const kinds = (items: ReturnType<typeof buildIssueWorkItems>) => items.map((x) => [x.kind, x.code])
@@ -138,9 +168,7 @@ describe('buildIssueWorkItems', () => {
             issue(106, { statusId: 4 }),
             issue(107, { assignee: other }),
           ],
-          runs: [
-            run(9, { assignee: other, result: 'FAIL', defects: [{ issueId: 105, key: 'CORE-105', statusId: 2 }] }),
-          ],
+          cases: [tc(9, { moduleId: 11, result: 'FAIL', bug: 105 })],
         }),
       },
       t,
@@ -161,92 +189,72 @@ describe('buildIssueWorkItems', () => {
     expect(testsSignal(items)).toBe('red')
   })
 
-  it('lượt chạy của tôi: cần chạy lại từng dòng, chưa chạy gộp theo đợt; đợt đóng bỏ qua', () => {
+  it('testcase của tôi (module được giao ở môi trường): cần test lại từng dòng, chưa test gộp theo module × môi trường', () => {
     const items = buildIssueWorkItems(
       {
         project,
         role: 'QA',
         me,
         data: data({
-          runs: [
-            run(1, { result: 'PASS', needsRerun: true }),
-            run(2),
-            run(3),
-            run(4, { assignee: other }),
-            run(5, { cycleId: 60 }),
+          cases: [
+            tc(1, { result: 'FAIL', retest: true }),
+            tc(2),
+            tc(3),
+            tc(4, { moduleId: 11 }),
+            tc(5, { result: 'PASS' }),
           ],
         }),
       },
       t,
     )
     expect(kinds(items)).toEqual([
-      ['TEST_RERUN', 'TC-1'],
+      ['TEST_RERUN', 'PHI·TC_1'],
       ['TEST_NOT_RUN', null],
     ])
+    expect(items[0]).toMatchObject({
+      sub: 'SIT – R3 · SIT · CORE-9 đã fix ở v1.0.2',
+      action: { href: '/projects/1/tests?tab=sheet&filter=retest&env=1&module=10&tc=1' },
+    })
     expect(items[1]).toMatchObject({
       count: 2,
-      title: '2 lượt test chưa chạy',
-      action: { href: '/projects/1/tests/cycles/50?run=mine' },
+      title: '2 testcase chưa test',
+      sub: 'Cấu hình phí · SIT',
+      action: { href: '/projects/1/tests?tab=sheet&filter=untest&env=1&module=10' },
     })
     expect(testsSignal(items)).toBe('red')
+    // Đợt test đã bàn giao: không còn việc test.
+    const handed = {
+      ...data({ cases: [tc(2)] }),
+      tests: { plan: { ...PLAN, status: 'HANDED_OVER' as const }, cases: [tc(2)], trace: null },
+    }
+    expect(buildIssueWorkItems({ project, role: 'QA', me, data: handed }, t)).toEqual([])
   })
 
   it('REQ chưa có testcase: chỉ QA có testcase.manage, gộp theo tài liệu', () => {
-    const tree: TestTreeNodeDto[] = [
-      {
-        id: 'doc-1',
-        kind: 'DOCUMENT',
-        parentId: null,
-        label: 'SRS-01 · Xác thực',
-        requirement: null,
-        testCount: 2,
-        needsReviewCount: 0,
-      },
-      {
-        id: 'req-1-a',
-        kind: 'REQUIREMENT',
-        parentId: 'doc-1',
-        label: 'REQ-01 · Đăng nhập',
-        requirement: {
-          documentId: 1,
-          documentCode: 'SRS-01',
-          reqUid: 'a',
-          reqKey: 'REQ-01',
-          title: 'Đăng nhập',
-          freshness: 'FRESH',
-          changedNote: null,
-        },
-        testCount: 2,
-        needsReviewCount: 0,
-      },
-      {
-        id: 'req-1-b',
-        kind: 'REQUIREMENT',
-        parentId: 'doc-1',
-        label: 'REQ-02 · Khoá tạm',
-        requirement: {
-          documentId: 1,
-          documentCode: 'SRS-01',
-          reqUid: 'b',
-          reqKey: 'REQ-02',
-          title: 'Khoá tạm',
-          freshness: 'FRESH',
-          changedNote: null,
-        },
-        testCount: 0,
-        needsReviewCount: 0,
-      },
-    ]
-    const qa = buildIssueWorkItems({ project, role: 'QA', me, data: data({ tree }) }, t)
+    const row = (reqUid: string, reqKey: string, title: string, status: TraceRowDto['status']): TraceRowDto => ({
+      documentId: 1,
+      documentCode: 'SRS-01',
+      documentTitle: 'Xác thực',
+      reqUid,
+      reqKey,
+      title,
+      anchorId: null,
+      changed: false,
+      status,
+      cases: [],
+      bugs: [],
+    })
+    const trace = [row('a', 'REQ-01', 'Đăng nhập', 'PASSED'), row('b', 'REQ-02', 'Khoá tạm', 'NO_TESTS')]
+    const qa = buildIssueWorkItems({ project, role: 'QA', me, data: data({ trace }) }, t)
     expect(kinds(qa)).toEqual([['REQ_WITHOUT_TEST', 'SRS-01']])
     expect(qa[0]).toMatchObject({
       title: 'REQ-02 · Khoá tạm',
-      action: { href: '/projects/1/tests?node=req-1-b&new=1' },
+      action: { href: '/projects/1/tests?tab=trace&trace=NO_TESTS&doc=1' },
     })
-    expect(buildIssueWorkItems({ project, role: 'DEV', me, data: data({ tree }) }, t)).toEqual([])
+    expect(buildIssueWorkItems({ project, role: 'DEV', me, data: data({ trace }) }, t)).toEqual([])
     expect(
       buildIssueWorkItems(
-        { project: { ...project, permissions: ['testcase.view'] }, role: 'QA', me, data: data({ tree }) },
+        { project: { ...project, permissions: ['testcase.view'] }, role: 'QA', me, data: data({ trace }) },
         t,
       ),
     ).toEqual([])

@@ -71,6 +71,15 @@ function workDocHref(d: WorkItemDto): string {
   return docHref(d.projectId, d.documentId ?? 0, q ? `?${q}` : '')
 }
 
+/** Link tới bảng testcase (Test cases v2) theo môi trường / module / case của dòng việc. */
+export function testsHref(projectId: number, ref: WorkItemDto['testRun'], filter: 'untest' | 'retest'): string {
+  const q = new URLSearchParams({ tab: 'sheet', filter })
+  if (ref?.envId) q.set('env', String(ref.envId))
+  if (ref?.moduleId) q.set('module', String(ref.moduleId))
+  if (ref?.testCaseId && filter === 'retest') q.set('tc', String(ref.testCaseId))
+  return `/projects/${projectId}/tests?${q.toString()}`
+}
+
 /** WorkItemDto → dòng hiển thị theo ngôn ngữ hiện tại. */
 export function toWorkItem(d: WorkItemDto, t: T): WorkItem {
   const n = d.count ?? 1
@@ -92,7 +101,8 @@ export function toWorkItem(d: WorkItemDto, t: T): WorkItem {
   const link = (text: string, href = workDocHref(d)): WorkAction => ({ kind: 'link', label: text, href })
   const reqTitle = d.requirement ? `${d.requirement.reqKey} · ${d.requirement.title}` : d.title
   const issueLink = (text: string) => link(text, issueHref(d.projectId, d.issue?.key ?? d.code ?? ''))
-  const runHref = (q: string) => `/projects/${d.projectId}/tests/cycles/${d.testRun?.cycleId ?? 0}?run=${q}`
+  // Test cases v2: mở bảng testcase đúng môi trường / module, lọc "Chưa test" hoặc "Cần test lại", trỏ tới case.
+  const runHref = (filter: 'untest' | 'retest') => testsHref(d.projectId, d.testRun, filter)
 
   switch (d.kind) {
     case 'CHANGES_REQUESTED':
@@ -267,8 +277,8 @@ export function toWorkItem(d: WorkItemDto, t: T): WorkItem {
         letter: 'T',
         tone: 'warn',
         sub: [d.testRun?.cycleName ?? '', d.note || t('Testcase đã đổi', 'Test case changed')].join(' · '),
-        reason: t('Cần chạy lại', 'Rerun needed'),
-        action: link(t('Chạy lại', 'Rerun'), runHref(String(d.testRun?.runId ?? ''))),
+        reason: t('Cần test lại', 'Retest needed'),
+        action: link(t('Test lại', 'Retest'), runHref('retest')),
       }
     case 'TEST_NOT_RUN':
       return {
@@ -276,14 +286,13 @@ export function toWorkItem(d: WorkItemDto, t: T): WorkItem {
         category: 'test',
         letter: 'T',
         tone: 'blue',
-        title: n === 1 ? d.title : t(`${n} lượt test chưa chạy`, `${n} test runs not run yet`),
+        title: n === 1 ? d.title : t(`${n} testcase chưa test`, `${n} test cases not tested yet`),
         code: n === 1 ? d.code : null,
         sub: d.testRun?.cycleName ?? '',
-        reason: t('Chưa chạy', 'Not run'),
-        action: link(t('Chạy', 'Run'), runHref('mine')),
+        reason: t('Chưa test', 'Not tested'),
+        action: link(t('Test', 'Test'), runHref('untest')),
       }
     case 'REQ_WITHOUT_TEST': {
-      const node = d.requirement ? `req-${d.documentId ?? 0}-${d.requirement.reqUid}` : `doc-${d.documentId ?? 0}`
       return {
         ...base,
         category: 'test',
@@ -292,9 +301,10 @@ export function toWorkItem(d: WorkItemDto, t: T): WorkItem {
         title: n === 1 && d.requirement ? reqTitle : t(`${n} REQ chưa có testcase`, `${n} REQs without test cases`),
         sub: n === 1 ? `${d.code ?? ''} · ${d.title}` : (d.note ?? ''),
         reason: t('Thiếu test', 'No tests'),
+        // Sinh testcase chỉ mở từ tab Đối chiếu REQ (lọc REQ chưa có testcase của tài liệu này).
         action: link(
           t('+ Testcase', '+ Test case'),
-          `/projects/${d.projectId}/tests?node=${encodeURIComponent(node)}&new=1`,
+          `/projects/${d.projectId}/tests?tab=trace&trace=NO_TESTS&doc=${d.documentId ?? 0}`,
         ),
       }
     }

@@ -1,25 +1,12 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { Link } from 'react-router-dom'
 import clsx from 'clsx'
-import { authApi } from '@/api/authApi'
 import { useAuth } from '@/context/AuthContext'
 import { Avatar } from '@/components/ui/Avatar'
 import { LanguageSwitch } from '@/components/ui/LanguageSwitch'
-import { CheckIcon, LogoutIcon } from '@/components/ui/icons'
+import { LogoutIcon } from '@/components/ui/icons'
 import { useI18n } from '@/i18n'
-import { invalidateData } from '@/lib/dataEvents'
 import { ICON, UpDownIcon, menuItemClass, useSidebarPopover, type NavItem } from './shared'
-
-const DEMO_ROLE_ACCOUNTS = [
-  { email: 'sarah@fintechcorp.com', name: 'Sarah Lin', role: 'Tenant & WS Admin' },
-  { email: 'ky@fintechcorp.com', name: 'Vũ Kim Kỳ', role: 'Project Manager' },
-  { email: 'minh@fintechcorp.com', name: 'Phạm Công Minh', role: 'Business Analyst (BA)' },
-  { email: 'trang@fintechcorp.com', name: 'Đặng Thu Trang', role: 'Tech Lead' },
-  { email: 'luong@fintechcorp.com', name: 'Phạm Minh Lương', role: 'Developer' },
-  { email: 'tam@fintechcorp.com', name: 'Trương Quang Tâm', role: 'QA / Tester' },
-  { email: 'quan@fintechcorp.com', name: 'Hoàng Minh Quân', role: 'UI/UX Designer' },
-  { email: 'tran.c@fintechcorp.com', name: 'Trần Thị C', role: 'Reviewer (Read-only)' },
-]
 
 export function AccountMenu({
   compact,
@@ -30,27 +17,11 @@ export function AccountMenu({
   adminItems: NavItem[]
   accountHint?: string
 }) {
-  const { user, logout, applySession, refreshMe } = useAuth()
+  const { user, logout } = useAuth()
   const { t } = useI18n()
   const ref = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useSidebarPopover(ref, buttonRef)
-  const [switchingEmail, setSwitchingEmail] = useState<string | null>(null)
-  const isMock = import.meta.env.VITE_USE_MOCK !== 'false'
-
-  const handleQuickSwitch = async (email: string) => {
-    if (email === user?.email || switchingEmail) return
-    setSwitchingEmail(email)
-    try {
-      const session = await authApi.login({ email, password: 'Password@123' })
-      applySession(session)
-      await refreshMe()
-      invalidateData()
-      setOpen(false)
-    } finally {
-      setSwitchingEmail(null)
-    }
-  }
 
   return (
     <div className="relative" ref={ref}>
@@ -84,39 +55,6 @@ export function AccountMenu({
                     </Link>
                   ),
               )}
-            </>
-          )}
-          {isMock && (
-            <>
-              <div className="my-1 border-t border-gray-100" />
-              <p className="px-2.5 pb-1 pt-1.5 text-[11px] font-medium text-gray-500">
-                {t('Chuyển nhanh vai trò (Demo RBAC)', 'Quick Switch Role (Demo RBAC)')}
-              </p>
-              <div className="max-h-48 space-y-0.5 overflow-y-auto px-1">
-                {DEMO_ROLE_ACCOUNTS.map((acc) => {
-                  const active = user?.email === acc.email
-                  return (
-                    <button
-                      key={acc.email}
-                      type="button"
-                      disabled={switchingEmail !== null}
-                      onClick={() => void handleQuickSwitch(acc.email)}
-                      className={clsx(
-                        'flex w-full items-center justify-between rounded-[7px] px-2 py-1.5 text-left text-xs transition-colors',
-                        active
-                          ? 'bg-brand-50 font-semibold text-brand-800'
-                          : 'text-gray-700 hover:bg-gray-100',
-                      )}
-                    >
-                      <span className="min-w-0 truncate">
-                        <span className="block truncate">{acc.name}</span>
-                        <span className="block truncate text-[10.5px] font-normal text-gray-500">{acc.role}</span>
-                      </span>
-                      {active && <CheckIcon className="h-3.5 w-3.5 shrink-0 text-brand-600" />}
-                    </button>
-                  )
-                })}
-              </div>
             </>
           )}
           <div className="my-1 border-t border-gray-100" />

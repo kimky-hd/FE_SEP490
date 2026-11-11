@@ -3,7 +3,6 @@ import type { ItemsDto } from '@/types/rbac'
 import type {
   CreateProjectBody,
   PhaseDto,
-  PhaseExitCriterionKey,
   ProjectDto,
   ProjectMemberCandidateDto,
   ProjectMemberDto,
@@ -74,18 +73,19 @@ export const projectApi = {
   updatePhase: (
     projectId: number,
     phaseId: number,
-    body: {
-      name?: string
-      description?: string
-      position?: number
-      isActive?: boolean
-      exitCriteria?: PhaseExitCriterionKey[]
-    },
+    body: { name?: string; description?: string; position?: number; isActive?: boolean; exitCriteria?: string[] },
   ) => api.patch<WorkflowDto>(`/projects/${projectId}/phases/${phaseId}`, body).then((r) => r.data),
 
   savePhaseWorkflow: (
     projectId: number,
     phaseId: number,
-    body: { statuses: StatusInput[]; transitions: TransitionInput[]; exitCriteria?: PhaseExitCriterionKey[] },
+    body: { statuses: StatusInput[]; transitions: TransitionInput[] },
   ) => api.put<PhaseDto>(`/projects/${projectId}/phases/${phaseId}/workflow`, body).then((r) => r.data),
+
+  // --- Tiến độ giai đoạn (§12.6 — đề xuất, BE chưa có; UI gọi sau cờ FEATURES.phaseLifecycle) ---
+  completePhase: (projectId: number, phaseId: number, body: { overrideReason?: string } = {}) =>
+    api.post<WorkflowDto>(`/projects/${projectId}/phases/${phaseId}/complete`, body).then((r) => r.data),
+
+  reopenPhase: (projectId: number, phaseId: number, body: { reason?: string } = {}) =>
+    api.post<WorkflowDto>(`/projects/${projectId}/phases/${phaseId}/reopen`, body).then((r) => r.data),
 }
