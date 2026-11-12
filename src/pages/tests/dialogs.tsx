@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import clsx from 'clsx'
 import { issueApi } from '@/api/issueApi'
 import { Modal } from '@/components/ui/Modal'
@@ -6,13 +6,10 @@ import { Button } from '@/components/ui/Button'
 import { SelectField } from '@/components/ui/SelectField'
 import { TextField } from '@/components/ui/TextField'
 import { useI18n } from '@/i18n'
-import { stripHeadingNumber } from '@/lib/testplan/sections'
-import { DEFAULT_CATEGORIES } from '@/lib/testplan/columns'
 import type { TestAbilities } from '@/lib/testplan/abilities'
 import type { ReqOption } from '../kanban/reqLinks'
 import type {
   BugSeverity,
-  DocSectionDto,
   TestBugRefDto,
   TestCaseDto,
   TestEnvironmentDto,
@@ -490,43 +487,34 @@ export function ReqLinkModal({
   )
 }
 
-/** "+ Thêm mục" (theo mục tài liệu chưa dùng) hoặc "+ Thêm nhóm" (loại test) vào một mục lớn. */
+/** "+ Thêm thư mục kiểm thử" (parent = null) hoặc "+ Thêm nhánh con" (parent = section lớn). */
 export function SectionModal({
-  module,
   parent,
-  docSections,
   onSave,
   onClose,
 }: {
   module: TestModuleDto
   parent: { sectionId: number; code: string; title: string } | null
-  docSections: DocSectionDto[] | null
   onSave: (body: { title: string; anchorId: string | null }) => Promise<void>
   onClose: () => void
 }) {
   const { t } = useI18n()
-  const used = new Set(module.sections.filter((s) => s.parentId === null).map((s) => s.anchorId))
-  const free = (docSections ?? []).filter((s) => !used.has(s.anchorId))
-  const [anchor, setAnchor] = useState<string>('')
   const [title, setTitle] = useState('')
   const [busy, setBusy] = useState(false)
-  const touched = useRef(false)
-  useEffect(() => {
-    if (parent || touched.current || !free.length) return
-    setAnchor(free[0].anchorId)
-    setTitle(stripHeadingNumber(free[0].title))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [docSections])
 
   const save = async () => {
     if (!title.trim()) return
     setBusy(true)
     try {
-      await onSave({ title: title.trim(), anchorId: parent ? null : anchor || null })
+      await onSave({ title: title.trim(), anchorId: null })
     } finally {
       setBusy(false)
     }
   }
+
+  const SUGGESTED_TAGS = parent
+    ? ['Flow (Luồng nghiệp vụ)', 'Giao diện & Thuật ngữ', 'Chức năng & Ràng buộc', 'Validate & Ngoại lệ', 'Phân quyền']
+    : ['Kiểm thử Luồng nghiệp vụ (E2E)', 'Kiểm thử Chức năng & Giao dịch', 'Kiểm thử Tích hợp Liên phân hệ', 'Kiểm thử Hiệu năng & Tải']
 
   return (
     <Modal
@@ -534,13 +522,13 @@ export function SectionModal({
       onClose={onClose}
       title={
         parent
-          ? t(`Thêm nhóm vào ${parent.code} ${parent.title}`, `Add a group to ${parent.code} ${parent.title}`)
-          : t(`Thêm mục · ${module.name}`, `Add a section · ${module.name}`)
+          ? t(`Thêm nhánh con vào "${parent.code} ${parent.title}"`, `Add sub-suite to "${parent.code} ${parent.title}"`)
+          : t('Tạo Thư mục kiểm thử mới', 'Create New Test Suite')
       }
       description={
         parent
-          ? t('Vd: Flow, Giao diện, Chức năng, Validate', 'e.g. Flow, UI, Function, Validate')
-          : t(`Theo mục trong tài liệu ${module.documentCode}`, `A heading of ${module.documentCode}`)
+          ? t('Tạo nhánh kiểm thử con trực thuộc thư mục này để phân nhóm kịch bản', 'Create a sub-suite under this suite')
+          : t('Tổ chức cấu trúc thư mục kiểm thử độc lập phục vụ kế hoạch test của QA', 'Create an independent test suite')
       }
       footer={
         <>
@@ -548,61 +536,47 @@ export function SectionModal({
             {t('Huỷ', 'Cancel')}
           </Button>
           <Button inline onClick={() => void save()} disabled={!title.trim()} isLoading={busy}>
-            {parent ? t('Thêm nhóm', 'Add group') : t('Thêm mục', 'Add section')}
+            {parent ? t('Thêm nhánh con', 'Add sub-suite') : t('Tạo thư mục', 'Create suite')}
           </Button>
         </>
       }
     >
-      <div className="space-y-3">
-        {!parent && (
-          <SelectField
-            id="sec-anchor"
-            label={t('Mục trong tài liệu', 'Document section')}
-            value={anchor}
-            onChange={(e) => {
-              touched.current = true
-              setAnchor(e.target.value)
-              const s = free.find((x) => x.anchorId === e.target.value)
-              if (s) setTitle(stripHeadingNumber(s.title))
-            }}
-          >
-            {docSections === null && <option value="">{t('Đang tải mục tài liệu…', 'Loading sections…')}</option>}
-            {free.map((s) => (
-              <option key={s.anchorId} value={s.anchorId}>
-                {s.title}
-                {s.reqUids.length ? ` · ${s.reqUids.length} REQ` : ''}
-              </option>
-            ))}
-            <option value="">{t('— Không theo mục nào', '— No document section')}</option>
-          </SelectField>
-        )}
+      <div className="space-y-4">
         <TextField
           id="sec-title"
-          label={parent ? t('Tên nhóm', 'Group name') : t('Tên mục', 'Section name')}
+          label={parent ? t('Tên nhánh con (*)', 'Sub-suite name (*)') : t('Tên thư mục kiểm thử (*)', 'Suite name (*)')}
           value={title}
           maxLength={200}
-          list={parent ? 'sec-cats' : undefined}
           placeholder={
             parent
-              ? t('Vd: Validate, Phân quyền', 'e.g. Validate, Permissions')
-              : t('Tên lấy theo mục tài liệu', 'Taken from the document heading')
+              ? t('Vd: 1.1 Luồng thiết lập chung (Flow), 1.2 Giao diện...', 'e.g. 1.1 Flow, 1.2 UI...')
+              : t('Vd: 1. Kiểm thử Biểu phí & Lãi vay Margin, 2. Đặt lệnh KRX...', 'e.g. 1. Fee & Margin, 2. KRX Orders...')
           }
-          onChange={(e) => {
-            touched.current = true
-            setTitle(e.target.value)
-          }}
+          onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') void save()
           }}
-          data-autofocus={parent ? true : undefined}
+          data-autofocus
         />
-        {parent && (
-          <datalist id="sec-cats">
-            {[...DEFAULT_CATEGORIES, 'Phân quyền'].map((c) => (
-              <option key={c} value={c} />
+
+        {/* Gợi ý phân loại nhanh */}
+        <div>
+          <span className="text-[11.5px] font-medium text-gray-500 block mb-1.5">
+            {t('Gợi ý phân loại nhanh:', 'Quick suggestions:')}
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {SUGGESTED_TAGS.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setTitle(tag)}
+                className="rounded border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-700 hover:bg-gray-100 hover:border-gray-300 transition-colors"
+              >
+                + {tag}
+              </button>
             ))}
-          </datalist>
-        )}
+          </div>
+        </div>
       </div>
     </Modal>
   )

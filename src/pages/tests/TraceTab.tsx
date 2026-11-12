@@ -33,8 +33,7 @@ import {
   type TraceStatus,
 } from '@/types/testing'
 import type { ReqOption } from '../kanban/reqLinks'
-import { AiGenerateModal } from './AiGenerateModal'
-import { AiSmartTestGeneratorModal, type GeneratedTestCaseOutput } from './AiSmartTestGeneratorModal'
+import { AiSmartTestGeneratorModal } from './AiSmartTestGeneratorModal'
 import { AiLayoutProposalDrawer } from '@/components/document/AiLayoutProposalDrawer'
 import { DocPreviewDrawer } from './DocPreviewDrawer'
 import { ReqLinkModal } from './dialogs'
@@ -139,7 +138,7 @@ export function TraceTab({
   env,
   cases,
   abilities,
-  reqs,
+  reqs: _reqs,
   initialFilter,
   initialDoc,
   patchCases,

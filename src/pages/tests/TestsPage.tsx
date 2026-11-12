@@ -144,8 +144,8 @@ export function TestsPage() {
         <h2 className="text-[17px] font-semibold text-gray-950">{t('Chưa có đợt test', 'No test plan yet')}</h2>
         <p className="mt-1.5 text-[14px] text-gray-600">
           {t(
-            'Gồm môi trường, module theo tài liệu và người test.',
-            'Environments, modules from documents and testers.',
+            'Chỉ cần tên đợt và môi trường để bắt đầu viết testcase.',
+            'A name and environments are enough to start.',
           )}
         </p>
         <div className="mt-5 flex flex-wrap justify-center gap-2">
@@ -200,7 +200,7 @@ export function TestsPage() {
     <div className="flex min-h-0 flex-1 flex-col">
       {!fullscreen && (
         <>
-          <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 px-4 pt-4 sm:px-6">
+          <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 px-4 pt-3 sm:px-6">
             <div className="min-w-0">
               <h2 className="flex flex-wrap items-center gap-2 text-[18px] font-semibold tracking-tight text-gray-950">
                 {plan.name}
@@ -236,42 +236,12 @@ export function TestsPage() {
                   ))}
               </p>
             </div>
-            <span className="flex-1" />
-            {(st.plans?.length ?? 0) > 1 && (
-              <select
-                aria-label={t('Đợt test', 'Test plan')}
-                value={plan.planId}
-                onChange={(e) => update({ plan: e.target.value, module: null, env: null, tc: null })}
-                className="h-8 rounded-control border border-gray-300 bg-white px-2 text-[13px] shadow-xs"
-              >
-                {st.plans!.map((x) => (
-                  <option key={x.planId} value={x.planId}>
-                    {x.name}
-                    {x.status === 'HANDED_OVER' ? t(' (đã bàn giao)', ' (handed over)') : ''}
-                  </option>
-                ))}
-              </select>
-            )}
-            {(abilities.plan || abilities.reopen) && (
-              <Link to={`/projects/${projectId}/tests/setup?new=1`} className={smallBtn}>
-                <PlusIcon width={16} height={16} aria-hidden="true" />
-                {t('Đợt test mới', 'New test plan')}
-              </Link>
-            )}
-            {abilities.plan && (
-              <Link to={`/projects/${projectId}/tests/setup?plan=${plan.planId}`} className={smallBtn}>
-                <SlidersIcon width={16} height={16} aria-hidden="true" />
-                {t('Thiết lập đợt test', 'Test plan setup')}
-              </Link>
-            )}
-          </div>
-
           <div
             role="group"
             aria-label={t('Môi trường test', 'Test environment')}
-            className="flex shrink-0 flex-wrap items-center gap-2 px-4 pt-3 sm:px-6"
+            className="flex flex-wrap items-center gap-1.5"
           >
-            <span className="mr-0.5 text-[12.5px] text-gray-500">{t('Môi trường test', 'Environment')}</span>
+            <span className="mr-0.5 text-[12.5px] text-gray-500">{t('Chạy trên', 'Run on')}</span>
             {plan.environments.map((e) => {
               const s = statsIn(cases, e.envId)
               const done = s.PASS + s.FAIL + s.NA
@@ -309,11 +279,40 @@ export function TestsPage() {
               )
             })}
           </div>
+            <span className="flex-1" />
+            {(st.plans?.length ?? 0) > 1 && (
+              <select
+                aria-label={t('Đợt test', 'Test plan')}
+                value={plan.planId}
+                onChange={(e) => update({ plan: e.target.value, module: null, env: null, tc: null })}
+                className="h-8 rounded-control border border-gray-300 bg-white px-2 text-[13px] shadow-xs"
+              >
+                {st.plans!.map((x) => (
+                  <option key={x.planId} value={x.planId}>
+                    {x.name}
+                    {x.status === 'HANDED_OVER' ? t(' (đã bàn giao)', ' (handed over)') : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+            {(abilities.plan || abilities.reopen) && (
+              <Link to={`/projects/${projectId}/tests/setup?new=1`} className={smallBtn}>
+                <PlusIcon width={16} height={16} aria-hidden="true" />
+                {t('Đợt test mới', 'New test plan')}
+              </Link>
+            )}
+            {abilities.plan && (
+              <Link to={`/projects/${projectId}/tests/setup?plan=${plan.planId}`} className={smallBtn}>
+                <SlidersIcon width={16} height={16} aria-hidden="true" />
+                {t('Thiết lập đợt test', 'Test plan setup')}
+              </Link>
+            )}
+          </div>
 
           <div
             role="tablist"
             aria-label="Test cases"
-            className="mt-3 flex shrink-0 gap-x-5 overflow-x-auto border-b border-gray-200 px-4 sm:px-6"
+            className="mt-2 flex shrink-0 gap-x-5 overflow-x-auto border-b border-gray-200 px-4 sm:px-6"
           >
             {TABS.map((id) => (
               <button

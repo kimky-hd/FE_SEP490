@@ -154,6 +154,7 @@ const DOC_CALLS: Calls<Omit<DocumentApi, 'mock'>> = {
   requestChanges: () => httpDocumentApi.requestChanges(2, 3, 'Sửa giúp'),
   createRevision: () => httpDocumentApi.createRevision(2),
   listRequirements: () => httpDocumentApi.listRequirements(2, 3),
+  listProjectRequirements: () => httpDocumentApi.listProjectRequirements(1),
   updateRequirement: () => httpDocumentApi.updateRequirement(4, { priority: 'HIGH' }),
   confirmFresh: () => httpDocumentApi.confirmFresh(4),
   listComments: () => httpDocumentApi.listComments(2, { versionId: 3 }),

@@ -16,7 +16,8 @@ import { retestIn, statsIn, statusIn } from '@/lib/testplan/status'
 import { ChevronDownIcon, HistoryIcon, TrashIcon, UndoIcon } from '@/components/ui/icons'
 import type { TestCaseDto, TestModuleDto, TestPlanDto, TestSectionDto } from '@/types/testing'
 import { CellDisplay, CellEditor, resultTooltip, type CellValue, type DisplayCtx } from './cells'
-import { iconBtn } from './testUi'
+import { iconBtn, isTestCaseStale } from './testUi'
+import { getPastelClass } from './TestcaseDynamicIsland'
 
 // Bảng testcase kiểu Excel của một module ở một môi trường: dòng mục / nhóm thu gọn được, "+ Testcase" ở dòng nhóm,
 // "+ Thêm nhóm" cuối mỗi mục. Phím: ↑↓←→ di chuyển, Enter / F2 sửa, Esc huỷ, Tab sang ô bên, Ctrl+Enter trong ô nhiều
@@ -47,12 +48,16 @@ export interface SheetGridProps {
   onOpenReqPicker: (tc: TestCaseDto) => void
   onOpenBug: (tc: TestCaseDto) => void
   onHistory: (tc: TestCaseDto) => void
+  onInspect?: (tc: TestCaseDto) => void
   onToggleDelete: (tc: TestCaseDto) => void
   onAddCase: (group: TestSectionDto) => void
   onAddGroup: (top: TestSectionDto) => void
   onMoveColumn: (from: string, to: string) => void
   onResizeColumn: (id: string, width: number) => void
   onRenameColumn: (id: string, label: string) => void
+  cellColors?: Record<string, string>
+  onActiveCellChange?: (pos: Pos | null) => void
+  onFormatCell?: (pos: Pos, format: 'bold' | 'italic' | 'underline' | 'strike') => void
 }
 
 type Row =
@@ -75,6 +80,9 @@ export function SheetGrid(p: SheetGridProps) {
   const { t } = useI18n()
   const { plan, module, envId, cases, columns, abilities, filter, wrap, collapsed, selected, focusCaseId } = p
   const [active, setActive] = useState<Pos | null>(null)
+  useEffect(() => {
+    p.onActiveCellChange?.(active)
+  }, [active, p.onActiveCellChange])
   const [editing, setEditing] = useState<Pos | null>(null)
   const [renaming, setRenaming] = useState<string | null>(null)
   const [dragCol, setDragCol] = useState<string | null>(null)
@@ -219,6 +227,25 @@ export function SheetGrid(p: SheetGridProps) {
     if (editing || renaming) return
     const target = e.target as HTMLElement
     if (!target.closest('[data-cell]')) return
+
+    if ((e.ctrlKey || e.metaKey) && active) {
+      if (e.key === 'b' || e.key === 'B') {
+        e.preventDefault()
+        p.onFormatCell?.(active, 'bold')
+        return
+      }
+      if (e.key === 'i' || e.key === 'I') {
+        e.preventDefault()
+        p.onFormatCell?.(active, 'italic')
+        return
+      }
+      if (e.key === 'u' || e.key === 'U') {
+        e.preventDefault()
+        p.onFormatCell?.(active, 'underline')
+        return
+      }
+    }
+
     const map: Record<string, [number, number]> = {
       ArrowUp: [-1, 0],
       ArrowDown: [1, 0],
@@ -273,7 +300,7 @@ export function SheetGrid(p: SheetGridProps) {
     window.addEventListener('mouseup', onUp)
   }
 
-  const tableWidth = columns.reduce((n, c) => n + widthOf(c), 36 + 72)
+  const tableWidth = columns.reduce((n, c) => n + widthOf(c), 36 + 56)
   const totalCols = columns.length + 2
   const canPick = abilities.manage || abilities.execute
 
@@ -349,7 +376,7 @@ export function SheetGrid(p: SheetGridProps) {
               <button
                 type="button"
                 onClick={() => p.onAddCase(s)}
-                className="rounded-[6px] border border-dashed border-gray-300 bg-white px-2 text-[12px] font-medium text-gray-600 hover:border-brand-500 hover:text-brand-700"
+                className="rounded px-2 py-0.5 text-[11.5px] font-medium text-gray-500 hover:text-brand-700 hover:bg-white/80 transition-colors"
               >
                 {t('+ Testcase', '+ Test case')}
               </button>
@@ -364,16 +391,23 @@ export function SheetGrid(p: SheetGridProps) {
     const deleted = tc.status === 'DELETED'
     const picked = selected.has(tc.testCaseId)
     const retest = !!retestIn(tc, envId)
+    const stale = isTestCaseStale(tc)
+    const rowColor = p.cellColors?.[String(tc.testCaseId)]
     return (
       <tr
         key={tc.testCaseId}
         data-row={tc.testCaseId}
-        className={clsx(picked && '[&>td]:bg-brand-50', deleted && '[&>td]:bg-gray-25 [&>td]:text-gray-400')}
+        className={clsx(
+          picked && '[&>td]:bg-brand-50',
+          deleted && '[&>td]:bg-gray-25 [&>td]:text-gray-400',
+          stale && 'bg-amber-50/20',
+        )}
       >
         <td
           className={clsx(
             'border-b border-r border-gray-100 border-b-gray-200 bg-white px-2 py-1.5 text-center align-top',
             retest && 'shadow-[inset_3px_0_0_#f79009]',
+            stale && 'shadow-[inset_4px_0_0_#f59e0b]',
           )}
         >
           <input
@@ -390,6 +424,8 @@ export function SheetGrid(p: SheetGridProps) {
           const isEditing = editing?.id === tc.testCaseId && editing.col === c.id
           const canEdit = editable(c, tc)
           const nav = focusable(c)
+          const cellColor = p.cellColors?.[`${tc.testCaseId}|${c.id}`] || rowColor
+          const pastelCls = getPastelClass(cellColor)
           return (
             <td
               key={c.id}
@@ -399,8 +435,8 @@ export function SheetGrid(p: SheetGridProps) {
               title={c.kind === 'result' ? resultTooltip(tc, plan, envId, t) : undefined}
               onClick={nav && !isEditing ? (e) => onCellClick(pos, e.detail) : undefined}
               className={clsx(
-                'border-b border-r border-gray-100 border-b-gray-200 px-2 py-1.5 align-top',
-                !picked && !deleted && (canEdit ? 'cursor-cell bg-white hover:bg-gray-25' : 'bg-gray-25 text-gray-600'),
+                'border-b border-r border-gray-100 border-b-gray-200 px-2 py-1.5 align-top transition-colors',
+                pastelCls ? pastelCls : (!picked && !deleted && (canEdit ? 'cursor-cell bg-white hover:bg-gray-25' : 'bg-gray-25 text-gray-600')),
                 deleted && c.kind !== 'key' && 'line-through',
                 (isActive || isEditing) && 'relative z-[1] outline outline-2 -outline-offset-2 outline-brand-500',
                 'focus:outline-none',
@@ -427,6 +463,7 @@ export function SheetGrid(p: SheetGridProps) {
                       canBug: abilities.execute && !deleted,
                       onReqEdit: () => p.onOpenReqPicker(tc),
                       onBug: () => p.onOpenBug(tc),
+                      onInspect: p.onInspect,
                     }}
                   />
                 </div>
@@ -434,7 +471,7 @@ export function SheetGrid(p: SheetGridProps) {
             </td>
           )
         })}
-        <td className="whitespace-nowrap border-b border-gray-200 bg-white px-1 py-1 text-center align-top">
+        <td className="whitespace-nowrap border-b border-gray-200 bg-white px-1 py-1 text-center align-top flex items-center justify-center gap-0.5">
           <button
             type="button"
             className={iconBtn}
@@ -467,12 +504,12 @@ export function SheetGrid(p: SheetGridProps) {
   }
 
   return (
-    <div ref={wrapRef} className="min-h-0 flex-1 overflow-auto" onKeyDown={onGridKey}>
+    <div ref={wrapRef} className="min-h-0 flex-1 overflow-auto pb-24" onKeyDown={onGridKey}>
       <table
         role="grid"
         aria-label={t(`Bảng testcase · ${module.name}`, `Test cases · ${module.name}`)}
         aria-rowcount={navRows.length}
-        className="table-fixed border-separate border-spacing-0 text-[13px]"
+        className="table-fixed border-separate border-spacing-0 text-[13px] mb-16"
         style={{ width: tableWidth }}
       >
         <colgroup>
@@ -480,7 +517,7 @@ export function SheetGrid(p: SheetGridProps) {
           {columns.map((c) => (
             <col key={c.id} style={{ width: widthOf(c) }} />
           ))}
-          <col style={{ width: 72 }} />
+          <col style={{ width: 56 }} />
         </colgroup>
         <thead>
           <tr>
@@ -608,9 +645,10 @@ export function SheetGrid(p: SheetGridProps) {
                         `Thêm nhóm vào mục ${row.top.code} ${row.top.title}`,
                         `Add a group to ${row.top.code} ${row.top.title}`,
                       )}
-                      className="rounded-[6px] border border-dashed border-gray-300 bg-white px-2.5 py-0.5 text-[12.5px] text-gray-600 hover:border-brand-500 hover:text-brand-700"
+                      className="rounded px-2.5 py-1 text-xs font-medium text-gray-500 hover:text-brand-700 hover:bg-gray-100 inline-flex items-center gap-1 transition-colors"
                     >
-                      {t('+ Thêm nhóm', '+ Add group')}
+                      <span>+</span>
+                      <span>{t('Thêm nhóm', 'Add group')}</span>
                     </button>
                   </td>
                 </tr>

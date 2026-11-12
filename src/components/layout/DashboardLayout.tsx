@@ -76,8 +76,8 @@ export function DashboardLayout({
   // Trang dự án / workspace dùng cả khung trắng, sát mép (layout tự đặt lề): header là một dải ngang.
   const fullWidth =
     /^\/(projects|workspaces)\/\d+(\/|$)/.test(pathname) && !/^\/workspaces\/\d+\/projects\/new/.test(pathname)
-  // Tab Tài liệu: khung trắng cao đúng cửa sổ (cây trang + trang tự cuộn bên trong), sidebar thu thành dải icon 56px.
-  const fill = /^\/projects\/\d+\/documents(\/|$)/.test(pathname)
+  // Tab Tài liệu & Test cases: khung trắng cao đúng cửa sổ (cây trang + trang tự cuộn bên trong), sidebar thu thành dải icon 56px.
+  const fill = /^\/projects\/\d+\/(documents(\/|$)|tests\/?$)/.test(pathname)
   const currentProjectId = Number(pathname.match(/^\/projects\/(\d+)/)?.[1] ?? NaN)
   const recentProjects = useRecentProjects(user?.id, currentCompany?.companyId ?? null)
   // Trong dự án sidebar đã là menu dự án nên không thu thành dải icon nữa.

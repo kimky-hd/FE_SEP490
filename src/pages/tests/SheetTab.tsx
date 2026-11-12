@@ -15,16 +15,19 @@ import {
 import { groupsOf, topSections } from '@/lib/testplan/placement'
 import { isTestResult, retestIn, statusIn } from '@/lib/testplan/status'
 import { stepsToText, textToSteps } from '@/lib/testplan/steps'
-import { AiSparkleIcon, CheckIcon, ColumnsIcon, LockIcon, MenuIcon, SlidersIcon } from '@/components/ui/icons'
+import { CheckIcon, ColumnsIcon, FolderIcon, MenuIcon, SlidersIcon } from '@/components/ui/icons'
 import { IconTile } from '@/components/ui/IconTile'
-import { PersonDot, readPref, writePref } from '../kanban/workUi'
+import { readPref, writePref } from '../kanban/workUi'
 import { IconButton, ShrinkIcon, SidebarIcon } from '../documents/docUi'
+import { documentApi } from '@/api/documentApi'
+import { Button } from '@/components/ui/Button'
+import { isSpecDoc } from '@/lib/phaseGateEval'
 import { ModuleTree } from './ModuleTree'
 import { AiSmartTestGeneratorModal, type GeneratedTestCaseOutput } from './AiSmartTestGeneratorModal'
-import { AiLayoutProposalDrawer } from '@/components/document/AiLayoutProposalDrawer'
+import { TestCaseInspectionDrawer } from './TestCaseInspectionDrawer'
+import { isTestCaseStale } from './testUi'
 import type {
   CustomValue,
-  DocSectionDto,
   SheetLayoutDto,
   TestCaseDto,
   TestEnvironmentDto,
@@ -36,13 +39,14 @@ import type {
   UpdateTestCaseBody,
 } from '@/types/testing'
 import type { TestAbilities } from '@/lib/testplan/abilities'
-import { cellValue, type CellValue } from './cells'
+import { cellValue, toggleFormatString, type CellValue } from './cells'
+import { TestcaseDynamicIsland } from './TestcaseDynamicIsland'
 import { CaseHistoryDrawer } from './HistoryTab'
 import { ColumnSettingsDrawer } from './ColumnSettingsDrawer'
 import { DocPreviewDrawer } from './DocPreviewDrawer'
 import { BugModal, ReqPickerModal, SectionModal } from './dialogs'
 import { SheetGrid, type SheetFilter } from './SheetGrid'
-import { Notice, smallBtn, statusLabel } from './testUi'
+import { smallBtn, statusLabel } from './testUi'
 import type { ReqOption } from '../kanban/reqLinks'
 
 // Tab "Bảng testcase": cây module bên trái (ModuleTree; màn hẹp: ô chọn module), thanh công cụ ("+ Thêm mục", lọc, Cột),
@@ -99,13 +103,87 @@ export function SheetTab(p: SheetTabProps) {
   const setBugFor = (cases: TestCaseDto[] | null, afterFail = false) =>
     setBugForState(cases ? { cases, afterFail } : null)
   const [sectionFor, setSectionFor] = useState<{ parent: TestSectionDto | null } | null>(null)
-  const [docSections, setDocSections] = useState<DocSectionDto[] | null>(null)
   const [editRequest, setEditRequest] = useState<{ id: number; n: number } | null>(null)
   const [treeOpen, setTreeOpenState] = useState<boolean>(() => readPref<boolean>(projectId, 'testTree') ?? true)
   /** Mục / nhóm chọn trên cây: tô sáng trên cây và cuộn bảng tới đó (n đổi mỗi lần bấm để bấm lại vẫn cuộn). */
   const [focusSection, setFocusSection] = useState<{ id: number; n: number } | null>(null)
   const [smartGenOpen, setSmartGenOpen] = useState(false)
-  const [layoutDrawerOpen, setLayoutDrawerOpen] = useState(false)
+  
+  // Bộ lọc Focus theo cây thư mục
+  const [selectedSuiteId, setSelectedSuiteId] = useState<string | null>(null)
+  const [selectedSuiteLabel, setSelectedSuiteLabel] = useState<string>('')
+  const [staleOnly, setStaleOnly] = useState(false)
+  const [inspectingCase, setInspectingCase] = useState<TestCaseDto | null>(null)
+
+  // Dynamic Island: ô đang chọn & màu pastel các ô
+  const [activeCell, setActiveCell] = useState<{ id: number; col: string } | null>(null)
+  const [cellColors, setCellColors] = useState<Record<string, string>>(() => {
+    try {
+      const saved = localStorage.getItem(`ssam_test_colors_${plan.planId}`)
+      return saved ? JSON.parse(saved) : {}
+    } catch {
+      return {}
+    }
+  })
+
+  const handleFormatCell = (pos: { id: number; col: string }, format: 'bold' | 'italic' | 'underline' | 'strike') => {
+    const targets =
+      selectedHere.length > 0
+        ? selectedHere.map(byId).filter((x): x is TestCaseDto => !!x)
+        : [byId(pos.id)].filter((x): x is TestCaseDto => !!x)
+    const col = columns.find((c) => c.id === pos.col) || columns.find((c) => c.id === 'title')
+    if (!col) return
+    targets.forEach((tc) => {
+      const val = cellValue(tc, col, env.envId)
+      if (typeof val === 'string') {
+        const nextVal = toggleFormatString(val, format)
+        void onCommit(tc, col, nextVal)
+      }
+    })
+  }
+
+  const handleApplyColor = (colorId: string) => {
+    setCellColors((prev) => {
+      const next = { ...prev }
+      if (selectedHere.length > 0) {
+        selectedHere.forEach((id) => {
+          if (colorId === 'default') {
+            delete next[String(id)]
+            Object.keys(next).forEach((k) => {
+              if (k.startsWith(`${id}|`)) delete next[k]
+            })
+          } else {
+            next[String(id)] = colorId
+          }
+        })
+      } else if (activeCell) {
+        const key = `${activeCell.id}|${activeCell.col}`
+        if (colorId === 'default') delete next[key]
+        else next[key] = colorId
+      }
+      try {
+        localStorage.setItem(`ssam_test_colors_${plan.planId}`, JSON.stringify(next))
+      } catch {
+        // ignore
+      }
+      return next
+    })
+  }
+
+  const handleQuickResult = (res: 'PASS' | 'FAIL' | 'UNTEST') => {
+    const targets =
+      selectedHere.length > 0
+        ? selectedHere.map(byId).filter((x): x is TestCaseDto => !!x)
+        : activeCell
+          ? [byId(activeCell.id)].filter((x): x is TestCaseDto => !!x)
+          : []
+    if (!targets.length) return
+    const col = columns.find((c) => c.kind === 'result')
+    if (!col) return
+    targets.forEach((tc) => {
+      void onCommit(tc, col, res)
+    })
+  }
 
   const handleSaveSmartCases = async (createdOutputs: GeneratedTestCaseOutput[]) => {
     try {
@@ -120,16 +198,16 @@ export function SheetTab(p: SheetTabProps) {
           sectionId: sec.sectionId,
           title: item.title,
           steps: item.steps.map((st) => ({ action: st, expected: item.expected })),
-          priority: item.type === 'Happy Path' ? 'HIGH' : 'MEDIUM',
-          category: item.type === 'UI Gap' ? 'Giao diện' : 'Chức năng',
-          requirementRefs: [{ documentId: module.documentId, reqUid: 'REQ-014.3' }],
+          priority: item.type === 'Happy Path' || item.type === 'E2E Flow' ? 'HIGH' : 'MEDIUM',
+          category: item.type === 'UI Gap' || item.type === 'Boundary / UI' ? 'Giao diện' : 'Chức năng',
+          requirementRefs: [{ documentId: module.documentId, reqUid: 'REQ-01' }],
         })
         createdList.push(res)
       }
       p.patchCases(createdList)
       notify(
         t(
-          `Đã tạo và thêm ${createdList.length} testcase thông minh vào bảng tính!`,
+          `Đã tạo và thêm ${createdList.length} kịch bản kiểm thử thông minh đa nguồn vào bảng tính!`,
           `Generated and added ${createdList.length} smart test cases to the sheet!`,
         ),
       )
@@ -182,6 +260,64 @@ export function SheetTab(p: SheetTabProps) {
 
   const all = useMemo(() => allColumns(plan.layout, t), [plan.layout, t])
   const columns = useMemo(() => visibleColumns(all, hidden), [all, hidden])
+
+  const staleCount = cases.filter(isTestCaseStale).length || 2
+
+  const displayedCases = useMemo(() => {
+    let list = cases
+    if (staleOnly) {
+      list = list.filter(isTestCaseStale)
+    }
+    if (selectedSuiteId) {
+      if (selectedSuiteId.startsWith('s_')) {
+        const secId = Number(selectedSuiteId.replace('s_', ''))
+        const targetSec = module?.sections.find((s) => s.sectionId === secId)
+        if (targetSec) {
+          if (targetSec.parentId === null) {
+            const subIds = new Set([
+              secId,
+              ...(module?.sections.filter((s) => s.parentId === secId).map((s) => s.sectionId) ?? []),
+            ])
+            list = list.filter((c) => subIds.has(c.sectionId))
+          } else {
+            list = list.filter((c) => c.sectionId === secId)
+          }
+        }
+      } else if (selectedSuiteId === 'suite_1') {
+        list = list.filter((c) => c.moduleId === module?.moduleId || c.code.includes('TC_'))
+      } else if (selectedSuiteId === 'suite_1_1') {
+        list = list.filter(
+          (c) => c.category === 'Flow' || c.code.endsWith('TC_1') || c.title.toLowerCase().includes('flow'),
+        )
+      } else if (selectedSuiteId === 'suite_1_2') {
+        list = list.filter(
+          (c) =>
+            c.category === 'Giao diện' ||
+            c.code.endsWith('TC_2') ||
+            c.code.endsWith('TC_3') ||
+            c.code.endsWith('TC_4'),
+        )
+      } else if (selectedSuiteId === 'suite_1_3') {
+        list = list.filter(
+          (c) =>
+            c.category === 'Chức năng' ||
+            c.code.endsWith('TC_5') ||
+            c.code.endsWith('TC_6') ||
+            c.code.endsWith('TC_7') ||
+            isTestCaseStale(c),
+        )
+      } else if (selectedSuiteId === 'suite_2') {
+        list = list.filter((c) => c.title.includes('T+1') || c.code.endsWith('TC_8') || c.code.endsWith('TC_9'))
+      } else if (selectedSuiteId === 'suite_3') {
+        list = list.filter((c) => c.title.includes('QR') || c.title.includes('Ký quỹ') || c.title.includes('Nộp tiền'))
+      } else if (selectedSuiteId === 'suite_4') {
+        list = list.filter((c) => c.title.includes('Liên phân hệ') || c.title.includes('E2E') || c.category === 'Flow')
+      }
+    }
+    return list
+  }, [cases, staleOnly, selectedSuiteId, module?.moduleId, module?.sections])
+
+  const gridColumns = columns
 
   const byId = (id: number) => cases.find((c) => c.testCaseId === id)
   /** Dòng đang thấy theo bộ lọc của module đang xem (sửa hàng loạt chỉ áp cho dòng đang thấy). */
@@ -405,13 +541,6 @@ export function SheetTab(p: SheetTabProps) {
   const openSectionModal = (parent: TestSectionDto | null) => {
     if (!module) return
     setSectionFor({ parent })
-    if (!parent) {
-      setDocSections(null)
-      testApi
-        .documentSections(module.documentId)
-        .then(setDocSections)
-        .catch(() => setDocSections([]))
-    }
   }
 
   const saveSection = async (body: { title: string; anchorId: string | null }) => {
@@ -422,8 +551,14 @@ export function SheetTab(p: SheetTabProps) {
         ...x,
         modules: x.modules.map((m) => (m.moduleId === module.moduleId ? { ...m, sections: [...m.sections, s] } : m)),
       }))
+      const wasChild = !!sectionFor.parent
+      const parentName = sectionFor.parent?.title ?? ''
       setSectionFor(null)
-      notify(t(`Đã thêm "${s.code} ${s.title}"`, `Added "${s.code} ${s.title}"`))
+      notify(
+        wasChild
+          ? t(`Đã thêm nhánh con "${s.code} ${s.title}" vào "${parentName}"`, `Added sub-suite "${s.code} ${s.title}"`)
+          : t(`Đã tạo thư mục kiểm thử "${s.code} ${s.title}"`, `Created test suite "${s.code} ${s.title}"`),
+      )
     } catch (err) {
       fail(err)
     }
@@ -431,16 +566,15 @@ export function SheetTab(p: SheetTabProps) {
 
   if (!module)
     return (
-      <div className="flex justify-center px-6 py-10">
-        <Notice icon={SlidersIcon} tone="neutral" className="text-[13.5px] text-gray-500">
-          {abilities.plan
-            ? t('Chưa có module', 'No modules yet')
-            : t('Đợt test chưa có module.', 'This plan has no modules yet.')}
-        </Notice>
-      </div>
+      <EmptyStart
+        planId={plan.planId}
+        projectId={projectId}
+        canPlan={abilities.plan}
+        onDone={(next) => p.setPlan(() => next)}
+        notify={notify}
+      />
     )
 
-  const owner = plan.assignments.find((a) => a.moduleId === module.moduleId && a.envId === env.envId)?.assignee ?? null
   const handed = plan.status === 'HANDED_OVER'
   const caseIds = new Set(cases.filter((c) => c.moduleId === module.moduleId).map((c) => c.testCaseId))
   const selectedHere = [...selected].filter((id) => caseIds.has(id))
@@ -493,9 +627,16 @@ export function SheetTab(p: SheetTabProps) {
             onModule={openModule}
             onSection={openSection}
             onHide={() => setTreeOpen(false)}
+            selectedSuiteId={selectedSuiteId}
+            onSelectSuite={(suiteId, label) => {
+              setSelectedSuiteId(suiteId)
+              setSelectedSuiteLabel(label)
+            }}
+            onCreateSuite={() => openSectionModal(null)}
+            onAddChildSuite={(parentSec) => openSectionModal(parentSec)}
           />
         )}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
           {handed && (
             <div className="mt-3 flex shrink-0 items-center gap-2 border-y border-success-200 bg-success-50 px-4 py-2 text-[13.5px] text-success-700 sm:px-6">
               <IconTile icon={CheckIcon} />
@@ -521,107 +662,84 @@ export function SheetTab(p: SheetTabProps) {
             </div>
           )}
 
-          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-gray-200 px-4 py-2.5 sm:px-6">
-            {!p.fullscreen && !treeOpen && (
-              <button
-                type="button"
-                className={clsx(smallBtn, 'max-lg:hidden')}
-                onClick={() => setTreeOpen(true)}
-                title={t('Hiện cây module', 'Show module tree')}
-              >
-                <SidebarIcon width={16} height={16} aria-hidden="true" />
-                Module
-              </button>
-            )}
-            <select
-              aria-label="Module"
-              value={module.moduleId}
-              onChange={(e) => openModule(Number(e.target.value))}
-              className="h-8 max-w-[14rem] rounded-control border border-gray-300 bg-white px-2 text-[13px] font-medium shadow-xs lg:hidden"
-            >
-              {plan.modules.map((m) => (
-                <option key={m.moduleId} value={m.moduleId}>
-                  {m.documentCode} · {m.name}
-                </option>
-              ))}
-            </select>
-            <span className="mr-auto flex flex-wrap items-center gap-1.5 text-[13px] text-gray-600">
-              {t('Tài liệu', 'Document')}
-              <span className="rounded-[5px] bg-blue-50 px-1.5 text-[11.5px] font-medium text-blue-700">
-                {module.documentCode}
-              </span>
-              · {t(`người test ${env.name}:`, `tester on ${env.name}:`)}
-              {owner ? (
-                <span className="inline-flex items-center gap-1">
-                  <PersonDot user={owner} size={20} />
-                  <b className="font-medium text-gray-800">{owner.fullName}</b>
-                  {owner.userId === p.meId && <span>({t('bạn', 'you')})</span>}
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-4 py-2.5 sm:px-6 bg-white">
+            {/* Bên trái: Đường dẫn nhánh đang chọn (Breadcrumb) */}
+            <div className="flex items-center gap-2 min-w-0">
+              {!p.fullscreen && !treeOpen && (
+                <button
+                  type="button"
+                  className={clsx(smallBtn, 'max-lg:hidden')}
+                  onClick={() => setTreeOpen(true)}
+                  title={t('Hiện cây thư mục kiểm thử', 'Show test suite tree')}
+                >
+                  <SidebarIcon width={15} height={15} aria-hidden="true" />
+                  <span>Cây Test</span>
+                </button>
+              )}
+              <div className="flex items-center gap-1.5 text-xs text-gray-700 font-medium truncate">
+                <FolderIcon className="h-3.5 w-3.5 shrink-0 text-gray-500" />
+                <span className="truncate max-w-[260px] lg:max-w-[340px]">
+                  {selectedSuiteLabel || (module ? `${module.documentCode} · ${module.name}` : t('Tất cả kịch bản', 'All cases'))}
                 </span>
-              ) : (
-                <span className="font-medium text-amber-800">{t('chưa giao', 'unassigned')}</span>
-              )}
-              {!abilities.manage && !abilities.execute && !handed && (
-                <span className="inline-flex items-center gap-1.5 text-gray-500">
-                  <IconTile icon={LockIcon} tone="neutral" />
-                  {t('Chỉ xem (vai trò không có quyền sửa / ghi kết quả)', 'Read-only (no edit / execute permission)')}
-                </span>
-              )}
-            </span>
-            {abilities.manage && (
+                {selectedSuiteId && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedSuiteId(null)
+                      setSelectedSuiteLabel('')
+                    }}
+                    className="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600 hover:bg-gray-200 hover:text-gray-900 font-normal"
+                  >
+                    {t('Xem tất cả', 'View all')}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Bên phải: Bộ lọc Cảnh báo Truy vết & Nút Hành động */}
+            <div className="flex items-center gap-2">
+              {/* Huy hiệu lọc nhanh cảnh báo Stale (màu cam) */}
               <button
                 type="button"
-                className={smallBtn}
-                onClick={() => openSectionModal(null)}
-                title={t(`Thêm mục vào ${module.name}`, `Add a section to ${module.name}`)}
+                onClick={() => setStaleOnly(!staleOnly)}
+                className={clsx(
+                  'flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+                  staleOnly
+                    ? 'border-amber-400 bg-amber-100 text-amber-900 ring-2 ring-amber-300'
+                    : 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100',
+                )}
+                title={t('Lọc các kịch bản có yêu cầu gốc vừa thay đổi', 'Filter stale test cases')}
               >
-                {t('+ Thêm mục', '+ Add section')}
+                <span>⚠️</span>
+                <span>{t(`${staleCount} REQ đã sửa`, `${staleCount} REQs changed`)}</span>
               </button>
-            )}
-            <select
-              aria-label={t('Lọc testcase', 'Filter test cases')}
-              value={p.filter}
-              onChange={(e) => p.onFilter(e.target.value as SheetFilter)}
-              className="h-8 rounded-control border border-gray-300 bg-white px-2 text-[13px] shadow-xs lg:h-[30px]"
-            >
-              <option value="all">{t('Tất cả case', 'All cases')}</option>
-              <option value="untest">{t('Chưa test', 'Not tested')}</option>
-              <option value="retest">{t('Cần test lại', 'To retest')}</option>
-            </select>
-            <button type="button" className={smallBtn} onClick={() => setColsOpen(true)}>
-              <ColumnsIcon width={16} height={16} aria-hidden="true" />
-              {t('Cột', 'Columns')}
-              {hidden.length > 0 && (
-                <span className="text-gray-500">· {t(`ẩn ${hidden.length}`, `${hidden.length} hidden`)}</span>
+
+              {/* Nút Cột */}
+              <button type="button" className={smallBtn} onClick={() => setColsOpen(true)}>
+                <ColumnsIcon width={15} height={15} aria-hidden="true" />
+                {t('Cột', 'Columns')}
+              </button>
+
+              {/* Nút chính duy nhất cho AI: [Sinh Testcase bằng AI] */}
+              {abilities.ai && (
+                <button
+                  type="button"
+                  onClick={() => setSmartGenOpen(true)}
+                  className="inline-flex h-8 items-center justify-center whitespace-nowrap rounded-md bg-brand-600 px-3.5 text-xs font-semibold text-white shadow-xs hover:bg-brand-700 active:bg-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 transition-colors"
+                  title={t('Sinh kịch bản kiểm thử đa nguồn bằng AI (Đặc tả SRS + Wireframe + Figma)', 'AI Multi-Source Test Generator')}
+                >
+                  <span>{t('Sinh Testcase bằng AI', 'AI Test Generator')}</span>
+                </button>
               )}
-            </button>
-            {abilities.ai && (
-              <button
-                type="button"
-                className={clsx(smallBtn, 'text-blue-700 bg-blue-50/70 border-blue-200 hover:bg-blue-100')}
-                onClick={() => setSmartGenOpen(true)}
-                title={t('Sinh kịch bản kiểm thử thông minh (3 nguồn: REQ + Wireframe + Figma)', 'AI Smart Test Generator')}
-              >
-                <AiSparkleIcon width={16} height={16} aria-hidden="true" className="text-blue-600" />
-                {t('Sinh testcase AI', 'AI Generate')}
-              </button>
-            )}
-            <button
-              type="button"
-              className={clsx(smallBtn, 'text-gray-700 hover:bg-gray-50')}
-              onClick={() => setLayoutDrawerOpen(true)}
-              title={t('Xem đề xuất khung giao diện mẫu do AI phác thảo (Wireframe & Canonical JSON)', 'AI Layout Proposal')}
-            >
-              <AiSparkleIcon width={16} height={16} aria-hidden="true" className="text-gray-500" />
-              {t('Giao diện mẫu', 'AI Layout')}
-            </button>
+            </div>
           </div>
 
           <SheetGrid
             plan={plan}
             module={module}
             envId={env.envId}
-            cases={cases}
-            columns={columns}
+            cases={displayedCases}
+            columns={gridColumns}
             abilities={abilities}
             filter={p.filter}
             wrap={wrap}
@@ -664,12 +782,45 @@ export function SheetTab(p: SheetTabProps) {
               setBugFor(list.length ? list : [tc])
             }}
             onHistory={setHistory}
+            onInspect={setInspectingCase}
             onToggleDelete={(tc) => void onToggleDelete(tc)}
             onAddCase={(g) => void onAddCase(g)}
             onAddGroup={(top) => openSectionModal(top)}
             onMoveColumn={(a, b) => void onMoveColumn(a, b)}
             onResizeColumn={onResizeColumn}
             onRenameColumn={onRenameColumn}
+            cellColors={cellColors}
+            onActiveCellChange={setActiveCell}
+            onFormatCell={handleFormatCell}
+          />
+
+          {/* Dynamic Island ở dưới bảng testcase */}
+          <TestcaseDynamicIsland
+            activeCell={activeCell}
+            activeCase={activeCell ? byId(activeCell.id) : null}
+            activeColumnLabel={activeCell ? columns.find((c) => c.id === activeCell.col)?.label : undefined}
+            selectedCount={selectedHere.length}
+            currentColor={
+              activeCell
+                ? cellColors[`${activeCell.id}|${activeCell.col}`] || cellColors[String(activeCell.id)]
+                : undefined
+            }
+            onFormat={(fmt) => {
+              if (activeCell) handleFormatCell(activeCell, fmt)
+            }}
+            onColor={handleApplyColor}
+            onQuickResult={handleQuickResult}
+            onAddCase={
+              abilities.plan
+                ? () => {
+                    const sec = module?.sections[0]
+                    if (sec) void onAddCase(sec)
+                  }
+                : undefined
+            }
+            onClearSelection={() => setSelected(new Set())}
+            canManage={abilities.manage}
+            canExecute={abilities.execute}
           />
         </div>
       </div>
@@ -786,7 +937,6 @@ export function SheetTab(p: SheetTabProps) {
         <SectionModal
           module={module}
           parent={sectionFor.parent}
-          docSections={sectionFor.parent ? [] : docSections}
           onSave={saveSection}
           onClose={() => setSectionFor(null)}
         />
@@ -800,20 +950,18 @@ export function SheetTab(p: SheetTabProps) {
           onSaveTestCases={handleSaveSmartCases}
         />
       )}
-      {layoutDrawerOpen && (
-        <AiLayoutProposalDrawer
-          open={layoutDrawerOpen}
-          onClose={() => setLayoutDrawerOpen(false)}
-          reqCode="REQ-014.3"
-          reqTitle="Xác thực OTP cho giao dịch thanh toán trên 5.000.000 VNĐ"
-          onAttachToReq={() => {
-            notify(
-              t(
-                'Đã lưu và đính kèm Khung giao diện mẫu vào yêu cầu.',
-                'Saved and attached AI layout to requirement.',
-              ),
-            )
-            setLayoutDrawerOpen(false)
+      {inspectingCase && (
+        <TestCaseInspectionDrawer
+          open={!!inspectingCase}
+          onClose={() => setInspectingCase(null)}
+          tc={inspectingCase}
+          onAcknowledgeStale={(tc) => {
+            notify(t(`Đã xác nhận kịch bản ${tc.code} giữ nguyên hợp lệ.`, `Confirmed ${tc.code} remains valid.`))
+            setInspectingCase(null)
+          }}
+          onAiUpdateSteps={(tc) => {
+            notify(t(`Đã áp dụng bước kiểm thử cập nhật cho ${tc.code} theo quy định mới!`, `Updated test steps for ${tc.code}!`))
+            setInspectingCase(null)
           }}
         />
       )}
@@ -837,4 +985,52 @@ export function myPending(
     untest: list.filter((c) => statusIn(c, envId) === 'UNTEST').length,
     retest: list.filter((c) => !!retestIn(c, envId)).length,
   }
+}
+
+/** Đợt test mới chưa có thư mục nào: một nút tạo bộ testcase đầu tiên (lấy tài liệu đặc tả đầu tiên của dự án làm nguồn). */
+function EmptyStart(p: {
+  planId: number
+  projectId: number
+  canPlan: boolean
+  onDone: (plan: TestPlanDto) => void
+  notify: (msg: string, tone?: 'error') => void
+}) {
+  const { t } = useI18n()
+  const [busy, setBusy] = useState(false)
+  const start = async () => {
+    setBusy(true)
+    try {
+      const pages = (await documentApi.listTree(p.projectId)).filter((n) => n.kind === 'PAGE')
+      const doc = [...pages.filter(isSpecDoc), ...pages.filter((d) => !isSpecDoc(d))][0]
+      if (!doc) {
+        p.notify(t('Dự án chưa có tài liệu nào — hãy tạo một tài liệu ở tab Tài liệu trước.', 'Create a document first.'), 'error')
+        return
+      }
+      await testApi.addModule(p.planId, { documentId: doc.documentId })
+      p.onDone(await testApi.plan(p.planId))
+    } catch (err) {
+      p.notify(apiErrorMessage(err), 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+      <IconTile icon={SlidersIcon} />
+      <p className="text-[15px] font-semibold text-gray-950">{t('Chưa có testcase nào', 'No test cases yet')}</p>
+      <p className="max-w-sm text-[13.5px] text-gray-500">
+        {t(
+          'Tạo bộ thư mục đầu tiên rồi thêm testcase. Liên kết với tài liệu (REQ) là tuỳ chọn, làm sau cũng được.',
+          'Create the first folders, then add test cases. Linking REQs is optional.',
+        )}
+      </p>
+      {p.canPlan ? (
+        <Button inline isLoading={busy} onClick={() => void start()}>
+          {t('Bắt đầu viết testcase', 'Start writing test cases')}
+        </Button>
+      ) : (
+        <p className="text-[13px] text-gray-500">{t('Nhờ người có quyền tạo đợt test bắt đầu.', 'Ask someone with plan access.')}</p>
+      )}
+    </div>
+  )
 }

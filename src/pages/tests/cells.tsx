@@ -8,7 +8,7 @@ import { lastResultIn, retestIn, statusIn } from '@/lib/testplan/status'
 import { stepsToText } from '@/lib/testplan/steps'
 import { PersonDot } from '../kanban/workUi'
 import type { CustomValue, TestCaseDto, TestPlanDto, TestPriority, TestResult } from '@/types/testing'
-import { AiMark, BuildTag, ResultCell, shortDateTime, shortDay } from './testUi'
+import { BuildTag, ResultCell, isTestCaseStale, shortDateTime, shortDay } from './testUi'
 
 // Ô của bảng testcase: giá trị để sửa, hiển thị theo loại cột, ô sửa (editor). Không giữ state — SheetGrid lo.
 
@@ -68,22 +68,38 @@ export interface DisplayCtx {
   onReqClick: (ref: { documentId: number; reqUid: string }) => void
   onReqEdit: () => void
   onBug: () => void
+  onInspect?: (tc: TestCaseDto) => void
 }
 
 /** Hiển thị ô (không sửa). */
 export function CellDisplay({ tc, col, ctx }: { tc: TestCaseDto; col: ColumnDef; ctx: DisplayCtx }): ReactNode {
   const { t } = useI18n()
+  const stale = isTestCaseStale(tc)
   switch (col.kind) {
     case 'key':
       return <span className="font-mono text-[12px] text-gray-600">{tc.code}</span>
     case 'result':
       return <ResultCell status={statusIn(tc, ctx.envId)} flag={retestIn(tc, ctx.envId)} />
     case 'req': {
-      if (!tc.requirements.length)
+      if (!tc.requirements.length && !stale)
         return ctx.canEditReq ? <span className="text-gray-400">{t('+ Gắn REQ', '+ Link REQ')}</span> : <Empty />
       return (
         <span className="flex flex-wrap items-center gap-1">
-          {tc.aiSuggestedReqs && <AiMark />}
+          {stale && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                ctx.onInspect?.(tc)
+              }}
+              title={t('Yêu cầu gốc REQ-01 vừa sửa đổi — Bấm để đối chiếu thay đổi', 'Original requirement changed — Click to inspect diff')}
+              className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-900 border border-amber-300 hover:bg-amber-100 transition-colors cursor-pointer"
+            >
+              <span>⚠️</span>
+              <span className="font-mono font-semibold">REQ-01</span>
+              <span className="text-[10px] text-amber-700">(Đã sửa)</span>
+            </button>
+          )}
           {tc.requirements.map((r) => {
             const label = r.reqKey ?? t('REQ đã xoá', 'REQ removed')
             const title = [r.documentCode, ctx.reqTitle(r.documentId, r.reqUid) ?? r.title, r.changedNote]
@@ -216,7 +232,65 @@ export function CellDisplay({ tc, col, ctx }: { tc: TestCaseDto; col: ColumnDef;
         {col.custom?.unit ? ` ${col.custom.unit}` : ''}
       </span>
     )
-  return String(v)
+  return renderFormattedContent(String(v))
+}
+
+/** Chuyển đổi định dạng văn bản (đậm, nghiêng, gạch chân, gạch ngang) cho ô testcase */
+export function toggleFormatString(str: string, format: 'bold' | 'italic' | 'underline' | 'strike'): string {
+  if (!str) str = ''
+  switch (format) {
+    case 'bold':
+      if (str.startsWith('**') && str.endsWith('**') && str.length >= 4) return str.slice(2, -2)
+      return `**${str}**`
+    case 'italic':
+      if (str.startsWith('*') && str.endsWith('*') && str.length >= 2) return str.slice(1, -1)
+      return `*${str}*`
+    case 'underline':
+      if (str.startsWith('<u>') && str.endsWith('</u>') && str.length >= 7) return str.slice(3, -4)
+      return `<u>${str}</u>`
+    case 'strike':
+      if (str.startsWith('~~') && str.endsWith('~~') && str.length >= 4) return str.slice(2, -2)
+      return `~~${str}~~`
+  }
+}
+
+/** Phân tích và hiển thị văn bản có đánh dấu định dạng nhẹ (**đậm**, *nghiêng*, <u>gạch chân</u>, ~~gạch ngang~~) */
+export function renderFormattedContent(text: string): ReactNode {
+  if (!text || typeof text !== 'string') return text
+  const tokenRegex = /(\*\*[^*]+\*\*|\*[^*]+\*|<u>.*?<\/u>|~~[^~]+~~)/g
+  const parts = text.split(tokenRegex)
+  if (parts.length <= 1) return text
+  return parts.map((part, idx) => {
+    if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) {
+      return (
+        <strong key={idx} className="font-semibold text-gray-950">
+          {part.slice(2, -2)}
+        </strong>
+      )
+    }
+    if (part.startsWith('*') && part.endsWith('*') && part.length >= 2) {
+      return (
+        <em key={idx} className="italic font-medium">
+          {part.slice(1, -1)}
+        </em>
+      )
+    }
+    if (part.startsWith('<u>') && part.endsWith('</u>') && part.length >= 7) {
+      return (
+        <u key={idx} className="underline decoration-gray-400 underline-offset-2">
+          {part.slice(3, -4)}
+        </u>
+      )
+    }
+    if (part.startsWith('~~') && part.endsWith('~~') && part.length >= 4) {
+      return (
+        <s key={idx} className="line-through text-gray-400">
+          {part.slice(2, -2)}
+        </s>
+      )
+    }
+    return part
+  })
 }
 
 /** Chú thích (title) của ô Kết quả: ai ghi, lúc nào, môi trường + build, ghi thay ai. */

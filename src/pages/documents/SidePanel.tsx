@@ -228,7 +228,7 @@ function RequirementsTab({
                 title={t('Mở đề xuất khung giao diện mẫu do AI phác thảo', 'Open AI Layout Proposal')}
               >
                 <AiSparkleIcon className="h-3 w-3 text-blue-600" />
-                <span>{t('✨ Đề xuất Giao diện mẫu', '✨ AI Layout Proposal')}</span>
+                <span>{t('Đề xuất Giao diện mẫu', 'Layout Proposal')}</span>
               </button>
               {stale && canConfirm && (
                 <button

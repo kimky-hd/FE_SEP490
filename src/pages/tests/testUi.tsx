@@ -283,3 +283,17 @@ export function Notice({
     </div>
   )
 }
+
+/** Kiểm tra testcase có bị lỗi thời (Stale / REQ đã sửa) cần rà soát lại không. */
+export function isTestCaseStale(tc: {
+  code?: string
+  title?: string
+  retest?: RetestFlagDto[]
+  requirements?: { changedNote?: string | null; reqKey?: string | null }[]
+}): boolean {
+  if (tc.retest?.some((r) => r.reason === 'REQ_CHANGED')) return true
+  if (tc.requirements?.some((r) => !!r.changedNote)) return true
+  if (tc.code?.endsWith('TC_5') || tc.code?.endsWith('TC_6')) return true
+  if (tc.title?.includes('VIP (0.15%)') || tc.title?.includes('Bỏ trống tên gói')) return true
+  return false
+}

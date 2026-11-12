@@ -433,6 +433,25 @@ function LoadedDocument({
           onPrint={print}
           canDelete={can.delete}
           onDelete={() => onDeleteRequest(node)}
+          onOpenAiLayout={() =>
+            setLayoutProposalReq(
+              requirements[0] ?? {
+                requirementId: 0,
+                documentId: node.documentId,
+                reqUid: 'REQ-01',
+                reqKey: node.code || 'SRS-014',
+                title: node.title,
+                priority: 'HIGH',
+                freshness: 'FRESH',
+                anchorId: '',
+                bodyPreview: '',
+                bodyLength: 0,
+                acceptanceCriteria: [],
+                createdAt: '',
+                updatedAt: '',
+              },
+            )
+          }
         />
 
         {compare && hasBase && (

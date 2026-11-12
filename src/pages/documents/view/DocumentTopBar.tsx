@@ -47,6 +47,7 @@ interface Props {
   onPrint: () => void
   canDelete: boolean
   onDelete: () => void
+  onOpenAiLayout?: () => void
 }
 
 export function DocumentTopBar({
@@ -71,6 +72,7 @@ export function DocumentTopBar({
   onPrint,
   canDelete,
   onDelete,
+  onOpenAiLayout,
 }: Props) {
   const { t } = useI18n()
   const menu = usePopover()
@@ -163,6 +165,16 @@ export function DocumentTopBar({
       )}
       {panelBtn('reqs', reqLabel)}
       {panelBtn('comments', commentLabel)}
+      {onOpenAiLayout && (
+        <button
+          type="button"
+          onClick={onOpenAiLayout}
+          className="hidden md:inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-2xs"
+          title={t('Tạo Khung giao diện mẫu cho tài liệu này', 'Layout Proposal')}
+        >
+          <span>{t('Khung giao diện mẫu', 'Layout Proposal')}</span>
+        </button>
+      )}
       {/* Toàn màn hình đủ chỗ: hiện hết thao tác thay vì giấu trong "…". */}
       {fullscreen && (
         <>

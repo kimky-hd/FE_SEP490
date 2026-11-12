@@ -216,7 +216,7 @@ export function TestSetupPage() {
       )}
       <span className="text-[13px] text-gray-500">
         {t(
-          'Thường chỉ làm một lần khi tạo đợt test; thay đổi lưu ngay.',
+          'Chỉ cần tên đợt và môi trường là đủ để bắt đầu viết testcase; thay đổi lưu ngay.',
           'Usually done once per plan; changes save immediately.',
         )}
       </span>
@@ -447,15 +447,14 @@ export function TestSetupPage() {
 
         <Panel
           icon={FileTextIcon}
-          title={t('Module = tài liệu đặc tả', 'Module = spec document')}
-          step={3}
-          hint={t('Mỗi tài liệu là một module, mỗi § là một mục', 'One module per document, one section per heading')}
+          title={t('Liên kết tài liệu đặc tả (tuỳ chọn)', 'Link spec documents (optional)')}
+                    hint={t('Chỉ cần nếu muốn truy vết REQ; bỏ trống vẫn viết testcase bình thường', 'Only for REQ traceability; leave empty to write tests freely')}
         >
           <div className="overflow-x-auto">
             <table className={tableCls}>
               <thead>
                 <tr>
-                  <th className={thCls}>Module</th>
+                  <th className={thCls}>{t('Nhóm test', 'Group')}</th>
                   <th className={thCls}>{t('Tài liệu nguồn', 'Source document')}</th>
                   <th className={thCls}>{t('Mục lớn (từ tài liệu)', 'Sections (from the document)')}</th>
                   <th className={clsx(thCls, 'w-16 text-right')}>Case</th>
@@ -554,7 +553,7 @@ export function TestSetupPage() {
                               await st.reloadPlan()
                               notify(
                                 t(
-                                  `Đã tạo module ${m.name} — giao người ở bước 4`,
+                                  `Đã tạo module ${m.name} — giao người ở phần Phân công`,
                                   `Created ${m.name} — assign testers in step 4`,
                                 ),
                               )
@@ -562,12 +561,12 @@ export function TestSetupPage() {
                           }
                         >
                           <PlusIcon width={16} height={16} aria-hidden="true" />
-                          {t('Tạo module từ tài liệu', 'Create module from document')}
+                          {t('Liên kết tài liệu', 'Link document')}
                         </button>
                       </span>
                     ) : (
                       <span className="text-[13px] text-gray-500">
-                        {t('Mọi tài liệu đã là module.', 'Every document is already a module.')}
+                        {t('Mọi tài liệu đã được liên kết.', 'Every document is already linked.')}
                       </span>
                     )}
                   </td>
@@ -577,12 +576,12 @@ export function TestSetupPage() {
           </div>
         </Panel>
 
-        <Panel icon={UsersIcon} title={t('Phân công', 'Assignments')} step={4}>
+        <Panel icon={UsersIcon} title={t('Phân công người test (tuỳ chọn)', 'Assign testers (optional)')}>
           <div className="overflow-x-auto">
             <table className={tableCls}>
               <thead>
                 <tr>
-                  <th className={thCls}>Module</th>
+                  <th className={thCls}>{t('Nhóm test', 'Group')}</th>
                   {plan.environments.map((e) => (
                     <th key={e.envId} className={thCls}>
                       {e.name}
